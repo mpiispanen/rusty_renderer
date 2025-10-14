@@ -1,0 +1,33 @@
+[package]
+name = "rusty_renderer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Matias Piispanen <matias.piispanen@gmail.com>"]
+description = "A multi-backend 3D renderer supporting Vulkan, DirectX 12, and wgpu"
+repository = "https://github.com/mpiispanen/rusty_renderer"
+license = "MIT"
+readme = "README.md"
+keywords = ["graphics", "rendering", "vulkan", "directx", "wgpu"]
+categories = ["graphics", "rendering"]
+
+[dependencies]
+# Dependencies will be added in subsequent milestones
+# - winit: Window creation and event handling (M1)
+# - clap: Command-line argument parsing (M1)
+# - log, env_logger: Logging infrastructure (M1)
+# - anyhow: Error handling (M1)
+# - vulkanalia: Vulkan bindings (M3)
+# - windows: DirectX 12 bindings (M4)
+# - wgpu: WebGPU abstraction (M4)
+
+[dev-dependencies]
+# Test dependencies will be added in M1
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
