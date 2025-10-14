@@ -1,2 +1,162 @@
-# rusty_renderer
-A cross platform graphics rendering sandbox developed in Rust to aid learning Rust and AI driven development
+# Rusty Renderer
+
+[![CI](https://github.com/mpiispanen/rusty_renderer/actions/workflows/ci.yml/badge.svg)](https://github.com/mpiispanen/rusty_renderer/actions/workflows/ci.yml)
+
+A multi-backend 3D renderer in Rust supporting Vulkan, DirectX 12, and wgpu.
+
+This is a cross-platform graphics rendering sandbox developed in Rust to aid learning Rust and AI-driven development.
+
+## Features
+
+- **Multi-backend support**: Vulkan (via vulkanalia), DirectX 12 (Windows), and wgpu
+- **Modern architecture**: Render graph system for automatic dependency management
+- **Cross-platform**: Linux, Windows, and macOS support
+- **Well-tested**: Comprehensive unit and integration tests
+- **CI/CD**: Automated builds, tests, and checks
+
+## Building
+
+### Prerequisites
+
+- Rust 1.70+ (install from [rustup.rs](https://rustup.rs))
+- Platform-specific graphics drivers:
+  - **Linux**: Vulkan drivers (usually included with GPU drivers)
+  - **Windows**: DirectX 12 compatible GPU
+  - **All platforms**: wgpu fallback available
+
+### Build Instructions
+
+```bash
+# Clone the repository
+git clone https://github.com/mpiispanen/rusty_renderer.git
+cd rusty_renderer
+
+# Build in debug mode
+cargo build
+
+# Build in release mode
+cargo build --release
+
+# Run
+cargo run
+
+# Run with options
+cargo run -- --backend vulkan --width 1920 --height 1080
+```
+
+## Command-Line Options
+
+```
+Usage: rusty_renderer [OPTIONS]
+
+Options:
+  -b, --backend <BACKEND>    Graphics backend [default: vulkan] [possible values: vulkan, wgpu]
+      --width <WIDTH>        Window width [default: 1280]
+      --height <HEIGHT>      Window height [default: 720]
+  -d, --debug                Enable debug mode and validation layers
+      --vsync                Enable VSync [default: true]
+      --log-level <LEVEL>    Log level [default: info] [possible values: off, error, warn, info, debug, trace]
+  -h, --help                 Print help
+  -V, --version              Print version
+```
+
+## Testing
+
+```bash
+# Run all tests
+cargo test
+
+# Run specific test
+cargo test test_name
+
+# Run with output
+cargo test -- --nocapture
+```
+
+## Development
+
+### Code Quality
+
+```bash
+# Format code
+cargo fmt
+
+# Check formatting
+cargo fmt -- --check
+
+# Run linter
+cargo clippy
+
+# Build documentation
+cargo doc --open
+```
+
+### CI/CD
+
+The project uses GitHub Actions for continuous integration. All commits are:
+- Built in release mode
+- Tested
+- Linted with clippy
+- Format-checked
+- Documentation is verified
+
+See `.github/workflows/ci.yml` for details.
+
+For self-hosted runner setup (needed for GPU testing), see [docs/SELF_HOSTED_RUNNER.md](docs/SELF_HOSTED_RUNNER.md).
+
+## Project Structure
+
+```
+rusty_renderer/
+├── src/
+│   ├── main.rs              # Application entry point
+│   ├── app.rs               # Application framework and event loop
+│   ├── config.rs            # Configuration and CLI parsing
+│   ├── backends/            # Graphics backend abstractions
+│   ├── render_graph/        # Render graph system
+│   ├── scene/               # Scene management
+│   ├── shaders/             # Shader management
+│   ├── ui/                  # User interface
+│   └── profiling/           # Performance profiling
+├── tests/                   # Integration tests
+├── shaders/                 # Shader source files
+├── assets/                  # Test assets
+└── docs/                    # Documentation
+```
+
+## Documentation
+
+- [Design Document](docs/DESIGN.md) - Architecture and technical decisions
+- [Milestones](docs/MILESTONES.md) - Development roadmap
+- [Self-Hosted Runner Setup](docs/SELF_HOSTED_RUNNER.md) - CI/CD runner configuration
+
+## Milestones
+
+- [x] **M1: Project Foundation** - Basic structure, CLI, CI/CD
+- [ ] **M2: Backend Abstraction** - Stub implementations for all backends
+- [ ] **M3: Vulkan Triangle** - First graphics output
+- [ ] **M4: Multi-Backend Triangle** - DirectX and wgpu support
+- [ ] **M5: Render Graph** - Advanced rendering pipeline
+
+See [docs/MILESTONES.md](docs/MILESTONES.md) for detailed milestone plans.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+This is primarily a learning project, but suggestions and feedback are welcome!
+
+1. Check existing issues or create a new one
+2. Fork the repository
+3. Create a feature branch
+4. Make your changes
+5. Run tests and formatting
+6. Submit a pull request
+
+## Acknowledgments
+
+- Built as a learning project for Rust and modern graphics programming
+- Inspired by production renderers like Frostbite, Unreal Engine, and Unity
+- Developed with AI assistance for accelerated learning
