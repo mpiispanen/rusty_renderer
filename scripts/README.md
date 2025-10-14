@@ -2,6 +2,13 @@
 
 This directory contains helper scripts for setting up GitHub milestones and issues.
 
+## Quick Start for New Sessions
+
+```bash
+# Get full context and status
+./scripts/session_status.sh
+```
+
 ## Usage
 
 ### 1. Create Milestones
@@ -19,6 +26,19 @@ This creates all 5 milestones (M1-M5) in your GitHub repository.
 ```
 
 This creates all 5 issues for Milestone 1: Project Foundation.
+
+### 3. Check Session Status
+
+```bash
+./scripts/session_status.sh
+```
+
+Shows:
+- Git status and pending commits
+- Recent commits
+- GitHub milestones status
+- Project structure status
+- Next steps
 
 ## Prerequisites
 
