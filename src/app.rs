@@ -73,7 +73,7 @@ impl ApplicationHandler for App {
                     self.window = Some(window);
                 }
                 Err(e) => {
-                    log::error!("Failed to create window: {}", e);
+                    log::error!("Failed to create window: {e}");
                     event_loop.exit();
                 }
             }
