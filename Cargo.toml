@@ -30,7 +30,8 @@ env_logger = "0.11"
 # - wgpu: WebGPU abstraction (M4)
 
 [dev-dependencies]
-# Test dependencies will be added in M1
+# Test dependencies
+env_logger = "0.11"
 
 [profile.dev]
 opt-level = 0
