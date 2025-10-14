@@ -1,7 +1,7 @@
 # Rusty Renderer - Session Context
 
 **Last Updated:** 2025-10-14  
-**Current Phase:** Initial Setup & Planning
+**Current Phase:** Milestone 1 Complete - Ready for Milestone 2
 
 ## 📍 Current Status
 
@@ -12,26 +12,34 @@
 - ✅ Milestone breakdown documented (docs/MILESTONES.md, docs/GITHUB_SETUP.md)
 - ✅ GitHub CLI scripts created for milestone/issue creation
 - ✅ Documentation conversion script (markdown → HTML)
+- ✅ **MILESTONE 1 COMPLETE:** Project Foundation
+  - ✅ Cargo workspace structure set up
+  - ✅ Basic application framework implemented (app.rs, main.rs, lib.rs)
+  - ✅ Command-line argument parsing (clap with config.rs)
+  - ✅ CI/CD pipeline configured (GitHub Actions with caching)
+  - ✅ Testing infrastructure created (12 tests passing)
+  - ✅ CI validated and passing (run #18511049136)
 
 ### What's Next
-1. **Push changes to GitHub** (`git push origin main`)
-2. **Create GitHub milestones** (`./scripts/create_milestones.sh`)
-3. **Create Milestone 1 issues** (`./scripts/create_m1_issues.sh`)
-4. **Start Milestone 1 implementation**
+1. **Start Milestone 2: Window Management & Event Loop**
+   - Implement window creation with winit
+   - Event loop and input handling
+   - Window resize handling
+   - Basic error reporting
 
 ### Current Branch
-- `main` - 4 commits ahead of origin
+- `main` - up to date with origin, all CI passing
 
 ## 🎯 Active Milestone
 
-**Milestone 1: Project Foundation** (Not yet started)
+**Milestone 1: Project Foundation** ✅ COMPLETE
 
-Issues to create (via script):
-1. Set up Cargo workspace structure
-2. Implement basic application framework
-3. Add command-line argument parsing
-4. Set up CI/CD pipeline
-5. Create testing infrastructure
+Completed items:
+1. ✅ Set up Cargo workspace structure - Basic Cargo.toml with dependencies
+2. ✅ Implement basic application framework - app.rs with App struct, renderer framework
+3. ✅ Add command-line argument parsing - clap integration with Config struct
+4. ✅ Set up CI/CD pipeline - GitHub Actions with build, test, clippy, format, docs jobs
+5. ✅ Create testing infrastructure - Unit tests for config, integration test framework
 
 ## 📁 Project Structure
 
@@ -48,23 +56,26 @@ rusty_renderer/
 │   ├── create_m1_issues.sh     # Create M1 issues
 │   └── README.md
 ├── .github/
-│   └── ISSUE_TEMPLATE/     # Issue templates
-├── LICENSE
-└── README.md
-
-# To be created in M1:
-├── src/                    # Source code (M1)
-│   ├── main.rs
-│   ├── app.rs
-│   ├── backends/
-│   ├── render_graph/
-│   ├── scene/
-│   ├── shaders/
-│   ├── ui/
-│   └── profiling/
-├── tests/                  # Integration tests (M1)
+│   ├── ISSUE_TEMPLATE/     # Issue templates
+│   └── workflows/
+│       └── ci.yml          # CI/CD pipeline (M1 ✅)
+├── src/                    # Source code (M1 ✅)
+│   ├── main.rs            # Entry point with CLI parsing
+│   ├── lib.rs             # Library exports
+│   ├── app.rs             # Main App struct and run loop
+│   ├── config.rs          # Configuration handling
+│   ├── backends/          # Backend trait (stub)
+│   ├── render_graph/      # Render graph (stub)
+│   ├── scene/             # Scene management (stub)
+│   ├── shaders/           # Shader utilities (stub)
+│   ├── ui/                # UI integration (stub)
+│   └── profiling/         # Profiling (stub)
+├── tests/                 # Integration tests (M1 ✅)
+│   └── backend_test.rs    # Backend loading tests
 ├── shaders/               # Shader files (M3+)
-└── assets/                # Test assets (M7+)
+├── assets/                # Test assets (M7+)
+├── Cargo.toml             # Project metadata and deps
+└── LICENSE
 ```
 
 ## 🔑 Key Decisions & Architecture
@@ -98,6 +109,34 @@ rusty_renderer/
 
 ## 🛠️ Quick Commands
 
+### Build and Test
+```bash
+# Build (debug)
+cargo build
+
+# Build (release)
+cargo build --release
+
+# Test
+cargo test
+
+# Lint
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Format
+cargo fmt --all
+
+# Check formatting
+cargo fmt --all -- --check
+
+# Build docs
+cargo doc --no-deps
+
+# Run application
+cargo run -- --help
+cargo run -- --backend vulkan --width 1920 --height 1080
+```
+
 ### Documentation
 ```bash
 # Generate HTML docs
@@ -105,62 +144,71 @@ rusty_renderer/
 
 # View design doc
 cat docs/DESIGN.md
+
+# View milestones
+cat docs/MILESTONES.md
 ```
 
-### GitHub Setup (when ready)
+### CI Status
 ```bash
-# Push changes
-git push origin main
+# View recent workflow runs
+gh run list --limit 5
 
-# Create milestones
-./scripts/create_milestones.sh
+# View specific run details
+gh run view <run_id>
 
-# Create M1 issues
-./scripts/create_m1_issues.sh
-
-# View issues
-gh issue list --milestone "M1: Project Foundation"
+# Check failed job logs
+gh run view <run_id> --log-failed
 ```
 
-### Development (after M1 setup)
+### Git
 ```bash
-# Build
-cargo build
+# Check status
+git status
 
-# Test
-cargo test
+# View recent commits
+git log --oneline -10
 
-# Lint
-cargo clippy
-
-# Format
-cargo fmt
+# View specific commit
+git show <commit_sha>
 ```
 
 ## 🚀 Starting a New Session
 
-1. **Review this file** (`SESSION_CONTEXT.md`)
-2. **Check git status** (`git status`)
-3. **Review current milestone** (`gh issue list --milestone "M1: Project Foundation"` or check docs/MILESTONES.md)
-4. **Check design doc** for architecture reference (`docs/DESIGN.md`)
+1. **Review this file** (`SESSION_CONTEXT.md`) - Current status and recent work
+2. **Check git status** (`git status`) - Verify clean working tree
+3. **Review current milestone** - Check docs/MILESTONES.md for M2 details
+4. **Run tests** (`cargo test`) - Ensure everything still works
+5. **Check CI status** (`gh run list --limit 3`) - Verify latest runs passed
 
 ## 💡 Notes for AI Assistant
 
-- Project is in **initial planning phase**
-- No Rust code exists yet - will be created in Milestone 1
+- **Milestone 1 is COMPLETE** ✅
+- Project has basic Rust structure with:
+  - App framework (app.rs with run loop)
+  - CLI parsing (clap with config.rs)  
+  - CI/CD pipeline (GitHub Actions with caching)
+  - Testing infrastructure (12 tests passing)
+- Ready to start **Milestone 2: Window Management & Event Loop**
 - Focus on Vulkan first, then DirectX, then wgpu for each feature
 - Keep implementations minimal and focused
 - Update SESSION_CONTEXT.md when significant progress is made
 - macOS support is explicitly out of scope
+- CI uses self-hosted runner on Bazzite Linux
+
+## 🐛 Known Issues
+
+- CI job completion detection: GitHub Actions can show "in_progress" status even after job completes successfully. Always verify with `gh run view <run_id>` or check the actual workflow conclusion field.
 
 ## 📝 Recent Commits
 
-```bash
-git log --oneline -5
+Latest (from `git log --oneline -5`):
+```
+6ba10e8 (HEAD -> main, origin/main) Establish proper CI-validated workflow
+1467b10 Create testing infrastructure
+03a1120 Document disk space warning on Bazzite
+507b6ca Set up CI/CD pipeline
+2b7bf4e Add command-line argument parsing
 ```
 
-Latest:
-- Add GitHub CLI scripts for milestone and issue creation
-- Restructure milestone tracking to use proper GitHub milestones
-- Add GitHub issue templates and milestone tracking
-- Initial design document and documentation structure
+**Latest CI Run:** #18511049136 - ✅ SUCCESS (2025-10-14T21:49:03Z)
