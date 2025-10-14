@@ -124,13 +124,25 @@ rusty_renderer/
 └── docs/                    # Documentation
 ```
 
-## Documentation
+## Project Documentation
 
-- [Design Document](docs/DESIGN.md) - Architecture and technical decisions
-- [Milestones](docs/MILESTONES.md) - Development roadmap
-- [Self-Hosted Runner Setup](docs/SELF_HOSTED_RUNNER.md) - CI/CD runner configuration
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
+- **[docs/WORKFLOW.md](docs/WORKFLOW.md)** - Development workflow and CI requirements
+- [docs/DESIGN.md](docs/DESIGN.md) - Architecture and technical decisions
+- [docs/MILESTONES.md](docs/MILESTONES.md) - Development roadmap
+- [docs/SELF_HOSTED_RUNNER.md](docs/SELF_HOSTED_RUNNER.md) - CI/CD runner setup
 
 ## Milestones
+
+- [x] **M1: Project Foundation** - Basic structure, CLI, CI/CD
+- [ ] **M2: Backend Abstraction** - Stub implementations for all backends
+- [ ] **M3: Vulkan Triangle** - First graphics output
+- [ ] **M4: Multi-Backend Triangle** - DirectX and wgpu support
+- [ ] **M5: Render Graph** - Advanced rendering pipeline
+
+See [docs/MILESTONES.md](docs/MILESTONES.md) for detailed milestone plans.
+
+## Acknowledgments
 
 - [x] **M1: Project Foundation** - Basic structure, CLI, CI/CD
 - [ ] **M2: Backend Abstraction** - Stub implementations for all backends
@@ -148,14 +160,28 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 This is primarily a learning project, but suggestions and feedback are welcome!
 
+**Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/WORKFLOW.md](docs/WORKFLOW.md) before contributing.**
+
+Key points:
+1. Run local checks before pushing (`cargo test`, `cargo clippy`, `cargo fmt`)
+2. **Wait for CI to pass** before closing issues
+3. Follow the workflow in [docs/WORKFLOW.md](docs/WORKFLOW.md)
+
+Quick start:
 1. Check existing issues or create a new one
 2. Fork the repository
-3. Create a feature branch
-4. Make your changes
-5. Run tests and formatting
-6. Submit a pull request
+3. Make your changes following [CONTRIBUTING.md](CONTRIBUTING.md)
+4. Run tests and formatting locally
+5. Submit changes and **wait for CI** ✅
+6. Address any CI failures
 
-## Acknowledgments
+## Project Documentation
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** - How to contribute
+- **[docs/WORKFLOW.md](docs/WORKFLOW.md)** - Development workflow and CI requirements
+- [docs/DESIGN.md](docs/DESIGN.md) - Architecture and technical decisions
+- [docs/MILESTONES.md](docs/MILESTONES.md) - Development roadmap
+- [docs/SELF_HOSTED_RUNNER.md](docs/SELF_HOSTED_RUNNER.md) - CI/CD runner setup
 
 - Built as a learning project for Rust and modern graphics programming
 - Inspired by production renderers like Frostbite, Unreal Engine, and Unity

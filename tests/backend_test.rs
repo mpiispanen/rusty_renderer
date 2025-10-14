@@ -11,5 +11,5 @@ fn test_backend_module_exists() {
 
     // This test verifies that the backend module compiles and is accessible
     // Actual backend trait and implementation tests will be added in M2
-    assert!(true, "Backend module exists and compiles");
+    // Just calling setup successfully means the module structure is correct
 }
