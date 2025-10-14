@@ -168,6 +168,24 @@ systemctl --user stop github-runner.service
 systemctl --user disable github-runner.service
 ```
 
+## Known Issues
+
+### Disk Space Warning on Bazzite
+
+You may see warnings like "You are running out of disk space. Free space left: 0 MB" in GitHub Actions logs. This is a **false positive** due to Bazzite's architecture:
+
+- Bazzite uses composefs for the root filesystem (`/`), which is read-only and shows as 100% full
+- This is normal and expected for immutable Linux distributions
+- Actual work happens in `/var/home` which has plenty of space
+- The warning doesn't affect job execution - jobs will complete successfully
+
+To verify actual disk space:
+```bash
+df -h /var/home
+```
+
+This is a known limitation of the GitHub Actions runner's disk space check and can be safely ignored on Bazzite.
+
 ## Troubleshooting
 
 ### Runner Not Starting After Reboot
