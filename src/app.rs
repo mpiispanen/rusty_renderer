@@ -3,6 +3,7 @@
 //! This module provides the main application structure, event loop,
 //! and window management using winit.
 
+use crate::config::Config;
 use anyhow::Result;
 use winit::{
     application::ApplicationHandler,
@@ -14,32 +15,39 @@ use winit::{
 /// Main application structure
 pub struct App {
     window: Option<Window>,
+    config: Config,
 }
 
 impl App {
-    /// Create a new application instance
-    pub fn new() -> Self {
+    /// Create a new application instance with the given configuration
+    pub fn new(config: Config) -> Self {
         log::info!("Creating application");
-        Self { window: None }
+        log::info!("Backend: {}", config.backend);
+        log::info!(
+            "Window size: {}x{}",
+            config.window_size().0,
+            config.window_size().1
+        );
+        log::info!("Debug mode: {}", config.debug);
+        log::info!("VSync: {}", config.vsync);
+
+        Self {
+            window: None,
+            config,
+        }
     }
 
     /// Run the application event loop
-    pub fn run() -> Result<()> {
+    pub fn run(config: Config) -> Result<()> {
         log::info!("Starting Rusty Renderer");
 
         let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Poll);
 
-        let mut app = App::new();
+        let mut app = App::new(config);
         event_loop.run_app(&mut app)?;
 
         Ok(())
-    }
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -50,7 +58,10 @@ impl ApplicationHandler for App {
 
             let window_attributes = Window::default_attributes()
                 .with_title("Rusty Renderer")
-                .with_inner_size(winit::dpi::LogicalSize::new(1280, 720));
+                .with_inner_size(winit::dpi::LogicalSize::new(
+                    self.config.width,
+                    self.config.height,
+                ));
 
             match event_loop.create_window(window_attributes) {
                 Ok(window) => {
