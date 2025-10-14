@@ -3,16 +3,7 @@
 //! This is the main entry point for the Rusty Renderer application.
 
 use anyhow::Result;
-
-// Module declarations
-mod app;
-mod backends;
-mod config;
-mod profiling;
-mod render_graph;
-mod scene;
-mod shaders;
-mod ui;
+use rusty_renderer::{app, config};
 
 fn main() -> Result<()> {
     // Parse command-line arguments

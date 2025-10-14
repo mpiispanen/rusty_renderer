@@ -1,0 +1,14 @@
+//! Rusty Renderer - A multi-backend 3D renderer in Rust
+//!
+//! This crate provides a flexible 3D rendering framework with support for
+//! multiple graphics backends (Vulkan, DirectX 12, wgpu).
+
+// Module declarations - public for testing and library use
+pub mod app;
+pub mod backends;
+pub mod config;
+pub mod profiling;
+pub mod render_graph;
+pub mod scene;
+pub mod shaders;
+pub mod ui;
