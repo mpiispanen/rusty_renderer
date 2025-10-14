@@ -14,6 +14,9 @@ categories = ["graphics", "rendering"]
 # Window and event handling
 winit = "0.30"
 
+# Command-line argument parsing
+clap = { version = "4.5", features = ["derive"] }
+
 # Error handling
 anyhow = "1.0"
 
@@ -22,7 +25,6 @@ log = "0.4"
 env_logger = "0.11"
 
 # Future dependencies:
-# - clap: Command-line argument parsing (M1, Issue #3)
 # - vulkanalia: Vulkan bindings (M3)
 # - windows: DirectX 12 bindings (M4)
 # - wgpu: WebGPU abstraction (M4)
