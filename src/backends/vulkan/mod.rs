@@ -54,6 +54,15 @@ pub struct VulkanBackend {
     pipeline: vk::Pipeline,
     framebuffers: Vec<vk::Framebuffer>,
 
+    // Command buffers and synchronization
+    command_pool: vk::CommandPool,
+    command_buffers: Vec<vk::CommandBuffer>,
+    image_available_semaphores: Vec<vk::Semaphore>,
+    render_finished_semaphores: Vec<vk::Semaphore>,
+    in_flight_fences: Vec<vk::Fence>,
+    current_frame: usize,
+    image_index: u32,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -89,6 +98,13 @@ impl VulkanBackend {
             pipeline_layout: vk::PipelineLayout::null(),
             pipeline: vk::Pipeline::null(),
             framebuffers: vec![],
+            command_pool: vk::CommandPool::null(),
+            command_buffers: vec![],
+            image_available_semaphores: vec![],
+            render_finished_semaphores: vec![],
+            in_flight_fences: vec![],
+            current_frame: 0,
+            image_index: 0,
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -721,6 +737,129 @@ impl VulkanBackend {
         }
         self.framebuffers.clear();
     }
+
+    /// Create command pool
+    fn create_command_pool(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+
+        let indices = QueueFamilyIndices::get(instance, self.physical_device, self.surface);
+
+        let info = vk::CommandPoolCreateInfo::builder()
+            .queue_family_index(indices.graphics)
+            .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+
+        self.command_pool = unsafe { device.create_command_pool(&info, None)? };
+
+        log::info!("Command pool created");
+        Ok(())
+    }
+
+    /// Create command buffers
+    fn create_command_buffers(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let allocate_info = vk::CommandBufferAllocateInfo::builder()
+            .command_pool(self.command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(self.framebuffers.len() as u32);
+
+        self.command_buffers = unsafe { device.allocate_command_buffers(&allocate_info)? };
+
+        log::info!("Created {} command buffers", self.command_buffers.len());
+        Ok(())
+    }
+
+    /// Create synchronization objects
+    fn create_sync_objects(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        const MAX_FRAMES_IN_FLIGHT: usize = 2;
+
+        let semaphore_info = vk::SemaphoreCreateInfo::builder();
+        let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
+
+        for _ in 0..MAX_FRAMES_IN_FLIGHT {
+            self.image_available_semaphores
+                .push(unsafe { device.create_semaphore(&semaphore_info, None)? });
+            self.render_finished_semaphores
+                .push(unsafe { device.create_semaphore(&semaphore_info, None)? });
+            self.in_flight_fences
+                .push(unsafe { device.create_fence(&fence_info, None)? });
+        }
+
+        log::info!("Created synchronization objects for {MAX_FRAMES_IN_FLIGHT} frames in flight");
+        Ok(())
+    }
+
+    /// Record command buffer for a specific image index
+    fn record_command_buffer(&self, image_index: usize) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let command_buffer = self.command_buffers[image_index];
+
+        let begin_info = vk::CommandBufferBeginInfo::builder();
+
+        unsafe {
+            device.begin_command_buffer(command_buffer, &begin_info)?;
+        }
+
+        let clear_values = &[vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 1.0],
+            },
+        }];
+
+        let render_pass_info = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.render_pass)
+            .framebuffer(self.framebuffers[image_index])
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain_extent,
+            })
+            .clear_values(clear_values);
+
+        unsafe {
+            device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_info,
+                vk::SubpassContents::INLINE,
+            );
+
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline,
+            );
+
+            // Draw triangle (3 vertices, no vertex buffer - hardcoded in shader)
+            device.cmd_draw(command_buffer, 3, 1, 0, 0);
+
+            device.cmd_end_render_pass(command_buffer);
+            device.end_command_buffer(command_buffer)?;
+        }
+
+        Ok(())
+    }
+
+    /// Destroy synchronization objects
+    fn destroy_sync_objects(&mut self) {
+        if let Some(device) = &self.device {
+            unsafe {
+                for &semaphore in &self.image_available_semaphores {
+                    device.destroy_semaphore(semaphore, None);
+                }
+                for &semaphore in &self.render_finished_semaphores {
+                    device.destroy_semaphore(semaphore, None);
+                }
+                for &fence in &self.in_flight_fences {
+                    device.destroy_fence(fence, None);
+                }
+            }
+        }
+        self.image_available_semaphores.clear();
+        self.render_finished_semaphores.clear();
+        self.in_flight_fences.clear();
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -771,17 +910,119 @@ impl GraphicsBackend for VulkanBackend {
         self.create_framebuffers()
             .context("Failed to create framebuffers")?;
 
+        // Create command pool
+        self.create_command_pool()
+            .context("Failed to create command pool")?;
+
+        // Create command buffers
+        self.create_command_buffers()
+            .context("Failed to create command buffers")?;
+
+        // Create synchronization objects
+        self.create_sync_objects()
+            .context("Failed to create synchronization objects")?;
+
         log::info!("Vulkan backend initialized");
         Ok(())
     }
 
     fn begin_frame(&mut self) -> Result<()> {
-        // Will be implemented in issue #25
+        let device = match self.device.as_ref() {
+            Some(d) => d,
+            None => return Ok(()), // Not initialized yet
+        };
+
+        // Wait for fence
+        let in_flight_fence = self.in_flight_fences[self.current_frame];
+        unsafe {
+            device.wait_for_fences(&[in_flight_fence], true, u64::MAX)?;
+        }
+
+        // Acquire next image
+        let image_available = self.image_available_semaphores[self.current_frame];
+        let result = unsafe {
+            device.acquire_next_image_khr(
+                self.swapchain_khr,
+                u64::MAX,
+                image_available,
+                vk::Fence::null(),
+            )
+        };
+
+        let image_index = match result {
+            Ok((index, _)) => index as usize,
+            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => {
+                self.swapchain_outdated = true;
+                return Ok(());
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        self.image_index = image_index as u32;
+
+        // Reset fence
+        unsafe {
+            device.reset_fences(&[in_flight_fence])?;
+        }
+
+        // Record command buffer
+        self.record_command_buffer(image_index)?;
+
         Ok(())
     }
 
     fn end_frame(&mut self) -> Result<()> {
-        // Will be implemented in issue #25
+        let device = match self.device.as_ref() {
+            Some(d) => d,
+            None => return Ok(()), // Not initialized yet
+        };
+
+        if self.swapchain_outdated {
+            return Ok(());
+        }
+
+        let wait_semaphores = &[self.image_available_semaphores[self.current_frame]];
+        let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
+        let command_buffers = &[self.command_buffers[self.image_index as usize]];
+        let signal_semaphores = &[self.render_finished_semaphores[self.current_frame]];
+
+        let submit_info = vk::SubmitInfo::builder()
+            .wait_semaphores(wait_semaphores)
+            .wait_dst_stage_mask(wait_stages)
+            .command_buffers(command_buffers)
+            .signal_semaphores(signal_semaphores);
+
+        let in_flight_fence = self.in_flight_fences[self.current_frame];
+
+        unsafe {
+            device.queue_submit(self.graphics_queue, &[submit_info], in_flight_fence)?;
+        }
+
+        let swapchains = &[self.swapchain_khr];
+        let image_indices = &[self.image_index];
+
+        let present_info = vk::PresentInfoKHR::builder()
+            .wait_semaphores(signal_semaphores)
+            .swapchains(swapchains)
+            .image_indices(image_indices);
+
+        let result = unsafe { device.queue_present_khr(self.present_queue, &present_info) };
+
+        let changed = match result {
+            Ok(vk::SuccessCode::SUCCESS) => false,
+            Ok(vk::SuccessCode::SUBOPTIMAL_KHR) => true,
+            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => true,
+            Err(e) => return Err(e.into()),
+            Ok(_) => false,
+        };
+
+        if changed {
+            self.swapchain_outdated = true;
+        }
+
+        // Advance to next frame
+        self.current_frame = (self.current_frame + 1) % self.in_flight_fences.len();
+
         Ok(())
     }
 
@@ -798,6 +1039,14 @@ impl GraphicsBackend for VulkanBackend {
             // Wait for device to finish
             if let Some(device) = &self.device {
                 let _ = device.device_wait_idle();
+            }
+
+            // Destroy synchronization objects
+            self.destroy_sync_objects();
+
+            // Destroy command pool (also frees command buffers)
+            if let Some(device) = &self.device {
+                device.destroy_command_pool(self.command_pool, None);
             }
 
             // Destroy pipeline
