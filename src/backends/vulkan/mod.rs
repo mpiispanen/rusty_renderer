@@ -1,23 +1,138 @@
-//! Vulkan backend stub
+//! Vulkan backend implementation
 //!
-//! This is a stub implementation for issue #12.
-//! Real Vulkan implementation will be added in M3.
+//! This module implements the Vulkan graphics backend using vulkanalia.
+//! Supports validation layers in debug mode and provides a complete
+//! Vulkan rendering pipeline.
 
 use super::*;
+use anyhow::{Context, Result};
+use std::ffi::CStr;
+use std::os::raw::c_void;
+use vulkanalia::loader::{LibloadingLoader, LIBRARY};
+use vulkanalia::prelude::v1_0::*;
+use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
+use vulkanalia::window as vk_window;
 
-/// Vulkan backend stub
+const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
+const VALIDATION_LAYER: vk::ExtensionName =
+    vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
+
+/// Vulkan backend implementation
 pub struct VulkanBackend {
+    // Core Vulkan objects (wrapped in Option for initialization order)
+    entry: Option<Entry>,
+    instance: Option<Instance>,
+    messenger: Option<vk::DebugUtilsMessengerEXT>,
+
+    // Stub components (will be replaced in future issues)
     device: VulkanDevice,
     swapchain: VulkanSwapchain,
 }
 
 impl VulkanBackend {
-    /// Create a new Vulkan backend stub
+    /// Create a new Vulkan backend
     pub fn new() -> Result<Self> {
+        log::info!("Creating Vulkan backend");
+
+        // Load Vulkan library
+        let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
+        let entry = unsafe { Entry::new(loader).map_err(|e| anyhow::anyhow!("{e}"))? };
+
+        log::info!("Vulkan library loaded successfully");
+
         Ok(Self {
+            entry: Some(entry),
+            instance: None,
+            messenger: None,
             device: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
+    }
+
+    /// Create Vulkan instance with validation layers
+    fn create_instance(&mut self, window: &winit::window::Window) -> Result<()> {
+        let entry = self.entry.as_ref().context("Entry not initialized")?;
+
+        // Application info
+        let app_info = vk::ApplicationInfo::builder()
+            .application_name(b"Rusty Renderer\0")
+            .application_version(vk::make_version(0, 1, 0))
+            .engine_name(b"No Engine\0")
+            .engine_version(vk::make_version(0, 1, 0))
+            .api_version(vk::make_version(1, 0, 0));
+
+        // Get required extensions from window
+        let mut extensions = vk_window::get_required_instance_extensions(window)
+            .iter()
+            .map(|e| e.as_ptr())
+            .collect::<Vec<_>>();
+
+        // Add debug utils extension in debug mode
+        if VALIDATION_ENABLED {
+            extensions.push(vk::EXT_DEBUG_UTILS_EXTENSION.name.as_ptr());
+        }
+
+        // Validation layers
+        let available_layers = unsafe { entry.enumerate_instance_layer_properties()? }
+            .iter()
+            .map(|l| l.layer_name)
+            .collect::<Vec<_>>();
+
+        let mut layers = Vec::new();
+
+        if VALIDATION_ENABLED {
+            if available_layers.contains(&VALIDATION_LAYER) {
+                layers.push(VALIDATION_LAYER.as_ptr());
+                log::info!("Validation layers enabled");
+            } else {
+                log::warn!("Validation layers requested but not available");
+            }
+        }
+
+        // Create instance
+        let mut info = vk::InstanceCreateInfo::builder()
+            .application_info(&app_info)
+            .enabled_extension_names(&extensions)
+            .enabled_layer_names(&layers);
+
+        // Debug messenger for instance creation/destruction
+        let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
+            .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
+            .user_callback(Some(debug_callback));
+
+        if VALIDATION_ENABLED {
+            info = info.push_next(&mut debug_info);
+        }
+
+        let instance = unsafe { entry.create_instance(&info, None)? };
+
+        log::info!("Vulkan instance created successfully");
+
+        self.instance = Some(instance);
+
+        Ok(())
+    }
+
+    /// Create debug messenger
+    fn create_debug_messenger(&mut self) -> Result<()> {
+        if !VALIDATION_ENABLED {
+            return Ok(());
+        }
+
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+
+        let info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
+            .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
+            .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
+            .user_callback(Some(debug_callback));
+
+        let messenger = unsafe { instance.create_debug_utils_messenger_ext(&info, None)? };
+
+        self.messenger = Some(messenger);
+        log::info!("Debug messenger created");
+
+        Ok(())
     }
 }
 
@@ -26,37 +141,86 @@ impl GraphicsBackend for VulkanBackend {
         BackendType::Vulkan
     }
 
-    fn initialize(&mut self, _window: &winit::window::Window) -> Result<()> {
-        // Stub: will be implemented in M3
+    fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
+        log::info!("Initializing Vulkan backend");
+
+        // Create instance
+        self.create_instance(window)
+            .context("Failed to create Vulkan instance")?;
+
+        // Create debug messenger
+        self.create_debug_messenger()
+            .context("Failed to create debug messenger")?;
+
+        log::info!("Vulkan backend initialized");
         Ok(())
     }
 
     fn begin_frame(&mut self) -> Result<()> {
-        // Stub: will be implemented in M3
+        // Will be implemented in issue #25
         Ok(())
     }
 
     fn end_frame(&mut self) -> Result<()> {
-        // Stub: will be implemented in M3
+        // Will be implemented in issue #25
         Ok(())
     }
 
     fn resize(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Stub: will be implemented in M3
+        // Will be implemented in issue #22 (swapchain)
         Ok(())
     }
 
     fn cleanup(&mut self) {
-        // Stub: will be implemented in M3
+        log::info!("Cleaning up Vulkan backend");
+
+        unsafe {
+            if let Some(instance) = &self.instance {
+                if let Some(messenger) = self.messenger {
+                    instance.destroy_debug_utils_messenger_ext(messenger, None);
+                }
+                instance.destroy_instance(None);
+            }
+        }
+
+        log::info!("Vulkan backend cleaned up");
     }
 
-    fn device(&self) -> &dyn Device {
+    fn device(&self) -> &dyn super::Device {
         &self.device
     }
 
     fn swapchain(&self) -> &dyn Swapchain {
         &self.swapchain
     }
+}
+
+/// Debug callback for Vulkan validation layers
+unsafe extern "system" fn debug_callback(
+    severity: vk::DebugUtilsMessageSeverityFlagsEXT,
+    type_: vk::DebugUtilsMessageTypeFlagsEXT,
+    data: *const vk::DebugUtilsMessengerCallbackDataEXT,
+    _: *mut c_void,
+) -> vk::Bool32 {
+    let data = *data;
+    let message = CStr::from_ptr(data.message).to_string_lossy();
+
+    match severity {
+        vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
+            log::error!("Vulkan [{type_:?}]: {message}");
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::WARNING => {
+            log::warn!("Vulkan [{type_:?}]: {message}");
+        }
+        vk::DebugUtilsMessageSeverityFlagsEXT::INFO => {
+            log::info!("Vulkan [{type_:?}]: {message}");
+        }
+        _ => {
+            log::debug!("Vulkan [{type_:?}]: {message}");
+        }
+    }
+
+    vk::FALSE
 }
 
 /// Vulkan device stub
@@ -70,7 +234,7 @@ impl VulkanDevice {
     }
 }
 
-impl Device for VulkanDevice {
+impl super::Device for VulkanDevice {
     fn name(&self) -> &str {
         "Vulkan Stub Device"
     }
