@@ -130,7 +130,21 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
-                // Rendering will be implemented in future milestones
+                // Render a frame
+                if let Some(backend) = &mut self.backend {
+                    if let Err(e) = backend.begin_frame() {
+                        log::error!("Failed to begin frame: {e}");
+                        return;
+                    }
+
+                    // TODO: Record rendering commands here
+
+                    if let Err(e) = backend.end_frame() {
+                        log::error!("Failed to end frame: {e}");
+                        return;
+                    }
+                }
+
                 if let Some(window) = &self.window {
                     window.request_redraw();
                 }

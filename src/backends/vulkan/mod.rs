@@ -32,6 +32,7 @@ pub struct VulkanBackend {
     entry: Option<Entry>,
     instance: Option<Instance>,
     messenger: Option<vk::DebugUtilsMessengerEXT>,
+    validation_enabled: bool, // Track if validation is actually enabled
 
     // Device and queues
     physical_device: vk::PhysicalDevice,
@@ -83,6 +84,7 @@ impl VulkanBackend {
             entry: Some(entry),
             instance: None,
             messenger: None,
+            validation_enabled: false, // Will be set during instance creation
             physical_device: vk::PhysicalDevice::null(),
             device: None,
             graphics_queue: vk::Queue::null(),
@@ -144,10 +146,14 @@ impl VulkanBackend {
         if VALIDATION_ENABLED {
             if available_layers.contains(&VALIDATION_LAYER) {
                 layers.push(VALIDATION_LAYER.as_ptr());
+                self.validation_enabled = true;
                 log::info!("Validation layers enabled");
             } else {
+                self.validation_enabled = false;
                 log::warn!("Validation layers requested but not available");
             }
+        } else {
+            self.validation_enabled = false;
         }
 
         // Create instance
@@ -162,7 +168,7 @@ impl VulkanBackend {
             .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
             .user_callback(Some(debug_callback));
 
-        if VALIDATION_ENABLED {
+        if self.validation_enabled {
             info = info.push_next(&mut debug_info);
         }
 
@@ -177,7 +183,7 @@ impl VulkanBackend {
 
     /// Create debug messenger
     fn create_debug_messenger(&mut self) -> Result<()> {
-        if !VALIDATION_ENABLED {
+        if !self.validation_enabled {
             return Ok(());
         }
 
@@ -312,7 +318,7 @@ impl VulkanBackend {
             .collect::<Vec<_>>();
 
         // Validation layers
-        let layers = if VALIDATION_ENABLED {
+        let layers = if self.validation_enabled {
             vec![VALIDATION_LAYER.as_ptr()]
         } else {
             vec![]
