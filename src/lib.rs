@@ -15,4 +15,4 @@ pub mod ui;
 
 // Re-export main types for convenience
 pub use app::App as RenderEngine;
-pub use config::{Config as RenderConfig, Backend as RenderBackend};
+pub use config::{Backend as RenderBackend, Config as RenderConfig};
