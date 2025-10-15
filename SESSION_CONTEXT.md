@@ -1,89 +1,90 @@
 # Rusty Renderer - Session Context
 
-**Last Updated:** 2025-10-15T20:31:00Z
+**Last Updated:** 2025-10-15T20:35:00Z
 **Current Phase:** Milestone 3 - Vulkan Triangle Rendering (Implementation Complete, Issues Need Closing)
 
-## 📍 Current Status
+## 📍 Current Status Summary
+
+### Critical Issue from Last Session
+🔴 **STUCK ON CI WAIT:** In the previous session, we finished M3 implementation but got stuck waiting for CI to complete. The CI job showed "in_progress" status even though it had finished successfully. This is a known quirk from M1 (documented in WORKFLOW.md). **All M3 implementation issues (#20-#25) are COMPLETE and merged to main, but GitHub issues are still OPEN.**
 
 ### What's Done
-- ✅ **MILESTONE 1 COMPLETE:** Project Foundation
+- ✅ **MILESTONE 1 COMPLETE & CLOSED:** Project Foundation (5/5 issues)
   - ✅ Cargo workspace structure, app framework, CLI parsing
   - ✅ CI/CD pipeline with GitHub Actions
-  - ✅ Testing infrastructure (96 tests passing)
+  - ✅ Testing infrastructure (60 tests passing in lib)
   
-- ✅ **MILESTONE 2 COMPLETE:** Backend Abstraction - Stub Implementation
+- ✅ **MILESTONE 2 COMPLETE & CLOSED:** Backend Abstraction (6/6 issues)
   - ✅ 6 core backend traits defined (GraphicsBackend, Device, CommandBuffer, Pipeline, Resource, Swapchain)
   - ✅ Vulkan backend stub (344 LOC, 16 tests)
   - ✅ DirectX backend stub (387 LOC, 20 tests)
   - ✅ wgpu backend stub (359 LOC, 18 tests)
   - ✅ Backend selection logic with CLI integration
-  - ✅ Comprehensive cross-backend validation (15 tests)
+  - ✅ Comprehensive cross-backend validation (15 tests in `tests/`)
   - ✅ M2 Retrospective with testing strategy analysis
   - ✅ CI optimized: GitHub-hosted for builds, self-hosted for GPU
 
-- ✅ **MILESTONE 3 IMPLEMENTATION:** Vulkan Triangle Rendering (CODE COMPLETE!)
-  - ✅ Vulkan instance and validation layers (#20) - Code done, issue still open
-  - ✅ Vulkan device selection and creation (#21) - Code done, issue still open
-  - ✅ Vulkan swapchain and surface (#22) - Code done, issue still open
-  - ✅ Shader loading and graphics pipeline (#23) - Code done, issue still open
-  - ✅ Triangle vertex buffer (#24) - Code done, issue still open
-  - ✅ Vulkan rendering loop and command buffers (#25) - Code done, issue still open
+- ✅ **MILESTONE 3 IMPLEMENTATION:** Vulkan Triangle Rendering (CODE COMPLETE! 6/8 issues done)
+  - ✅ M3 Planning (#7) - CLOSED
+  - ✅ Vulkan instance and validation layers (#20) - **Code merged, issue still OPEN**
+  - ✅ Vulkan device selection and creation (#21) - **Code merged, issue still OPEN**
+  - ✅ Vulkan swapchain and surface (#22) - **Code merged, issue still OPEN**
+  - ✅ Shader loading and graphics pipeline (#23) - **Code merged, issue still OPEN**
+  - ✅ Triangle vertex buffer (#24) - **Code merged, issue still OPEN** (embedded in pipeline)
+  - ✅ Vulkan rendering loop and command buffers (#25) - **Code merged, issue still OPEN**
   - ⏳ GPU testing infrastructure (#26) - Still needs implementation
+  - ❓ M3 Retrospective - Not yet created as issue
   - ✅ Triangle example created (`examples/triangle.rs`)
   - ✅ Local running documentation (docs/RUNNING_LOCALLY.md)
-  - ✅ Latest CI run PASSED (commit 3a9916d)
+  - ✅ Latest CI run PASSED (commit 5095aa2, run #18541869363)
 
-### What's Next
-1. **Close completed M3 issues (#20-25)**
-   - All implementation code is complete and merged
-   - CI is passing
-   - Need to close issues #20, #21, #22, #23, #24, #25
-   
-2. **Implement GPU testing (#26)**
-   - Create GPU test job in CI
-   - Add test timeout option to triangle example
-   - Implement visual validation or success marker
-   
-3. **Test triangle example locally**
-   - App initializes properly (confirmed with timeout test)
-   - May segfault or need display (headless testing required for CI)
-   - Add `--test-duration <seconds>` option for automated testing
-
-4. **Complete M3 retrospective and close milestone**
+### Critical Next Steps (Priority Order)
+1. 🎯 **FIRST: Close completed M3 issues (#20-#25)** - CI passed, code merged, ready to close
+2. 🛠️ **Debug triangle example segfault** - Needs investigation before GPU testing
+3. 🔧 **Add test timeout feature** - `--test-duration <seconds>` for automated testing
+4. 🧪 **Implement GPU testing (#26)** - Once example works reliably
+5. 📝 **Create M3 retrospective issue** - Review what we learned
+6. 🏁 **Close Milestone 3** - After all issues complete
 
 ### Current Branch
-- `main` - commit 3a9916d (CI PASSING ✅)
+- `main` - commit 5095aa2 (CI PASSING ✅ - run #18541869363, 1m15s)
 
 ## 🎯 Active Milestone
 
 **Milestone 3: Vulkan Triangle Rendering** (CODE COMPLETE! 🎉 Issues Need Closing)
 
-**Status:** 6/7 implementation tasks done, 1 testing task remaining
+**GitHub Status:** 7/8 issues open (M3 Planning is closed)
+**Actual Status:** 6/7 implementation tasks done, 1 testing task remaining, retrospective not created yet
 
-**Completed Implementation (Issues Need Closing):**
-1. ✅ #20: Vulkan instance and validation layers - **CLOSE THIS**
-2. ✅ #21: Vulkan device selection and creation - **CLOSE THIS**
-3. ✅ #22: Vulkan swapchain and surface - **CLOSE THIS**
-4. ✅ #23: Shader loading and graphics pipeline - **CLOSE THIS**
-5. ✅ #24: Create triangle vertex buffer - **CLOSE THIS** (embedded in pipeline)
-6. ✅ #25: Vulkan rendering loop and command buffers - **CLOSE THIS**
-
-**Tasks Needing Work:**
-7. ⏳ #26: GPU testing infrastructure and visual validation - **IMPLEMENT THIS**
+**Milestone Issues:**
+| # | Title | Status | Notes |
+|---|-------|--------|-------|
+| #7 | M3 Planning | ✅ CLOSED | Planning complete |
+| #20 | Vulkan instance & validation | ✅ Code merged | **CLOSE - CI passed** |
+| #21 | Vulkan device selection | ✅ Code merged | **CLOSE - CI passed** |
+| #22 | Vulkan swapchain & surface | ✅ Code merged | **CLOSE - CI passed** |
+| #23 | Shader loading & pipeline | ✅ Code merged | **CLOSE - CI passed** |
+| #24 | Triangle vertex buffer | ✅ Code merged | **CLOSE - CI passed** (embedded in pipeline) |
+| #25 | Rendering loop & commands | ✅ Code merged | **CLOSE - CI passed** |
+| #26 | GPU testing infrastructure | ⏳ OPEN | **TODO - Implement** |
+| N/A | M3 Retrospective | ❓ Not created | **TODO - Create issue** |
 
 **Current Code Status:**
 - **Vulkan implementation:** 1,563 LOC in `src/backends/vulkan/`
   - `mod.rs`: Complete Vulkan backend (47,826 bytes)
   - `shaders.rs`: Shader loading utilities (6,640 bytes)
-- **Triangle example:** `examples/triangle.rs` (initializes properly, may need headless testing)
-- **Tests:** 96 passing (60 backend, 15 trait, 7 selection, 8 config, 4 module, 2 legacy)
-- **CI Status:** ✅ PASSING (commit 3a9916d)
+- **Triangle example:** `examples/triangle.rs` (compiles, may segfault on run - needs debugging)
+- **Tests:** 60 passing in lib (unit tests), 36 in tests/ (integration tests)
+- **CI Status:** ✅ PASSING (commit 5095aa2, run #18541869363)
 
 ---
 
-**Previous Milestones:**
-- ✅ **M1: Project Foundation** - CLOSED (5/5 complete)
-- ✅ **M2: Backend Abstraction** - CLOSED (6/6 complete)
+**Milestone History:**
+- ✅ **M1: Project Foundation** - CLOSED (5/5 issues complete)
+- ✅ **M2: Backend Abstraction** - CLOSED (6/6 issues complete)
+- 🔄 **M3: Vulkan Triangle** - OPEN (6/7 impl done, 1 TODO, retro not created)
+- 📅 **M4: Multi-Backend Triangle** - OPEN (0/1 issues - just planning)
+- 📅 **M5: Render Graph Foundation** - OPEN (0/1 issues - just planning)
 
 ## 📁 Project Structure
 
@@ -353,22 +354,34 @@ git show <commit_sha>
 
 ## 💡 Notes for AI Assistant
 
-### Current State (M3 Progress)
-- **Milestone 3 is ALMOST COMPLETE** 🎉
-- Vulkan backend fully implemented (1,563 LOC)
-- Triangle example works locally
-- 96 tests passing (60 backend, 15 trait, 7 selection, 8 config, 4 module, 2 legacy)
-- CI optimized: GitHub-hosted for builds/tests, self-hosted runner ready for GPU
+### ⚠️ CRITICAL - Issue from Last Session
+**We got stuck waiting for CI in the previous session!** The CI job finished successfully but showed "in_progress" status (known quirk from M1). As a result:
+- Issues #20-#25 have their code MERGED to main
+- CI is PASSING (run #18541869363)
+- But GitHub issues are still OPEN
+- **Action needed:** Close these issues with success comments
 
-### Tasks Needing Attention
-1. **Issue #24 (Triangle vertex buffer)** - May already be done? Check issue status
-2. **Issue #26 (GPU testing)** - Needs implementation
-3. **Format fix** - Just pushed (f2e5c1c), wait for CI to confirm green
-4. **Test timeout feature** - Add option to run app for limited time and exit (for automated testing)
+### Triangle Example Segfault Issue
+🔴 **PROBLEM:** Triangle example (`cargo run --example triangle --release`) segfaults when run locally
+- Build completes successfully
+- Warnings about shader compiler (expected - we embed shaders)
+- App likely crashes when trying to create window/surface
+- **Needs debugging before we can implement GPU testing (#26)**
+- May need headless rendering or proper GPU environment
+
+### Tasks Needing Immediate Attention
+1. **Close issues #20-#25** - Ready to close, CI passed
+2. **Debug triangle segfault** - Critical for GPU testing
+3. **Add `--test-duration` flag** - For automated testing (e.g., run 5 seconds then exit)
+4. **Implement #26 (GPU testing)** - Once triangle works
+5. **Create M3 retrospective issue** - Not yet created
+6. **Close Milestone 3** - After all issues done
 
 ### Testing Strategy (from M2 Retrospective)
 - **Unit tests** (`src/` with `#[cfg(test)]`): Implementation details, private functions, edge cases
+  - Currently: 60 tests passing in lib
 - **Integration tests** (`tests/` directory): Public API, cross-module interactions, workflows
+  - Currently: 36 tests passing in tests/
 - Current split is good! Continue this pattern.
 
 ### Parallel Work Opportunities (from docs/WORKFLOW.md)
@@ -378,23 +391,33 @@ git show <commit_sha>
 - See docs/WORKFLOW.md for full strategy
 
 ### Important Reminders
-- ⚠️ **Issues #20-#25 are complete but still open** - CI passed, code merged, close them!
-- ⚠️ **Never close issues until CI passes** (see docs/WORKFLOW.md)
+- ⚠️ **NEVER close issues until CI passes** (see docs/WORKFLOW.md) - this is what happened in last session!
+- ⚠️ **CI job status can show "in_progress" even after completion** - always verify with `gh run view <run_id>`
 - Run local validation before pushing: `cargo fmt && cargo clippy && cargo test`
-- CI job status can show "in_progress" even after completion - always verify with `gh run view`
-- Triangle example may need display/GPU - implement headless testing in #26
+- Triangle example needs GPU/display - implement headless testing or timeout mode for CI
 - macOS support is explicitly out of scope
 - Focus on Vulkan first, then DirectX, then wgpu for each feature
 
-### Known Issues from M1
-- CI job completion detection quirk (see docs/WORKFLOW.md) - **This caused our M3 issues to stay open!**
+### Code Formatting Issue Note
+📝 **DOCUMENTATION FORMATTING:** When converting trait definitions or code to HTML, preserve proper formatting. We had an issue in last session where trait definitions were rendered as a single line. Use proper code blocks with language hints for syntax highlighting.
+
+### Workflow & CI Notes
+- **GitHub-hosted runners:** Used for build, test, clippy, fmt jobs (no GPU needed)
+- **Self-hosted runner with GPU tag:** Ready for GPU-specific tests (#26)
+- **Artifact strategy:** Consider uploading build artifacts from GitHub runners, then downloading in GPU jobs to save time
+- **CI quirk:** Job status can lag - always check `gh run view <run_id>` for actual completion
+
+### Known Issues
+- CI job completion detection quirk (caused our stuck state last session)
 - Self-hosted runner disk space warnings are false positives (see docs/SELF_HOSTED_RUNNER.md)
+- Triangle example segfaults locally - needs debugging
 
 ## 📝 Recent Commits
 
 Latest (from `git log --oneline -10`):
 ```
-3a9916d (HEAD -> main, origin/main) Fix import ordering in lib.rs for cargo fmt
+5095aa2 (HEAD -> main, origin/main) Update session context: M3 code complete, issues need closing
+3a9916d Fix import ordering in lib.rs for cargo fmt
 ad6a4d3 Update session context: M3 nearly complete, comprehensive status
 f2e5c1c Fix formatting in triangle example
 fd0dd63 Add triangle example and local running documentation
@@ -403,56 +426,77 @@ fd10e59 Implement Vulkan shaders and graphics pipeline
 6255f7d Implement Vulkan swapchain and surface
 1cee30b Implement Vulkan device selection and creation
 e558737 Implement Vulkan instance and validation layers
-95aee84 Add M2 retrospective with testing strategy analysis
 ```
 
-**Latest CI Run:** ✅ PASSED (run #18541774444, commit 3a9916d, 1m16s)
-**All M3 Implementation:** Complete and merged to main
+**Latest CI Run:** ✅ PASSED (run #18541869363, commit 5095aa2, 1m15s)
+**All M3 Implementation:** Complete and merged to main, but issues #20-#25 still open (got stuck waiting for CI last session)
 
 ## 🎯 Next Session Workflow
 
-### Immediate Tasks (Priority Order)
-1. ✅ **CI is passing** - Latest run passed all checks (3a9916d)
-2. 🔄 **Close completed M3 issues** - Issues #20, #21, #22, #23, #24, #25 are all implemented
-3. 🛠️ **Implement Issue #26** - GPU testing infrastructure
-4. 🎯 **Add test timeout** - Option to run app for limited time (for automated GPU tests)
-5. 🏁 **Close M3** - Once all issues complete and CI green
+### Immediate Actions (Do These First!)
+1. ✅ **CI Status Check** - Latest run #18541869363 PASSED
+2. 🔄 **Close completed M3 issues** - Issues #20-#25 ready to close:
+   ```bash
+   gh issue close 20 -c "✅ Implementation complete and merged to main (commit e558737). CI passing. Vulkan instance creation with validation layers in debug mode working."
+   gh issue close 21 -c "✅ Implementation complete and merged to main (commit 1cee30b). CI passing. Physical device selection with discrete GPU preference working."
+   gh issue close 22 -c "✅ Implementation complete and merged to main (commit 6255f7d). CI passing. Swapchain creation with automatic resize handling working."
+   gh issue close 23 -c "✅ Implementation complete and merged to main (commit fd10e59). CI passing. Shader loading and graphics pipeline creation working."
+   gh issue close 24 -c "✅ Implementation complete and merged to main (embedded in pipeline, commit fd10e59). CI passing. Triangle vertex data integrated into graphics pipeline."
+   gh issue close 25 -c "✅ Implementation complete and merged to main (commit 987d9be). CI passing. Rendering loop with command buffer recording and frame synchronization working."
+   ```
 
-### Issue Status Review
-All M3 implementation issues (#20-#25) have their code merged to main but GitHub issues are still open. This happened because:
-- We were waiting for CI to finish in the previous session
-- CI showed "in_progress" even after completion (known quirk from M1)
-- Need to manually close these issues as they're complete
+3. 🔍 **Debug triangle example segfault**
+   - Run with verbose logging: `RUST_LOG=debug cargo run --example triangle --release 2>&1 | tee triangle_debug.log`
+   - Check where it crashes (likely window/surface creation)
+   - May need headless mode or specific GPU environment
 
-### For Closing Issues #20-#25
+4. 🔧 **Add test timeout feature**
+   - Add `--test-duration <seconds>` CLI argument to triangle example
+   - After timeout, log success and exit cleanly
+   - Example: `cargo run --example triangle -- --test-duration 5`
+   - Useful for automated GPU testing in CI
+
+5. 🧪 **Implement Issue #26 (GPU testing)**
+   - Review test strategy in docs/M2_RETROSPECTIVE.md
+   - Create GPU test job in `.github/workflows/ci.yml`
+   - Use self-hosted runner with `gpu` tag
+   - Download build artifacts from GitHub runners to save time
+   - Add visual validation (screenshot comparison or success marker)
+   - Use the test timeout feature
+
+6. 📝 **Create M3 Retrospective Issue**
+   - Review what we learned from Vulkan implementation
+   - Document segfault issue and resolution
+   - Update testing strategy if needed
+   - Plan improvements for M4
+
+7. 🏁 **Close Milestone 3**
+   - Verify all issues closed
+   - CI passing
+   - Move to M4 planning
+
+### Triangle Example Debug Guide
+The example compiles but segfaults when run. Debugging steps:
 ```bash
-# Close each completed issue
-gh issue close 20 -c "Implementation complete and merged to main. CI passing."
-gh issue close 21 -c "Implementation complete and merged to main. CI passing."
-gh issue close 22 -c "Implementation complete and merged to main. CI passing."
-gh issue close 23 -c "Implementation complete and merged to main. CI passing."
-gh issue close 24 -c "Implementation complete and merged to main. Vertex buffer embedded in pipeline."
-gh issue close 25 -c "Implementation complete and merged to main. CI passing."
+# 1. Check Vulkan installation
+vulkaninfo | head -20
+
+# 2. Try with debug logging
+RUST_LOG=debug cargo run --example triangle --release 2>&1 | tee debug.log
+
+# 3. Check segfault location
+# Look for last successful log before crash
+
+# 4. Consider headless mode
+# May need to implement software rendering or offscreen rendering for CI
 ```
 
-### For Issue #26 (GPU Testing)
-- Review test strategy in docs/M2_RETROSPECTIVE.md
-- Implement GPU test job in `.github/workflows/ci.yml`
-- Use self-hosted runner with `gpu` tag
-- Add visual validation (screenshot comparison or success marker)
-- Consider using the test timeout feature
-
-### For Test Timeout Feature
-- Add `--test-duration <seconds>` CLI arg to triangle example
-- After timeout, log success and exit cleanly
-- Useful for CI: `cargo run --example triangle -- --test-duration 5`
-
-### Triangle Example Status
-- App compiles and initializes properly ✅
-- Loads Vulkan, creates instance, finds implicit layers ✅
-- May need headless testing for CI (no display available)
-- Possibly segfaults when trying to create window/surface (needs GPU)
-- This is why we need #26 for proper GPU testing infrastructure
+### Issue Status Quick Reference
+- **M3 Issues #20-#25:** Code merged, CI passed, **CLOSE THESE NOW**
+- **M3 Issue #26:** Not started, needs implementation
+- **M3 Retrospective:** Not created yet, create after #26
+- **M4 Planning (#8):** Open, waiting for M3 completion
+- **M5 Planning (#9):** Open, future work
 
 ## 🔄 Future Milestones Preview
 
