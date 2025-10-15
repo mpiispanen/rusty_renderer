@@ -165,6 +165,67 @@ Currently using **trunk-based development** (direct to main):
 
 Future: May adopt feature branches for larger changes.
 
+## Parallel Work Strategy
+
+### When to Use GitHub Agent Runners
+
+Some issues can be worked on in parallel without dependencies. These are perfect candidates for GitHub agent runners:
+
+**Indicators for Parallel Work:**
+- Issues with same milestone but different implementation files
+- Stub implementations (e.g., separate backend stubs)
+- Documentation tasks
+- Independent test suites
+- Non-conflicting feature additions
+
+**Example - M2 Backend Stubs:**
+After issue #11 (Define core backend traits) is complete, issues #12, #13, #14 can be worked on in parallel:
+- #12: Vulkan backend stub (src/backends/vulkan/)
+- #13: DirectX backend stub (src/backends/directx/)
+- #14: wgpu backend stub (src/backends/wgpu_backend/)
+
+Each touches different files, so no merge conflicts.
+
+### How to Identify Parallel Opportunities
+
+1. **Check Dependencies:** Issues with "Depends on" can't start until dependency completes
+2. **Check File Overlap:** Issues touching different files = parallel safe
+3. **Check Milestone Planning:** Planning docs often identify parallel work
+
+### Workflow for Parallel Issues
+
+When parallel work is identified:
+
+1. **Flag the opportunity:**
+   ```bash
+   # Comment on issues
+   gh issue comment <issue> --body "🔀 This issue can be worked in parallel with #X, #Y, #Z
+   
+   File scope: src/backends/vulkan/
+   No conflicts with other issues in progress."
+   ```
+
+2. **Assign to GitHub agent runners** if available
+
+3. **Coordinate in issue comments** to avoid conflicts
+
+4. **Monitor CI** - each parallel branch must pass CI independently
+
+### Current M2 Parallel Opportunity 🔀
+
+**After #11 completes**, these 3 issues can be worked **in parallel**:
+- Issue #12: Vulkan backend stub → `src/backends/vulkan/`
+- Issue #13: DirectX backend stub → `src/backends/directx/`  
+- Issue #14: wgpu backend stub → `src/backends/wgpu_backend/`
+
+**Why parallel-safe:**
+- Different directory scope (no file conflicts)
+- Same dependencies (only #11)
+- Independent test files
+- Stub implementations (no complex integration)
+
+This could reduce M2 timeline from 20-28 hours to ~16-22 hours (saving 4-6 hours).
+
 ## Issue Lifecycle
 
 1. **Open**: Issue created, ready to work on

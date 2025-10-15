@@ -74,6 +74,23 @@ else
 fi
 echo ""
 
+# Check for parallel work opportunities
+echo "🔀 Parallel Work Opportunities:"
+if command -v gh &> /dev/null && [ "$REPO_OWNER" != "unknown" ]; then
+    # Check for issues that could be done in parallel
+    OPEN_ISSUES=$(gh issue list --json number,title,milestone --jq 'length')
+    if [ "$OPEN_ISSUES" -gt 1 ]; then
+        echo "   💡 Check for parallelizable issues in current milestone"
+        echo "   See docs/WORKFLOW.md 'Parallel Work Strategy' section"
+        echo "   Consider using GitHub agent runners for independent tasks"
+    else
+        echo "   No parallel opportunities identified"
+    fi
+else
+    echo "   Install 'gh' CLI to check parallel work opportunities"
+fi
+echo ""
+
 # Next steps
 echo "🚀 Next Steps:"
 if [ ! -f "Cargo.toml" ]; then
