@@ -1,18 +1,47 @@
 # Rusty Renderer - Session Context
 
-**Last Updated:** 2025-10-15T20:35:00Z
-**Current Phase:** Milestone 3 - Vulkan Triangle Rendering (Implementation Complete, Issues Need Closing)
+**Last Updated:** 2025-10-15T20:40:00Z
+**Current Phase:** Milestone 3 - Vulkan Triangle Rendering (Implementation Complete, Testing Blocked by Segfault)
+
+## 📋 This Session Summary
+
+### What We Accomplished
+This was a productive session where we:
+
+1. **Reviewed stuck CI issue from M1** - Discovered the CI completion detection quirk documented in WORKFLOW.md
+2. **Completed Milestone 2 planning and retrospective** - Defined testing strategy (unit vs integration tests)
+3. **Created all M3 issues** - 8 issues for Vulkan triangle rendering implementation
+4. **Fixed documentation formatting** - Resolved code block rendering issues in HTML conversion
+5. **Optimized CI pipeline** - Split jobs between GitHub-hosted (build/test) and self-hosted (GPU) runners
+6. **Implemented parallel issue execution** - Used GitHub agents for independent work (#12, #13, #14)
+7. **Completed full Vulkan backend** - 1,563 LOC implementation with instance, device, swapchain, pipeline, rendering loop
+8. **Created triangle example** - Compiles successfully but has runtime segfault issue
+9. **Updated all documentation** - SESSION_CONTEXT, WORKFLOW, RUNNING_LOCALLY, DOCUMENTATION_STYLE
+
+### What's Blocking Us
+🔴 **Triangle Example Segfault** - The example compiles but crashes at runtime, preventing:
+- GPU testing infrastructure (#26) implementation
+- Verification that Vulkan backend actually works
+- Closing of M3 implementation issues (#20-#25)
+- Completion of Milestone 3
+
+### Next Session Priority
+**Debug and fix the triangle segfault** - This is the critical blocker. Everything else depends on having a working example.
 
 ## 📍 Current Status Summary
 
-### Critical Issue from Last Session
-🔴 **STUCK ON CI WAIT:** In the previous session, we finished M3 implementation but got stuck waiting for CI to complete. The CI job showed "in_progress" status even though it had finished successfully. This is a known quirk from M1 (documented in WORKFLOW.md). **All M3 implementation issues (#20-#25) are COMPLETE and merged to main, but GitHub issues are still OPEN.**
+### Session Overview
+This session completed a comprehensive review of the stuck CI issue from Milestone 1, closed Milestone 1, planned and executed Milestone 2, then moved into Milestone 3 implementation. We successfully implemented the full Vulkan backend with triangle rendering, but encountered a segfault issue when running the triangle example locally.
+
+### Critical Blocker
+🔴 **TRIANGLE EXAMPLE SEGFAULT:** The triangle example (`cargo run --example triangle --release`) compiles successfully but segfaults when run. This is blocking GPU testing infrastructure (#26). The issue appears to be related to window/surface creation or GPU initialization. We need to debug this before implementing automated GPU testing.
 
 ### What's Done
 - ✅ **MILESTONE 1 COMPLETE & CLOSED:** Project Foundation (5/5 issues)
   - ✅ Cargo workspace structure, app framework, CLI parsing
   - ✅ CI/CD pipeline with GitHub Actions
   - ✅ Testing infrastructure (60 tests passing in lib)
+  - ✅ Session Context and documentation system
   
 - ✅ **MILESTONE 2 COMPLETE & CLOSED:** Backend Abstraction (6/6 issues)
   - ✅ 6 core backend traits defined (GraphicsBackend, Device, CommandBuffer, Pipeline, Resource, Swapchain)
@@ -22,60 +51,85 @@
   - ✅ Backend selection logic with CLI integration
   - ✅ Comprehensive cross-backend validation (15 tests in `tests/`)
   - ✅ M2 Retrospective with testing strategy analysis
-  - ✅ CI optimized: GitHub-hosted for builds, self-hosted for GPU
+  - ✅ CI optimized: GitHub-hosted for builds, self-hosted for GPU tests
+  - ✅ Documentation formatting fixes
 
-- ✅ **MILESTONE 3 IMPLEMENTATION:** Vulkan Triangle Rendering (CODE COMPLETE! 6/8 issues done)
+- 🔄 **MILESTONE 3 IN PROGRESS:** Vulkan Triangle Rendering (6/8 issues done, 1 blocked)
   - ✅ M3 Planning (#7) - CLOSED
-  - ✅ Vulkan instance and validation layers (#20) - **Code merged, issue still OPEN**
-  - ✅ Vulkan device selection and creation (#21) - **Code merged, issue still OPEN**
-  - ✅ Vulkan swapchain and surface (#22) - **Code merged, issue still OPEN**
-  - ✅ Shader loading and graphics pipeline (#23) - **Code merged, issue still OPEN**
-  - ✅ Triangle vertex buffer (#24) - **Code merged, issue still OPEN** (embedded in pipeline)
-  - ✅ Vulkan rendering loop and command buffers (#25) - **Code merged, issue still OPEN**
-  - ⏳ GPU testing infrastructure (#26) - Still needs implementation
+  - ✅ Vulkan instance and validation layers (#20) - **Code merged, issue OPEN**
+  - ✅ Vulkan device selection and creation (#21) - **Code merged, issue OPEN**
+  - ✅ Vulkan swapchain and surface (#22) - **Code merged, issue OPEN**
+  - ✅ Shader loading and graphics pipeline (#23) - **Code merged, issue OPEN**
+  - ✅ Triangle vertex buffer (#24) - **Code merged, issue OPEN** (embedded in pipeline)
+  - ✅ Vulkan rendering loop and command buffers (#25) - **Code merged, issue OPEN**
+  - 🔴 GPU testing infrastructure (#26) - **BLOCKED by segfault issue**
   - ❓ M3 Retrospective - Not yet created as issue
-  - ✅ Triangle example created (`examples/triangle.rs`)
+  - ✅ Triangle example created (`examples/triangle.rs`) - **Compiles but segfaults**
   - ✅ Local running documentation (docs/RUNNING_LOCALLY.md)
-  - ✅ Latest CI run PASSED (commit 5095aa2, run #18541869363)
+  - ✅ Latest CI run PASSED (commit 706f46d, run #18541999231)
 
 ### Critical Next Steps (Priority Order)
-1. 🎯 **FIRST: Close completed M3 issues (#20-#25)** - CI passed, code merged, ready to close
-2. 🛠️ **Debug triangle example segfault** - Needs investigation before GPU testing
-3. 🔧 **Add test timeout feature** - `--test-duration <seconds>` for automated testing
-4. 🧪 **Implement GPU testing (#26)** - Once example works reliably
-5. 📝 **Create M3 retrospective issue** - Review what we learned
+1. 🔴 **DEBUG TRIANGLE SEGFAULT** - Critical blocker for GPU testing
+   - Run with verbose logging: `RUST_LOG=debug cargo run --example triangle 2>&1 | tee debug.log`
+   - Use debugger: `rust-gdb --args target/release/examples/triangle`
+   - Check Vulkan validation layers output
+   - May need headless rendering mode for CI
+   
+2. 🔧 **Add test timeout feature** - `--test-duration <seconds>` flag
+   - Needed for automated GPU testing
+   - Example: `cargo run --example triangle -- --test-duration 5`
+   - Should exit cleanly after timeout with success message
+   
+3. 🧪 **Implement GPU testing (#26)** - Once triangle works
+   - Use self-hosted runner with `gpu` tag
+   - Download artifacts from build job
+   - Run triangle example with timeout
+   - Validate success (screenshot or log markers)
+   
+4. 🎯 **Close completed M3 issues (#20-#25)** - After we confirm everything works
+   
+5. 📝 **Create M3 retrospective issue** - Document lessons learned
+   
 6. 🏁 **Close Milestone 3** - After all issues complete
 
 ### Current Branch
-- `main` - commit 5095aa2 (CI PASSING ✅ - run #18541869363, 1m15s)
+- `main` - commit 706f46d (CI PASSING ✅ - run #18541999231, 1m15s)
+- All M3 implementation code merged to main
+- Triangle example compiles but has runtime segfault issue
 
 ## 🎯 Active Milestone
 
-**Milestone 3: Vulkan Triangle Rendering** (CODE COMPLETE! 🎉 Issues Need Closing)
+**Milestone 3: Vulkan Triangle Rendering** (Implementation Complete, Testing Blocked by Segfault)
 
 **GitHub Status:** 7/8 issues open (M3 Planning is closed)
-**Actual Status:** 6/7 implementation tasks done, 1 testing task remaining, retrospective not created yet
+**Actual Status:** 6/7 implementation tasks complete, 1 testing task blocked by segfault
 
 **Milestone Issues:**
 | # | Title | Status | Notes |
 |---|-------|--------|-------|
 | #7 | M3 Planning | ✅ CLOSED | Planning complete |
-| #20 | Vulkan instance & validation | ✅ Code merged | **CLOSE - CI passed** |
-| #21 | Vulkan device selection | ✅ Code merged | **CLOSE - CI passed** |
-| #22 | Vulkan swapchain & surface | ✅ Code merged | **CLOSE - CI passed** |
-| #23 | Shader loading & pipeline | ✅ Code merged | **CLOSE - CI passed** |
-| #24 | Triangle vertex buffer | ✅ Code merged | **CLOSE - CI passed** (embedded in pipeline) |
-| #25 | Rendering loop & commands | ✅ Code merged | **CLOSE - CI passed** |
-| #26 | GPU testing infrastructure | ⏳ OPEN | **TODO - Implement** |
-| N/A | M3 Retrospective | ❓ Not created | **TODO - Create issue** |
+| #20 | Vulkan instance & validation | ✅ Code merged | **Ready to close after segfault fixed** |
+| #21 | Vulkan device selection | ✅ Code merged | **Ready to close after segfault fixed** |
+| #22 | Vulkan swapchain & surface | ✅ Code merged | **Ready to close after segfault fixed** |
+| #23 | Shader loading & pipeline | ✅ Code merged | **Ready to close after segfault fixed** |
+| #24 | Triangle vertex buffer | ✅ Code merged | **Ready to close after segfault fixed** |
+| #25 | Rendering loop & commands | ✅ Code merged | **Ready to close after segfault fixed** |
+| #26 | GPU testing infrastructure | 🔴 BLOCKED | **Waiting for segfault fix** |
+| N/A | M3 Retrospective | ❓ Not created | **TODO after testing works** |
 
 **Current Code Status:**
 - **Vulkan implementation:** 1,563 LOC in `src/backends/vulkan/`
   - `mod.rs`: Complete Vulkan backend (47,826 bytes)
   - `shaders.rs`: Shader loading utilities (6,640 bytes)
-- **Triangle example:** `examples/triangle.rs` (compiles, may segfault on run - needs debugging)
+- **Triangle example:** `examples/triangle.rs` - ⚠️ **Compiles but segfaults on run**
 - **Tests:** 60 passing in lib (unit tests), 36 in tests/ (integration tests)
-- **CI Status:** ✅ PASSING (commit 5095aa2, run #18541869363)
+- **CI Status:** ✅ PASSING (commit 706f46d, run #18541999231)
+
+**Segfault Issue Details:**
+- Example compiles successfully with only shader compiler warnings (expected)
+- Crashes at runtime, likely during window/surface/GPU initialization
+- Needs debugging before GPU testing can be implemented
+- May require headless rendering mode for CI environment
 
 ---
 
@@ -354,28 +408,46 @@ git show <commit_sha>
 
 ## 💡 Notes for AI Assistant
 
-### ⚠️ CRITICAL - Issue from Last Session
-**We got stuck waiting for CI in the previous session!** The CI job finished successfully but showed "in_progress" status (known quirk from M1). As a result:
-- Issues #20-#25 have their code MERGED to main
-- CI is PASSING (run #18541869363)
-- But GitHub issues are still OPEN
-- **Action needed:** Close these issues with success comments
+### ⚠️ CRITICAL - Triangle Segfault Issue
+**BLOCKER:** The triangle example segfaults when run locally. This is preventing:
+- GPU testing infrastructure implementation (#26)
+- Closing of M3 implementation issues (#20-#25)
+- Completion of Milestone 3
 
-### Triangle Example Segfault Issue
-🔴 **PROBLEM:** Triangle example (`cargo run --example triangle --release`) segfaults when run locally
-- Build completes successfully
-- Warnings about shader compiler (expected - we embed shaders)
-- App likely crashes when trying to create window/surface
-- **Needs debugging before we can implement GPU testing (#26)**
-- May need headless rendering or proper GPU environment
+**Debugging Steps Needed:**
+1. Run with verbose logging: `RUST_LOG=debug cargo run --example triangle 2>&1 | tee debug.log`
+2. Use debugger: `rust-gdb --args target/release/examples/triangle`
+3. Check Vulkan validation layers for errors
+4. Verify Vulkan runtime installation: `vulkaninfo | head -20`
+5. May need to implement headless/offscreen rendering for CI
 
-### Tasks Needing Immediate Attention
-1. **Close issues #20-#25** - Ready to close, CI passed
-2. **Debug triangle segfault** - Critical for GPU testing
-3. **Add `--test-duration` flag** - For automated testing (e.g., run 5 seconds then exit)
-4. **Implement #26 (GPU testing)** - Once triangle works
-5. **Create M3 retrospective issue** - Not yet created
-6. **Close Milestone 3** - After all issues done
+**Potential Causes:**
+- Window/surface creation issue (no display in CI environment?)
+- GPU device selection problem
+- Validation layer misconfiguration
+- Missing Vulkan runtime components
+
+### Triangle Example Test Feature Request
+Need to add `--test-duration <seconds>` CLI argument to triangle example:
+- Allows running for a fixed time period then exiting cleanly
+- Essential for automated GPU testing in CI
+- Should log success message before exiting
+- Example: `cargo run --example triangle -- --test-duration 5`
+
+### CI Pipeline Status
+- **GitHub-hosted runners:** Used for build, test, clippy, fmt, docs jobs ✅
+- **Self-hosted runner with `gpu` tag:** Ready for GPU tests (once segfault fixed)
+- **Artifact strategy:** Build artifacts uploaded by GitHub runners for reuse in GPU jobs
+- **Latest CI run:** #18541999231 - ✅ PASSED (1m15s)
+
+### Issue Status Tracking
+**Cannot close M3 implementation issues yet** because we need to verify the triangle example actually works. The CI passes but the example segfaults when run. We should:
+1. Fix the segfault
+2. Add timeout test feature
+3. Implement GPU testing (#26)
+4. Then close issues #20-#25 together
+5. Create and complete M3 retrospective
+6. Close Milestone 3
 
 ### Testing Strategy (from M2 Retrospective)
 - **Unit tests** (`src/` with `#[cfg(test)]`): Implementation details, private functions, edge cases
@@ -391,10 +463,12 @@ git show <commit_sha>
 - See docs/WORKFLOW.md for full strategy
 
 ### Important Reminders
-- ⚠️ **NEVER close issues until CI passes** (see docs/WORKFLOW.md) - this is what happened in last session!
-- ⚠️ **CI job status can show "in_progress" even after completion** - always verify with `gh run view <run_id>`
+- ⚠️ **SEGFAULT BLOCKER:** Triangle example must be debugged and fixed before closing M3
+- ⚠️ **Don't close issues prematurely** - Need to verify triangle example actually works
+- ⚠️ **CI passing doesn't mean everything works** - The example compiles but segfaults at runtime
 - Run local validation before pushing: `cargo fmt && cargo clippy && cargo test`
-- Triangle example needs GPU/display - implement headless testing or timeout mode for CI
+- Triangle example needs GPU/display - may need headless mode for CI
+- Test timeout feature needed for automated testing
 - macOS support is explicitly out of scope
 - Focus on Vulkan first, then DirectX, then wgpu for each feature
 
@@ -408,15 +482,16 @@ git show <commit_sha>
 - **CI quirk:** Job status can lag - always check `gh run view <run_id>` for actual completion
 
 ### Known Issues
-- CI job completion detection quirk (caused our stuck state last session)
+- 🔴 **Triangle example segfault** - Critical blocker for M3 completion
 - Self-hosted runner disk space warnings are false positives (see docs/SELF_HOSTED_RUNNER.md)
-- Triangle example segfaults locally - needs debugging
+- CI job completion detection can lag - use `gh run view <run_id>` for actual status
 
 ## 📝 Recent Commits
 
 Latest (from `git log --oneline -10`):
 ```
-5095aa2 (HEAD -> main, origin/main) Update session context: M3 code complete, issues need closing
+706f46d (HEAD -> main, origin/main) Update session context: Comprehensive review of stuck CI issue
+5095aa2 Update session context: M3 code complete, issues need closing
 3a9916d Fix import ordering in lib.rs for cargo fmt
 ad6a4d3 Update session context: M3 nearly complete, comprehensive status
 f2e5c1c Fix formatting in triangle example
@@ -425,78 +500,141 @@ fd0dd63 Add triangle example and local running documentation
 fd10e59 Implement Vulkan shaders and graphics pipeline
 6255f7d Implement Vulkan swapchain and surface
 1cee30b Implement Vulkan device selection and creation
-e558737 Implement Vulkan instance and validation layers
 ```
 
-**Latest CI Run:** ✅ PASSED (run #18541869363, commit 5095aa2, 1m15s)
-**All M3 Implementation:** Complete and merged to main, but issues #20-#25 still open (got stuck waiting for CI last session)
+**Latest CI Run:** ✅ PASSED (run #18541999231, commit 706f46d, 1m15s)
+**All M3 Implementation:** Code complete and merged to main, but triangle example has runtime segfault
 
 ## 🎯 Next Session Workflow
 
-### Immediate Actions (Do These First!)
-1. ✅ **CI Status Check** - Latest run #18541869363 PASSED
-2. 🔄 **Close completed M3 issues** - Issues #20-#25 ready to close:
-   ```bash
-   gh issue close 20 -c "✅ Implementation complete and merged to main (commit e558737). CI passing. Vulkan instance creation with validation layers in debug mode working."
-   gh issue close 21 -c "✅ Implementation complete and merged to main (commit 1cee30b). CI passing. Physical device selection with discrete GPU preference working."
-   gh issue close 22 -c "✅ Implementation complete and merged to main (commit 6255f7d). CI passing. Swapchain creation with automatic resize handling working."
-   gh issue close 23 -c "✅ Implementation complete and merged to main (commit fd10e59). CI passing. Shader loading and graphics pipeline creation working."
-   gh issue close 24 -c "✅ Implementation complete and merged to main (embedded in pipeline, commit fd10e59). CI passing. Triangle vertex data integrated into graphics pipeline."
-   gh issue close 25 -c "✅ Implementation complete and merged to main (commit 987d9be). CI passing. Rendering loop with command buffer recording and frame synchronization working."
-   ```
+### Immediate Actions (Priority Order!)
 
-3. 🔍 **Debug triangle example segfault**
-   - Run with verbose logging: `RUST_LOG=debug cargo run --example triangle --release 2>&1 | tee triangle_debug.log`
-   - Check where it crashes (likely window/surface creation)
-   - May need headless mode or specific GPU environment
+#### 1. 🔴 DEBUG TRIANGLE SEGFAULT (Highest Priority!)
+The triangle example compiles but crashes at runtime. This is blocking all further progress on M3.
 
-4. 🔧 **Add test timeout feature**
-   - Add `--test-duration <seconds>` CLI argument to triangle example
-   - After timeout, log success and exit cleanly
-   - Example: `cargo run --example triangle -- --test-duration 5`
-   - Useful for automated GPU testing in CI
-
-5. 🧪 **Implement Issue #26 (GPU testing)**
-   - Review test strategy in docs/M2_RETROSPECTIVE.md
-   - Create GPU test job in `.github/workflows/ci.yml`
-   - Use self-hosted runner with `gpu` tag
-   - Download build artifacts from GitHub runners to save time
-   - Add visual validation (screenshot comparison or success marker)
-   - Use the test timeout feature
-
-6. 📝 **Create M3 Retrospective Issue**
-   - Review what we learned from Vulkan implementation
-   - Document segfault issue and resolution
-   - Update testing strategy if needed
-   - Plan improvements for M4
-
-7. 🏁 **Close Milestone 3**
-   - Verify all issues closed
-   - CI passing
-   - Move to M4 planning
-
-### Triangle Example Debug Guide
-The example compiles but segfaults when run. Debugging steps:
+**Debugging Commands:**
 ```bash
-# 1. Check Vulkan installation
+# Check Vulkan installation
 vulkaninfo | head -20
 
-# 2. Try with debug logging
-RUST_LOG=debug cargo run --example triangle --release 2>&1 | tee debug.log
+# Verify GPU is available
+lspci | grep -i vga
 
-# 3. Check segfault location
-# Look for last successful log before crash
+# Run with debug logging
+RUST_LOG=debug cargo run --example triangle 2>&1 | tee triangle_debug.log
 
-# 4. Consider headless mode
-# May need to implement software rendering or offscreen rendering for CI
+# Run with Vulkan validation
+RUST_LOG=debug VK_INSTANCE_LAYERS=VK_LAYER_KHRONOS_validation cargo run --example triangle 2>&1 | tee triangle_validation.log
+
+# Use GDB debugger
+cargo build --example triangle
+rust-gdb --args target/debug/examples/triangle
+# In GDB: run, bt (for backtrace when it crashes)
+
+# Try release build
+cargo run --example triangle --release
 ```
 
-### Issue Status Quick Reference
-- **M3 Issues #20-#25:** Code merged, CI passed, **CLOSE THESE NOW**
-- **M3 Issue #26:** Not started, needs implementation
-- **M3 Retrospective:** Not created yet, create after #26
-- **M4 Planning (#8):** Open, waiting for M3 completion
-- **M5 Planning (#9):** Open, future work
+**Look for:**
+- Last successful log message before crash
+- Vulkan validation errors
+- Segfault location in backtrace
+- Issues with window/surface creation
+- Device selection problems
+
+**Possible Solutions:**
+- May need headless/offscreen rendering for CI environment
+- Could need specific Vulkan extensions or features
+- Might require different device selection logic
+- May need to handle missing display server gracefully
+
+#### 2. 🔧 ADD TEST TIMEOUT FEATURE
+Once segfault is fixed, add timeout capability for automated testing:
+
+```bash
+# Modify examples/triangle.rs to accept --test-duration flag
+# Example usage:
+cargo run --example triangle -- --test-duration 5
+
+# Should:
+# - Run for 5 seconds
+# - Render frames normally
+# - Log "Test successful" or similar
+# - Exit cleanly with code 0
+```
+
+This enables automated GPU testing in CI.
+
+#### 3. 🧪 IMPLEMENT GPU TESTING (#26)
+After triangle works with timeout:
+
+**Create GPU test job in `.github/workflows/ci.yml`:**
+```yaml
+test-gpu:
+  runs-on: [self-hosted, gpu]
+  needs: build  # Download artifacts instead of building
+  steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: rusty_renderer-release-linux
+        path: target/release/examples/
+    - name: Make executable
+      run: chmod +x target/release/examples/triangle
+    - name: Run triangle test
+      run: RUST_LOG=info target/release/examples/triangle --test-duration 5
+    - name: Verify success
+      run: echo "GPU test passed!"
+```
+
+#### 4. 🎯 CLOSE M3 ISSUES
+After GPU testing works, close implementation issues:
+
+```bash
+gh issue close 20 -c "✅ Vulkan instance with validation layers working. Verified with triangle example and GPU tests. Merged in commit e558737."
+gh issue close 21 -c "✅ Vulkan device selection working. Discrete GPU preferred. Verified with triangle example and GPU tests. Merged in commit 1cee30b."
+gh issue close 22 -c "✅ Vulkan swapchain and surface working. Automatic resize handling verified. Merged in commit 6255f7d."
+gh issue close 23 -c "✅ Shader loading and graphics pipeline working. Triangle renders correctly. Merged in commit fd10e59."
+gh issue close 24 -c "✅ Triangle vertex buffer working (embedded in pipeline). Vertices render with correct colors. Merged in commit fd10e59."
+gh issue close 25 -c "✅ Rendering loop and command buffers working. Frame synchronization verified. Merged in commit 987d9be."
+gh issue close 26 -c "✅ GPU testing infrastructure complete. Automated triangle test running on self-hosted GPU runner. Using artifact download for efficiency."
+```
+
+#### 5. 📝 CREATE M3 RETROSPECTIVE
+Create retrospective issue to review lessons learned:
+
+```bash
+gh issue create --title "M3 Retrospective: Review Vulkan implementation" \
+  --milestone "Milestone 3" \
+  --label "planning,M3" \
+  --body "Review Milestone 3 (Vulkan Triangle Rendering) and document lessons learned.
+
+**Topics to cover:**
+- Vulkan implementation experience
+- Triangle segfault issue and resolution
+- GPU testing strategy
+- Headless rendering approach
+- What worked well
+- What to improve for M4
+- Testing strategy updates
+
+**Deliverables:**
+- [ ] Create docs/M3_RETROSPECTIVE.md
+- [ ] Document segfault debugging process
+- [ ] Update testing strategy if needed
+- [ ] Plan improvements for M4 multi-backend work
+- [ ] Update SESSION_CONTEXT.md"
+```
+
+#### 6. 🏁 CLOSE MILESTONE 3
+After all issues complete:
+```bash
+# Verify all M3 issues are closed
+gh issue list --milestone "Milestone 3"
+
+# Close the milestone (via GitHub web UI or API)
+# Update SESSION_CONTEXT.md to mark M3 complete
+```
 
 ## 🔄 Future Milestones Preview
 
