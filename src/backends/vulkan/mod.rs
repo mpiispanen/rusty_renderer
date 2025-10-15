@@ -4,6 +4,8 @@
 //! Supports validation layers in debug mode and provides a complete
 //! Vulkan rendering pipeline.
 
+mod shaders;
+
 use super::*;
 use anyhow::{Context, Result};
 use std::ffi::CStr;
@@ -46,6 +48,12 @@ pub struct VulkanBackend {
     swapchain_image_views: Vec<vk::ImageView>,
     swapchain_outdated: bool,
 
+    // Render pass and pipeline
+    render_pass: vk::RenderPass,
+    pipeline_layout: vk::PipelineLayout,
+    pipeline: vk::Pipeline,
+    framebuffers: Vec<vk::Framebuffer>,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -77,6 +85,10 @@ impl VulkanBackend {
             swapchain_images: vec![],
             swapchain_image_views: vec![],
             swapchain_outdated: false,
+            render_pass: vk::RenderPass::null(),
+            pipeline_layout: vk::PipelineLayout::null(),
+            pipeline: vk::Pipeline::null(),
+            framebuffers: vec![],
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -509,6 +521,206 @@ impl VulkanBackend {
 
         Ok(())
     }
+
+    /// Create render pass
+    fn create_render_pass(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let color_attachment = vk::AttachmentDescription::builder()
+            .format(self.swapchain_format)
+            .samples(vk::SampleCountFlags::_1)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
+
+        let color_attachment_ref = vk::AttachmentReference::builder()
+            .attachment(0)
+            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+        let color_attachments = &[color_attachment_ref];
+        let subpass = vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(color_attachments);
+
+        let dependency = vk::SubpassDependency::builder()
+            .src_subpass(vk::SUBPASS_EXTERNAL)
+            .dst_subpass(0)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_access_mask(vk::AccessFlags::empty())
+            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
+
+        let attachments = &[color_attachment];
+        let subpasses = &[subpass];
+        let dependencies = &[dependency];
+        let info = vk::RenderPassCreateInfo::builder()
+            .attachments(attachments)
+            .subpasses(subpasses)
+            .dependencies(dependencies);
+
+        self.render_pass = unsafe { device.create_render_pass(&info, None)? };
+
+        log::info!("Render pass created");
+        Ok(())
+    }
+
+    /// Create graphics pipeline
+    fn create_pipeline(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Create shader modules
+        let vert_shader_module = self.create_shader_module(shaders::VERTEX_SHADER)?;
+        let frag_shader_module = self.create_shader_module(shaders::FRAGMENT_SHADER)?;
+
+        let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::VERTEX)
+            .module(vert_shader_module)
+            .name(b"main\0");
+
+        let frag_stage = vk::PipelineShaderStageCreateInfo::builder()
+            .stage(vk::ShaderStageFlags::FRAGMENT)
+            .module(frag_shader_module)
+            .name(b"main\0");
+
+        let stages = &[vert_stage, frag_stage];
+
+        // Vertex input (none - hardcoded in shader)
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder();
+
+        // Input assembly
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+            .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
+            .primitive_restart_enable(false);
+
+        // Viewport and scissor (dynamic)
+        let viewport = vk::Viewport::builder()
+            .x(0.0)
+            .y(0.0)
+            .width(self.swapchain_extent.width as f32)
+            .height(self.swapchain_extent.height as f32)
+            .min_depth(0.0)
+            .max_depth(1.0);
+
+        let scissor = vk::Rect2D::builder()
+            .offset(vk::Offset2D { x: 0, y: 0 })
+            .extent(self.swapchain_extent);
+
+        let viewports = &[viewport];
+        let scissors = &[scissor];
+        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+            .viewports(viewports)
+            .scissors(scissors);
+
+        // Rasterization
+        let rasterization_info = vk::PipelineRasterizationStateCreateInfo::builder()
+            .depth_clamp_enable(false)
+            .rasterizer_discard_enable(false)
+            .polygon_mode(vk::PolygonMode::FILL)
+            .line_width(1.0)
+            .cull_mode(vk::CullModeFlags::BACK)
+            .front_face(vk::FrontFace::CLOCKWISE)
+            .depth_bias_enable(false);
+
+        // Multisampling (disabled)
+        let multisample_info = vk::PipelineMultisampleStateCreateInfo::builder()
+            .sample_shading_enable(false)
+            .rasterization_samples(vk::SampleCountFlags::_1);
+
+        // Color blending
+        let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+            .color_write_mask(vk::ColorComponentFlags::all())
+            .blend_enable(false);
+
+        let color_blend_attachments = &[color_blend_attachment];
+        let color_blend_info = vk::PipelineColorBlendStateCreateInfo::builder()
+            .logic_op_enable(false)
+            .logic_op(vk::LogicOp::COPY)
+            .attachments(color_blend_attachments);
+
+        // Pipeline layout (no descriptors)
+        let layout_info = vk::PipelineLayoutCreateInfo::builder();
+        self.pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None)? };
+
+        // Create pipeline
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
+            .stages(stages)
+            .vertex_input_state(&vertex_input_info)
+            .input_assembly_state(&input_assembly_info)
+            .viewport_state(&viewport_info)
+            .rasterization_state(&rasterization_info)
+            .multisample_state(&multisample_info)
+            .color_blend_state(&color_blend_info)
+            .layout(self.pipeline_layout)
+            .render_pass(self.render_pass)
+            .subpass(0);
+
+        let (pipelines, _) = unsafe {
+            device.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)?
+        };
+
+        self.pipeline = pipelines[0];
+
+        // Cleanup shader modules
+        unsafe {
+            device.destroy_shader_module(vert_shader_module, None);
+            device.destroy_shader_module(frag_shader_module, None);
+        }
+
+        log::info!("Graphics pipeline created");
+        Ok(())
+    }
+
+    /// Create shader module from SPIR-V
+    fn create_shader_module(&self, code: &[u32]) -> Result<vk::ShaderModule> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let info = vk::ShaderModuleCreateInfo::builder().code(code);
+
+        Ok(unsafe { device.create_shader_module(&info, None)? })
+    }
+
+    /// Create framebuffers
+    fn create_framebuffers(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        self.framebuffers = self
+            .swapchain_image_views
+            .iter()
+            .map(|&image_view| {
+                let attachments = &[image_view];
+                let info = vk::FramebufferCreateInfo::builder()
+                    .render_pass(self.render_pass)
+                    .attachments(attachments)
+                    .width(self.swapchain_extent.width)
+                    .height(self.swapchain_extent.height)
+                    .layers(1);
+
+                unsafe { device.create_framebuffer(&info, None) }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        log::info!("Created {} framebuffers", self.framebuffers.len());
+        Ok(())
+    }
+
+    /// Destroy pipeline resources
+    fn destroy_pipeline(&mut self) {
+        if let Some(device) = &self.device {
+            unsafe {
+                device.destroy_pipeline(self.pipeline, None);
+                device.destroy_pipeline_layout(self.pipeline_layout, None);
+                device.destroy_render_pass(self.render_pass, None);
+
+                for &framebuffer in &self.framebuffers {
+                    device.destroy_framebuffer(framebuffer, None);
+                }
+            }
+        }
+        self.framebuffers.clear();
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -547,6 +759,18 @@ impl GraphicsBackend for VulkanBackend {
         self.create_swapchain_image_views()
             .context("Failed to create swapchain image views")?;
 
+        // Create render pass
+        self.create_render_pass()
+            .context("Failed to create render pass")?;
+
+        // Create graphics pipeline
+        self.create_pipeline()
+            .context("Failed to create graphics pipeline")?;
+
+        // Create framebuffers
+        self.create_framebuffers()
+            .context("Failed to create framebuffers")?;
+
         log::info!("Vulkan backend initialized");
         Ok(())
     }
@@ -575,6 +799,9 @@ impl GraphicsBackend for VulkanBackend {
             if let Some(device) = &self.device {
                 let _ = device.device_wait_idle();
             }
+
+            // Destroy pipeline
+            self.destroy_pipeline();
 
             // Destroy swapchain
             self.destroy_swapchain();
