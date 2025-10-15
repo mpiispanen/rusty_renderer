@@ -12,3 +12,7 @@ pub mod render_graph;
 pub mod scene;
 pub mod shaders;
 pub mod ui;
+
+// Re-export main types for convenience
+pub use app::App as RenderEngine;
+pub use config::{Config as RenderConfig, Backend as RenderBackend};

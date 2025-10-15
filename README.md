@@ -6,13 +6,28 @@ A multi-backend 3D renderer in Rust supporting Vulkan, DirectX 12, and wgpu.
 
 This is a cross-platform graphics rendering sandbox developed in Rust to aid learning Rust and AI-driven development.
 
+## Quick Start
+
+```bash
+# Install Vulkan runtime (see docs/RUNNING_LOCALLY.md for platform-specific instructions)
+# Ubuntu/Debian example:
+sudo apt install vulkan-tools libvulkan-dev
+
+# Clone and run the triangle example
+git clone https://github.com/mpiispanen/rusty_renderer.git
+cd rusty_renderer
+cargo run --example triangle --release
+```
+
+You should see a colorful RGB triangle! 🎨
+
 ## Features
 
 - **Multi-backend support**: Vulkan (via vulkanalia), DirectX 12 (Windows), and wgpu
 - **Modern architecture**: Render graph system for automatic dependency management
 - **Cross-platform**: Linux, Windows, and macOS support
 - **Well-tested**: Comprehensive unit and integration tests
-- **CI/CD**: Automated builds, tests, and checks
+- **CI/CD**: Automated builds, tests, and GPU validation
 
 ## Building
 
@@ -37,12 +52,14 @@ cargo build
 # Build in release mode
 cargo build --release
 
-# Run
-cargo run
+# Run triangle example
+cargo run --example triangle --release
 
-# Run with options
-cargo run -- --backend vulkan --width 1920 --height 1080
+# Run with detailed logging
+RUST_LOG=debug cargo run --example triangle
 ```
+
+For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md).
 
 ## Command-Line Options
 
