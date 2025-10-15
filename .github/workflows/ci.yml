@@ -12,9 +12,12 @@ env:
 jobs:
   build:
     name: Build
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
       
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -40,21 +43,34 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-target-
       
-      - name: Build
+      - name: Build (debug)
+        run: cargo build --verbose
+      
+      - name: Build (release)
         run: cargo build --release --verbose
       
-      - name: Upload build artifacts
+      - name: Upload debug binary
         uses: actions/upload-artifact@v4
         with:
-          name: rusty_renderer-linux
+          name: rusty_renderer-debug-linux
+          path: target/debug/rusty_renderer
+          if-no-files-found: error
+      
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusty_renderer-release-linux
           path: target/release/rusty_renderer
           if-no-files-found: error
 
   test:
-    name: Test
-    runs-on: self-hosted
+    name: Test (Unit)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
       
       - name: Cache cargo
         uses: actions/cache@v4
@@ -70,11 +86,39 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-  clippy:
-    name: Clippy
-    runs-on: self-hosted
+  test-gpu:
+    name: Test (GPU)
+    runs-on: [self-hosted, gpu]
+    needs: build
+    if: false  # Disabled until we have GPU-specific tests
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Download release binary
+        uses: actions/download-artifact@v4
+        with:
+          name: rusty_renderer-release-linux
+          path: ./bin
+      
+      - name: Make binary executable
+        run: chmod +x ./bin/rusty_renderer
+      
+      - name: Run GPU tests
+        run: |
+          # Future: GPU-specific integration tests will go here
+          ./bin/rusty_renderer --help
+          echo "GPU tests not yet implemented (placeholder for M3+)"
+
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       
       - name: Cache cargo
         uses: actions/cache@v4
@@ -92,18 +136,26 @@ jobs:
 
   format:
     name: Format
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
       
       - name: Check formatting
         run: cargo fmt --all -- --check
 
   docs:
     name: Documentation
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
       
       - name: Cache cargo
         uses: actions/cache@v4

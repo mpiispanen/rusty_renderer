@@ -2,12 +2,53 @@
 
 This guide walks you through setting up a GitHub Actions self-hosted runner on Bazzite Linux that will automatically start on boot.
 
+## CI Architecture
+
+### Hybrid Runner Strategy
+
+The project uses a **hybrid CI approach** for optimal resource usage:
+
+**GitHub-Hosted Runners (ubuntu-latest):**
+- Build jobs (debug + release)
+- Unit tests (no GPU required)
+- Clippy (linting)
+- Format checking
+- Documentation build
+
+**Self-Hosted Runner with GPU:**
+- GPU-specific integration tests (M3+)
+- Graphics API validation
+- Visual regression tests (future)
+
+### Benefits
+
+✅ **Cost Efficient:** Free GitHub runners for most jobs  
+✅ **Fast:** Parallel execution, artifact sharing between jobs  
+✅ **GPU Access:** Self-hosted runner tagged with `gpu` for graphics tests  
+✅ **Reduced Load:** Self-hosted runner only for GPU-requiring tasks
+
+### Build Artifact Flow
+
+```
+Build Job (GitHub-hosted)
+    ├─> Debug binary → artifact
+    └─> Release binary → artifact
+            ↓
+    Test-GPU Job (Self-hosted)
+        ├─> Downloads release binary
+        └─> Runs GPU tests without rebuilding
+```
+
+This saves ~2-3 minutes on GPU test jobs by reusing build artifacts.
+
 ## Why Self-Hosted Runner?
 
 For a graphics renderer project, we need:
 - Access to GPU hardware (Vulkan, DirectX via Wine/Proton, etc.)
 - Ability to run graphics tests with real hardware
 - Consistent environment for reproducible builds
+
+**Note:** Currently GPU tests are disabled (`if: false`) until M3 when we have actual GPU test cases.
 
 ## Prerequisites
 
@@ -54,9 +95,11 @@ tar xzf ./actions-runner-linux-x64-2.319.1.tar.gz
 # When prompted:
 # - Enter runner name: bazzite-gpu-runner (or your preference)
 # - Enter runner group: Default
-# - Enter labels: self-hosted,Linux,X64,gpu,vulkan (add any you want)
+# - Enter labels: self-hosted,Linux,X64,gpu (IMPORTANT: include 'gpu' tag)
 # - Enter work folder: _work (default is fine)
 ```
+
+**Important:** The `gpu` label is required for GPU-specific test jobs. The CI workflow uses `runs-on: [self-hosted, gpu]` to target this runner.
 
 ### 5. Test the Runner Manually
 
