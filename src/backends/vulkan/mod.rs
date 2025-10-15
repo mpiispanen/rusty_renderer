@@ -282,9 +282,8 @@ mod tests {
 
     #[test]
     fn test_vulkan_command_buffer_creation() {
-        let cmd_buffer = VulkanCommandBuffer::new();
+        let _cmd_buffer = VulkanCommandBuffer::new();
         // Just verify it doesn't panic
-        drop(cmd_buffer);
     }
 
     #[test]
