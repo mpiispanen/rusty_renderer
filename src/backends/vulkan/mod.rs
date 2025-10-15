@@ -11,11 +11,17 @@ use std::os::raw::c_void;
 use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
+use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
 use vulkanalia::window as vk_window;
+
+// Alias to avoid name collision with our Device trait
+type VkDevice = vulkanalia::Device;
 
 const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
 const VALIDATION_LAYER: vk::ExtensionName =
     vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
+
+const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 
 /// Vulkan backend implementation
 pub struct VulkanBackend {
@@ -24,8 +30,14 @@ pub struct VulkanBackend {
     instance: Option<Instance>,
     messenger: Option<vk::DebugUtilsMessengerEXT>,
 
+    // Device and queues
+    physical_device: vk::PhysicalDevice,
+    device: Option<VkDevice>,
+    graphics_queue: vk::Queue,
+    present_queue: vk::Queue,
+
     // Stub components (will be replaced in future issues)
-    device: VulkanDevice,
+    device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
 }
 
@@ -44,7 +56,11 @@ impl VulkanBackend {
             entry: Some(entry),
             instance: None,
             messenger: None,
-            device: VulkanDevice::new(),
+            physical_device: vk::PhysicalDevice::null(),
+            device: None,
+            graphics_queue: vk::Queue::null(),
+            present_queue: vk::Queue::null(),
+            device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
     }
@@ -134,6 +150,156 @@ impl VulkanBackend {
 
         Ok(())
     }
+
+    /// Pick physical device (GPU)
+    fn pick_physical_device(&mut self, window: &winit::window::Window) -> Result<()> {
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+
+        // Create temporary surface for device selection
+        let surface = unsafe { vk_window::create_surface(instance, window, window)? };
+
+        let devices = unsafe { instance.enumerate_physical_devices()? };
+
+        log::info!("Available devices: {}", devices.len());
+
+        // Find suitable device
+        let physical_device = devices
+            .iter()
+            .find(|d| self.is_device_suitable(instance, **d, surface))
+            .copied()
+            .context("No suitable physical device found")?;
+
+        // Log device info
+        let props = unsafe { instance.get_physical_device_properties(physical_device) };
+        let device_name = unsafe { CStr::from_ptr(props.device_name.as_ptr()) }.to_string_lossy();
+
+        log::info!("Selected device: {device_name}");
+        log::info!("Device type: {:?}", props.device_type);
+
+        self.physical_device = physical_device;
+
+        // Clean up temporary surface
+        unsafe {
+            instance.destroy_surface_khr(surface, None);
+        }
+
+        Ok(())
+    }
+
+    /// Check if device is suitable
+    fn is_device_suitable(
+        &self,
+        instance: &Instance,
+        device: vk::PhysicalDevice,
+        surface: vk::SurfaceKHR,
+    ) -> bool {
+        // Check queue families
+        let queue_families = QueueFamilyIndices::get(instance, device, surface);
+        if !queue_families.is_complete() {
+            return false;
+        }
+
+        // Check device extensions
+        if !self.check_device_extension_support(instance, device) {
+            return false;
+        }
+
+        // Check swapchain support
+        let swapchain_support = SwapchainSupport::get(instance, device, surface);
+        if swapchain_support.formats.is_empty() || swapchain_support.present_modes.is_empty() {
+            return false;
+        }
+
+        true
+    }
+
+    /// Check device extension support
+    fn check_device_extension_support(
+        &self,
+        instance: &Instance,
+        device: vk::PhysicalDevice,
+    ) -> bool {
+        let available = unsafe {
+            instance
+                .enumerate_device_extension_properties(device, None)
+                .unwrap_or_default()
+        };
+
+        let available_names: std::collections::HashSet<_> =
+            available.iter().map(|e| e.extension_name).collect();
+
+        DEVICE_EXTENSIONS
+            .iter()
+            .all(|ext| available_names.contains(ext))
+    }
+
+    /// Create logical device
+    fn create_logical_device(&mut self, window: &winit::window::Window) -> Result<()> {
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+
+        // Create surface for queue family detection
+        let surface = unsafe { vk_window::create_surface(instance, window, window)? };
+
+        let indices = QueueFamilyIndices::get(instance, self.physical_device, surface);
+
+        // Queue create infos
+        let mut unique_indices = vec![indices.graphics, indices.present];
+        unique_indices.dedup();
+
+        let queue_priorities = [1.0];
+        let queue_infos: Vec<_> = unique_indices
+            .iter()
+            .map(|&i| {
+                vk::DeviceQueueCreateInfo::builder()
+                    .queue_family_index(i)
+                    .queue_priorities(&queue_priorities)
+                    .build()
+            })
+            .collect();
+
+        // Device features (none required for now)
+        let features = vk::PhysicalDeviceFeatures::builder();
+
+        // Extensions
+        let extensions = DEVICE_EXTENSIONS
+            .iter()
+            .map(|n| n.as_ptr())
+            .collect::<Vec<_>>();
+
+        // Validation layers
+        let layers = if VALIDATION_ENABLED {
+            vec![VALIDATION_LAYER.as_ptr()]
+        } else {
+            vec![]
+        };
+
+        let info = vk::DeviceCreateInfo::builder()
+            .queue_create_infos(&queue_infos)
+            .enabled_features(&features)
+            .enabled_extension_names(&extensions)
+            .enabled_layer_names(&layers);
+
+        let device = unsafe { instance.create_device(self.physical_device, &info, None)? };
+
+        // Get queue handles
+        let graphics_queue = unsafe { device.get_device_queue(indices.graphics, 0) };
+        let present_queue = unsafe { device.get_device_queue(indices.present, 0) };
+
+        log::info!("Logical device created");
+        log::info!("Graphics queue family: {}", indices.graphics);
+        log::info!("Present queue family: {}", indices.present);
+
+        self.device = Some(device);
+        self.graphics_queue = graphics_queue;
+        self.present_queue = present_queue;
+
+        // Clean up temporary surface
+        unsafe {
+            instance.destroy_surface_khr(surface, None);
+        }
+
+        Ok(())
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -151,6 +317,14 @@ impl GraphicsBackend for VulkanBackend {
         // Create debug messenger
         self.create_debug_messenger()
             .context("Failed to create debug messenger")?;
+
+        // Pick physical device
+        self.pick_physical_device(window)
+            .context("Failed to pick physical device")?;
+
+        // Create logical device
+        self.create_logical_device(window)
+            .context("Failed to create logical device")?;
 
         log::info!("Vulkan backend initialized");
         Ok(())
@@ -175,6 +349,12 @@ impl GraphicsBackend for VulkanBackend {
         log::info!("Cleaning up Vulkan backend");
 
         unsafe {
+            // Destroy logical device
+            if let Some(device) = &self.device {
+                device.destroy_device(None);
+            }
+
+            // Destroy debug messenger and instance
             if let Some(instance) = &self.instance {
                 if let Some(messenger) = self.messenger {
                     instance.destroy_debug_utils_messenger_ext(messenger, None);
@@ -187,7 +367,7 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn device(&self) -> &dyn super::Device {
-        &self.device
+        &self.device_wrapper
     }
 
     fn swapchain(&self) -> &dyn Swapchain {
@@ -386,6 +566,78 @@ impl Swapchain for VulkanSwapchain {
         self.width = width;
         self.height = height;
         Ok(())
+    }
+}
+
+/// Queue family indices
+#[derive(Copy, Clone, Debug)]
+struct QueueFamilyIndices {
+    graphics: u32,
+    present: u32,
+}
+
+impl QueueFamilyIndices {
+    fn get(instance: &Instance, device: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> Self {
+        let properties = unsafe { instance.get_physical_device_queue_family_properties(device) };
+
+        let mut graphics = None;
+        let mut present = None;
+
+        for (index, properties) in properties.iter().enumerate() {
+            if properties.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                graphics = Some(index as u32);
+            }
+
+            let present_support = unsafe {
+                instance
+                    .get_physical_device_surface_support_khr(device, index as u32, surface)
+                    .unwrap_or(false)
+            };
+
+            if present_support {
+                present = Some(index as u32);
+            }
+
+            if graphics.is_some() && present.is_some() {
+                break;
+            }
+        }
+
+        Self {
+            graphics: graphics.unwrap_or(0),
+            present: present.unwrap_or(0),
+        }
+    }
+
+    fn is_complete(&self) -> bool {
+        self.graphics != u32::MAX && self.present != u32::MAX
+    }
+}
+
+/// Swapchain support details
+#[derive(Clone, Debug, Default)]
+#[allow(dead_code)]
+struct SwapchainSupport {
+    capabilities: vk::SurfaceCapabilitiesKHR,
+    formats: Vec<vk::SurfaceFormatKHR>,
+    present_modes: Vec<vk::PresentModeKHR>,
+}
+
+impl SwapchainSupport {
+    fn get(instance: &Instance, device: vk::PhysicalDevice, surface: vk::SurfaceKHR) -> Self {
+        unsafe {
+            Self {
+                capabilities: instance
+                    .get_physical_device_surface_capabilities_khr(device, surface)
+                    .unwrap_or_default(),
+                formats: instance
+                    .get_physical_device_surface_formats_khr(device, surface)
+                    .unwrap_or_default(),
+                present_modes: instance
+                    .get_physical_device_surface_present_modes_khr(device, surface)
+                    .unwrap_or_default(),
+            }
+        }
     }
 }
 
