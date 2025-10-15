@@ -3,8 +3,9 @@
 //! This module provides the main application structure, event loop,
 //! and window management using winit.
 
-use crate::config::Config;
-use anyhow::Result;
+use crate::backends::{self, BackendType, GraphicsBackend};
+use crate::config::{Backend, Config};
+use anyhow::{Context, Result};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -15,12 +16,13 @@ use winit::{
 /// Main application structure
 pub struct App {
     window: Option<Window>,
+    backend: Option<Box<dyn GraphicsBackend>>,
     config: Config,
 }
 
 impl App {
     /// Create a new application instance with the given configuration
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: Config) -> Result<Self> {
         log::info!("Creating application");
         log::info!("Backend: {}", config.backend);
         log::info!(
@@ -31,10 +33,24 @@ impl App {
         log::info!("Debug mode: {}", config.debug);
         log::info!("VSync: {}", config.vsync);
 
-        Self {
+        // Create backend based on config
+        let backend_type = match config.backend {
+            Backend::Vulkan => BackendType::Vulkan,
+            #[cfg(target_os = "windows")]
+            Backend::DirectX => BackendType::DirectX12,
+            Backend::Wgpu => BackendType::Wgpu,
+        };
+
+        let backend = backends::create_backend(backend_type)
+            .with_context(|| format!("Failed to create {backend_type} backend"))?;
+
+        log::info!("Successfully created {} backend", backend.backend_type());
+
+        Ok(Self {
             window: None,
+            backend: Some(backend),
             config,
-        }
+        })
     }
 
     /// Run the application event loop
@@ -44,7 +60,7 @@ impl App {
         let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Poll);
 
-        let mut app = App::new(config);
+        let mut app = App::new(config)?;
         event_loop.run_app(&mut app)?;
 
         Ok(())
@@ -70,6 +86,17 @@ impl ApplicationHandler for App {
                         window.inner_size().width,
                         window.inner_size().height
                     );
+
+                    // Initialize backend with the window
+                    if let Some(backend) = &mut self.backend {
+                        if let Err(e) = backend.initialize(&window) {
+                            log::error!("Failed to initialize backend: {e}");
+                            event_loop.exit();
+                            return;
+                        }
+                        log::info!("Backend initialized successfully");
+                    }
+
                     self.window = Some(window);
                 }
                 Err(e) => {
@@ -89,10 +116,18 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 log::info!("Close requested, shutting down");
+                if let Some(backend) = &mut self.backend {
+                    backend.cleanup();
+                }
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
                 log::debug!("Window resized to {}x{}", size.width, size.height);
+                if let Some(backend) = &mut self.backend {
+                    if let Err(e) = backend.resize(size.width, size.height) {
+                        log::error!("Backend resize failed: {e}");
+                    }
+                }
             }
             WindowEvent::RedrawRequested => {
                 // Rendering will be implemented in future milestones
