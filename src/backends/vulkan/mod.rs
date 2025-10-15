@@ -12,6 +12,7 @@ use vulkanalia::loader::{LibloadingLoader, LIBRARY};
 use vulkanalia::prelude::v1_0::*;
 use vulkanalia::vk::ExtDebugUtilsExtensionInstanceCommands;
 use vulkanalia::vk::KhrSurfaceExtensionInstanceCommands;
+use vulkanalia::vk::KhrSwapchainExtensionDeviceCommands;
 use vulkanalia::window as vk_window;
 
 // Alias to avoid name collision with our Device trait
@@ -35,6 +36,15 @@ pub struct VulkanBackend {
     device: Option<VkDevice>,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+
+    // Surface and swapchain
+    surface: vk::SurfaceKHR,
+    swapchain_khr: vk::SwapchainKHR,
+    swapchain_format: vk::Format,
+    swapchain_extent: vk::Extent2D,
+    swapchain_images: Vec<vk::Image>,
+    swapchain_image_views: Vec<vk::ImageView>,
+    swapchain_outdated: bool,
 
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
@@ -60,6 +70,13 @@ impl VulkanBackend {
             device: None,
             graphics_queue: vk::Queue::null(),
             present_queue: vk::Queue::null(),
+            surface: vk::SurfaceKHR::null(),
+            swapchain_khr: vk::SwapchainKHR::null(),
+            swapchain_format: vk::Format::default(),
+            swapchain_extent: vk::Extent2D::default(),
+            swapchain_images: vec![],
+            swapchain_image_views: vec![],
+            swapchain_outdated: false,
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -300,6 +317,198 @@ impl VulkanBackend {
 
         Ok(())
     }
+
+    /// Create surface
+    fn create_surface(&mut self, window: &winit::window::Window) -> Result<()> {
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+
+        let surface = unsafe { vk_window::create_surface(instance, window, window)? };
+
+        self.surface = surface;
+        log::info!("Vulkan surface created");
+
+        Ok(())
+    }
+
+    /// Choose swapchain surface format
+    fn choose_swapchain_format(formats: &[vk::SurfaceFormatKHR]) -> vk::SurfaceFormatKHR {
+        formats
+            .iter()
+            .find(|f| {
+                f.format == vk::Format::B8G8R8A8_SRGB
+                    && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR
+            })
+            .copied()
+            .unwrap_or(formats[0])
+    }
+
+    /// Choose swapchain present mode
+    fn choose_swapchain_present_mode(present_modes: &[vk::PresentModeKHR]) -> vk::PresentModeKHR {
+        present_modes
+            .iter()
+            .find(|&&m| m == vk::PresentModeKHR::MAILBOX)
+            .copied()
+            .unwrap_or(vk::PresentModeKHR::FIFO)
+    }
+
+    /// Choose swapchain extent
+    fn choose_swapchain_extent(
+        capabilities: &vk::SurfaceCapabilitiesKHR,
+        window: &winit::window::Window,
+    ) -> vk::Extent2D {
+        if capabilities.current_extent.width != u32::MAX {
+            capabilities.current_extent
+        } else {
+            let size = window.inner_size();
+            vk::Extent2D {
+                width: size.width.clamp(
+                    capabilities.min_image_extent.width,
+                    capabilities.max_image_extent.width,
+                ),
+                height: size.height.clamp(
+                    capabilities.min_image_extent.height,
+                    capabilities.max_image_extent.height,
+                ),
+            }
+        }
+    }
+
+    /// Create swapchain
+    fn create_swapchain(&mut self, window: &winit::window::Window) -> Result<()> {
+        let instance = self.instance.as_ref().context("Instance not initialized")?;
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Get swapchain support
+        let support = SwapchainSupport::get(instance, self.physical_device, self.surface);
+
+        let format = Self::choose_swapchain_format(&support.formats);
+        let present_mode = Self::choose_swapchain_present_mode(&support.present_modes);
+        let extent = Self::choose_swapchain_extent(&support.capabilities, window);
+
+        // Image count
+        let mut image_count = support.capabilities.min_image_count + 1;
+        if support.capabilities.max_image_count > 0
+            && image_count > support.capabilities.max_image_count
+        {
+            image_count = support.capabilities.max_image_count;
+        }
+
+        // Queue family indices
+        let indices = QueueFamilyIndices::get(instance, self.physical_device, self.surface);
+        let queue_family_indices = vec![indices.graphics, indices.present];
+
+        let (image_sharing_mode, queue_family_indices_slice) =
+            if indices.graphics != indices.present {
+                (vk::SharingMode::CONCURRENT, queue_family_indices.as_slice())
+            } else {
+                (vk::SharingMode::EXCLUSIVE, &[] as &[u32])
+            };
+
+        let info = vk::SwapchainCreateInfoKHR::builder()
+            .surface(self.surface)
+            .min_image_count(image_count)
+            .image_format(format.format)
+            .image_color_space(format.color_space)
+            .image_extent(extent)
+            .image_array_layers(1)
+            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
+            .image_sharing_mode(image_sharing_mode)
+            .queue_family_indices(queue_family_indices_slice)
+            .pre_transform(support.capabilities.current_transform)
+            .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
+            .present_mode(present_mode)
+            .clipped(true)
+            .old_swapchain(vk::SwapchainKHR::null());
+
+        let swapchain = unsafe { device.create_swapchain_khr(&info, None)? };
+
+        self.swapchain_khr = swapchain;
+        self.swapchain_format = format.format;
+        self.swapchain_extent = extent;
+
+        // Get swapchain images
+        self.swapchain_images = unsafe { device.get_swapchain_images_khr(swapchain)? };
+
+        log::info!("Swapchain created: {}x{}", extent.width, extent.height);
+        log::info!("Swapchain images: {}", self.swapchain_images.len());
+
+        Ok(())
+    }
+
+    /// Create swapchain image views
+    fn create_swapchain_image_views(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        self.swapchain_image_views = self
+            .swapchain_images
+            .iter()
+            .map(|&image| {
+                let info = vk::ImageViewCreateInfo::builder()
+                    .image(image)
+                    .view_type(vk::ImageViewType::_2D)
+                    .format(self.swapchain_format)
+                    .components(vk::ComponentMapping {
+                        r: vk::ComponentSwizzle::IDENTITY,
+                        g: vk::ComponentSwizzle::IDENTITY,
+                        b: vk::ComponentSwizzle::IDENTITY,
+                        a: vk::ComponentSwizzle::IDENTITY,
+                    })
+                    .subresource_range(vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    });
+
+                unsafe { device.create_image_view(&info, None) }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        log::info!(
+            "Created {} swapchain image views",
+            self.swapchain_image_views.len()
+        );
+
+        Ok(())
+    }
+
+    /// Destroy swapchain resources
+    fn destroy_swapchain(&mut self) {
+        if let Some(device) = &self.device {
+            unsafe {
+                for &image_view in &self.swapchain_image_views {
+                    device.destroy_image_view(image_view, None);
+                }
+                device.destroy_swapchain_khr(self.swapchain_khr, None);
+            }
+        }
+
+        self.swapchain_image_views.clear();
+        self.swapchain_images.clear();
+    }
+
+    /// Recreate swapchain (for resize)
+    #[allow(dead_code)]
+    fn recreate_swapchain(&mut self, window: &winit::window::Window) -> Result<()> {
+        log::info!("Recreating swapchain");
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Wait for device to be idle
+        unsafe {
+            device.device_wait_idle()?;
+        }
+
+        // Destroy old swapchain
+        self.destroy_swapchain();
+
+        // Create new swapchain
+        self.create_swapchain(window)?;
+        self.create_swapchain_image_views()?;
+
+        Ok(())
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -326,6 +535,18 @@ impl GraphicsBackend for VulkanBackend {
         self.create_logical_device(window)
             .context("Failed to create logical device")?;
 
+        // Create surface
+        self.create_surface(window)
+            .context("Failed to create surface")?;
+
+        // Create swapchain
+        self.create_swapchain(window)
+            .context("Failed to create swapchain")?;
+
+        // Create swapchain image views
+        self.create_swapchain_image_views()
+            .context("Failed to create swapchain image views")?;
+
         log::info!("Vulkan backend initialized");
         Ok(())
     }
@@ -340,8 +561,9 @@ impl GraphicsBackend for VulkanBackend {
         Ok(())
     }
 
-    fn resize(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Will be implemented in issue #22 (swapchain)
+    fn resize(&mut self, width: u32, height: u32) -> Result<()> {
+        log::info!("Resize requested: {width}x{height}");
+        self.swapchain_outdated = true;
         Ok(())
     }
 
@@ -349,6 +571,19 @@ impl GraphicsBackend for VulkanBackend {
         log::info!("Cleaning up Vulkan backend");
 
         unsafe {
+            // Wait for device to finish
+            if let Some(device) = &self.device {
+                let _ = device.device_wait_idle();
+            }
+
+            // Destroy swapchain
+            self.destroy_swapchain();
+
+            // Destroy surface
+            if let Some(instance) = &self.instance {
+                instance.destroy_surface_khr(self.surface, None);
+            }
+
             // Destroy logical device
             if let Some(device) = &self.device {
                 device.destroy_device(None);
