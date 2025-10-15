@@ -99,9 +99,9 @@ convert_md_to_html() {
     <div class="content">
 EOF
 
-    # Use markdown_py for conversion
+    # Use markdown_py for conversion with fenced code block support
     if command -v markdown_py &> /dev/null; then
-        markdown_py "${md_file}" >> "${html_file}"
+        markdown_py -x fenced_code -x codehilite "${md_file}" >> "${html_file}"
     elif command -v cmark &> /dev/null; then
         cmark "${md_file}" >> "${html_file}"
     else

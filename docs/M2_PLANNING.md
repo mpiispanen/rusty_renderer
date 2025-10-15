@@ -29,6 +29,9 @@ Key insight: **Trait-based backend abstraction is validated by stub structure**
 ### Core Traits (from DESIGN.md)
 
 #### 1. GraphicsBackend (Main Interface)
+
+**Purpose:** Unified entry point for all backend operations
+
 ```rust
 pub trait GraphicsBackend {
     fn backend_type() -> BackendType;
@@ -42,9 +45,10 @@ pub trait GraphicsBackend {
 }
 ```
 
-**Purpose:** Unified entry point for all backend operations
-
 #### 2. Device (Device Management)
+
+**Purpose:** GPU device abstraction, capability queries
+
 ```rust
 pub trait Device {
     fn name(&self) -> &str;
@@ -54,9 +58,10 @@ pub trait Device {
 }
 ```
 
-**Purpose:** GPU device abstraction, capability queries
-
 #### 3. CommandBuffer (Command Recording)
+
+**Purpose:** Recording rendering commands (minimal set for M2/M3)
+
 ```rust
 pub trait CommandBuffer {
     fn begin(&mut self) -> Result<()>;
@@ -67,9 +72,10 @@ pub trait CommandBuffer {
 }
 ```
 
-**Purpose:** Recording rendering commands (minimal set for M2/M3)
-
 #### 4. Pipeline (Pipeline State)
+
+**Purpose:** Graphics pipeline abstraction (will expand in M3)
+
 ```rust
 pub trait Pipeline {
     fn name(&self) -> &str;
@@ -77,9 +83,10 @@ pub trait Pipeline {
 }
 ```
 
-**Purpose:** Graphics pipeline abstraction (will expand in M3)
-
 #### 5. Resource (Buffers/Textures)
+
+**Purpose:** GPU resource management (basic for M2)
+
 ```rust
 pub trait Resource {
     fn size(&self) -> usize;
@@ -88,9 +95,10 @@ pub trait Resource {
 }
 ```
 
-**Purpose:** GPU resource management (basic for M2)
-
 #### 6. Swapchain (Presentation)
+
+**Purpose:** Window surface and presentation management
+
 ```rust
 pub trait Swapchain {
     fn width(&self) -> u32;
@@ -101,8 +109,6 @@ pub trait Swapchain {
     fn recreate(&mut self, width: u32, height: u32) -> Result<()>;
 }
 ```
-
-**Purpose:** Window surface and presentation management
 
 ### Design Principles
 
