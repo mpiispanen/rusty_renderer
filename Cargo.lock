@@ -1536,6 +1536,7 @@ dependencies = [
  "pollster",
  "vulkanalia",
  "wgpu",
+ "windows",
  "winit",
 ]
 
