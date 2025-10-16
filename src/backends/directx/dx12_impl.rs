@@ -5,9 +5,9 @@
 
 use super::*;
 use anyhow::{Context, Result};
-use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use std::mem;
 use std::ptr;
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::{
     core::*,
     Win32::Foundation::*,
@@ -15,6 +15,7 @@ use windows::{
     Win32::Graphics::Direct3D12::*,
     Win32::Graphics::Dxgi::Common::*,
     Win32::Graphics::Dxgi::*,
+    Win32::System::Threading::*,
 };
 
 /// DirectX 12 backend implementation
@@ -51,7 +52,16 @@ pub struct DirectXBackendImpl {
     height: u32,
     frame_count: u32,
     use_warp: bool,
+    
+    // Trait implementations
+    device_wrapper: DirectXDevice,
+    swapchain_wrapper: DirectXSwapchain,
 }
+
+// SAFETY: DirectX 12 objects are thread-safe once created
+// HANDLE is just a pointer that we manage carefully
+unsafe impl Send for DirectXBackendImpl {}
+unsafe impl Sync for DirectXBackendImpl {}
 
 impl DirectXBackendImpl {
     pub fn new() -> Result<Self> {
@@ -81,6 +91,12 @@ impl DirectXBackendImpl {
             height: 600,
             frame_count: 2, // Double buffering
             use_warp,
+            device_wrapper: DirectXDevice,
+            swapchain_wrapper: DirectXSwapchain {
+                width: 800,
+                height: 600,
+                frame_index: 0,
+            },
         })
     }
 
@@ -198,7 +214,8 @@ impl DirectXBackendImpl {
             let command_queue = self.command_queue.as_ref().context("Command queue not created")?;
             
             // Get HWND from window
-            let hwnd = match window.window_handle()?.as_raw() {
+            let window_handle = window.window_handle()?;
+            let hwnd = match window_handle.as_raw() {
                 RawWindowHandle::Win32(handle) => HWND(handle.hwnd.get() as isize),
                 _ => anyhow::bail!("Not a Windows window"),
             };
@@ -412,15 +429,11 @@ impl DirectXBackendImpl {
     }
 
     pub fn device(&self) -> &dyn Device {
-        &DirectXDevice
+        &self.device_wrapper
     }
 
     pub fn swapchain(&self) -> &dyn Swapchain {
-        &DirectXSwapchain {
-            width: self.width,
-            height: self.height,
-            frame_index: self.frame_index as usize,
-        }
+        &self.swapchain_wrapper
     }
 }
 
