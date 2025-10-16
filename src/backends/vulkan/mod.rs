@@ -722,7 +722,7 @@ impl VulkanBackend {
         }
 
         let info = vk::ShaderModuleCreateInfo::builder()
-            .code_size(code.len() * std::mem::size_of::<u32>())
+            .code_size(std::mem::size_of_val(code))
             .code(code);
 
         Ok(unsafe { device.create_shader_module(&info, None)? })
@@ -935,7 +935,8 @@ impl GraphicsBackend for VulkanBackend {
 
         log::info!("Creating graphics pipeline");
         // Create graphics pipeline
-        self.create_pipeline().context("Failed to create graphics pipeline")?;
+        self.create_pipeline()
+            .context("Failed to create graphics pipeline")?;
         log::info!("Graphics pipeline creation completed");
 
         // Create framebuffers
@@ -1062,9 +1063,12 @@ impl GraphicsBackend for VulkanBackend {
         if self.swapchain_extent.width == width && self.swapchain_extent.height == height {
             return Ok(());
         }
-        
-        log::info!("Resizing swapchain: {}x{} -> {width}x{height}", 
-            self.swapchain_extent.width, self.swapchain_extent.height);
+
+        log::info!(
+            "Resizing swapchain: {}x{} -> {width}x{height}",
+            self.swapchain_extent.width,
+            self.swapchain_extent.height
+        );
         self.swapchain_outdated = true;
         Ok(())
     }

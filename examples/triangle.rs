@@ -13,7 +13,7 @@ struct Args {
 impl Args {
     fn parse() -> Self {
         let mut test_duration = None;
-        
+
         let mut args = std::env::args().skip(1);
         while let Some(arg) = args.next() {
             match arg.as_str() {
@@ -29,13 +29,13 @@ impl Args {
                     std::process::exit(0);
                 }
                 _ => {
-                    eprintln!("Unknown argument: {}", arg);
+                    eprintln!("Unknown argument: {arg}");
                     eprintln!("Use --help for usage information");
                     std::process::exit(1);
                 }
             }
         }
-        
+
         Self { test_duration }
     }
 }
@@ -43,14 +43,14 @@ impl Args {
 fn main() -> anyhow::Result<()> {
     // Parse arguments
     let args = Args::parse();
-    
+
     // Initialize logging
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
 
     log::info!("Starting Rusty Renderer Triangle Example");
-    
+
     if let Some(duration) = args.test_duration {
-        log::info!("Test mode: will run for {} seconds", duration);
+        log::info!("Test mode: will run for {duration} seconds");
     }
 
     // Create configuration
@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
 
     // Create event loop
     let event_loop = EventLoop::new()?;
-    
+
     // Use Poll mode for better responsiveness
     event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
@@ -81,14 +81,14 @@ fn main() -> anyhow::Result<()> {
         // Wrap the check in Arc<Mutex> for thread safety
         let should_exit = Arc::new(Mutex::new(false));
         let should_exit_clone = Arc::clone(&should_exit);
-        
+
         // Spawn thread to set exit flag after duration
         std::thread::spawn(move || {
             std::thread::sleep(duration);
             *should_exit_clone.lock().unwrap() = true;
             log::info!("Test duration elapsed, requesting exit");
         });
-        
+
         // Run with exit check
         // Note: In winit 0.30, we need to use the event loop API differently
         // For now, just run normally - the thread will exit the process
@@ -99,5 +99,5 @@ fn main() -> anyhow::Result<()> {
     };
 
     log::info!("Triangle example finished");
-    result.map_err(|e| anyhow::anyhow!("Event loop error: {:?}", e))
+    result.map_err(|e| anyhow::anyhow!("Event loop error: {e:?}"))
 }

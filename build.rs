@@ -21,7 +21,7 @@ fn main() {
     if let Ok(output) = Command::new("glslc").arg("--version").output() {
         if output.status.success() {
             println!("cargo:warning=Compiling shaders with glslc");
-            
+
             // Compile vertex shader
             let vert_result = Command::new("glslc")
                 .arg(vertex_src)
@@ -62,7 +62,7 @@ fn main() {
         if let Ok(output) = Command::new("glslangValidator").arg("--version").output() {
             if output.status.success() {
                 println!("cargo:warning=Compiling shaders with glslangValidator");
-                
+
                 // Compile vertex shader
                 let vert_result = Command::new("glslangValidator")
                     .arg("-V")
@@ -102,36 +102,34 @@ fn main() {
     }
 
     // Validate compiled shaders if spirv-val is available
-    if compiled {
-        if let Ok(_) = Command::new("spirv-val").arg("--version").output() {
-            // Validate vertex shader
-            let vert_val = Command::new("spirv-val")
-                .arg(&vertex_spv)
-                .output()
-                .expect("Failed to run spirv-val");
+    if compiled && Command::new("spirv-val").arg("--version").output().is_ok() {
+        // Validate vertex shader
+        let vert_val = Command::new("spirv-val")
+            .arg(&vertex_spv)
+            .output()
+            .expect("Failed to run spirv-val");
 
-            if !vert_val.status.success() {
-                panic!(
-                    "Vertex shader validation failed:\n{}",
-                    String::from_utf8_lossy(&vert_val.stderr)
-                );
-            }
-
-            // Validate fragment shader
-            let frag_val = Command::new("spirv-val")
-                .arg(&fragment_spv)
-                .output()
-                .expect("Failed to run spirv-val");
-
-            if !frag_val.status.success() {
-                panic!(
-                    "Fragment shader validation failed:\n{}",
-                    String::from_utf8_lossy(&frag_val.stderr)
-                );
-            }
-
-            println!("cargo:warning=Shaders validated successfully with spirv-val");
+        if !vert_val.status.success() {
+            panic!(
+                "Vertex shader validation failed:\n{}",
+                String::from_utf8_lossy(&vert_val.stderr)
+            );
         }
+
+        // Validate fragment shader
+        let frag_val = Command::new("spirv-val")
+            .arg(&fragment_spv)
+            .output()
+            .expect("Failed to run spirv-val");
+
+        if !frag_val.status.success() {
+            panic!(
+                "Fragment shader validation failed:\n{}",
+                String::from_utf8_lossy(&frag_val.stderr)
+            );
+        }
+
+        println!("cargo:warning=Shaders validated successfully with spirv-val");
     }
 
     // If compilation failed, try to use pre-compiled shaders
