@@ -1,23 +1,124 @@
-//! wgpu backend stub
+//! wgpu backend implementation
 //!
-//! This is a stub implementation for issue #14.
-//! Real wgpu implementation will be added in M4.
+//! Provides cross-platform rendering using the wgpu library (WebGPU API).
+//! wgpu automatically selects the appropriate backend:
+//! - Windows: Direct3D 12
+//! - macOS/iOS: Metal
+//! - Linux/Android: Vulkan
+//! - Web: WebGPU
+//!
+//! This backend uses WGSL shaders and provides a higher-level API than Vulkan.
 
 use super::*;
+use anyhow::Context;
+use std::sync::Arc;
 
-/// wgpu backend stub
+/// wgpu backend implementation
 pub struct WgpuBackend {
-    device: WgpuDevice,
-    swapchain: WgpuSwapchain,
+    // Core wgpu objects
+    instance: Option<wgpu::Instance>,
+    surface: Option<Arc<wgpu::Surface<'static>>>,
+    adapter: Option<wgpu::Adapter>,
+    device: Option<wgpu::Device>,
+    queue: Option<wgpu::Queue>,
+    
+    // Surface configuration
+    surface_config: Option<wgpu::SurfaceConfiguration>,
+    
+    // Rendering pipeline
+    render_pipeline: Option<wgpu::RenderPipeline>,
+    
+    // Window size
+    width: u32,
+    height: u32,
+    
+    // Stub trait implementations (will be replaced)
+    device_wrapper: WgpuDevice,
+    swapchain_wrapper: WgpuSwapchain,
 }
 
 impl WgpuBackend {
-    /// Create a new wgpu backend stub
+    /// Create a new wgpu backend
     pub fn new() -> Result<Self> {
+        log::info!("Creating wgpu backend");
+        
         Ok(Self {
-            device: WgpuDevice,
-            swapchain: WgpuSwapchain::new(),
+            instance: None,
+            surface: None,
+            adapter: None,
+            device: None,
+            queue: None,
+            surface_config: None,
+            render_pipeline: None,
+            width: 800,
+            height: 600,
+            device_wrapper: WgpuDevice,
+            swapchain_wrapper: WgpuSwapchain::new(),
         })
+    }
+    
+    /// Load WGSL shader
+    fn load_shader(&self) -> &'static str {
+        include_str!("../../../shaders/wgsl/triangle.wgsl")
+    }
+    
+    /// Create render pipeline
+    fn create_render_pipeline(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let config = self.surface_config.as_ref().context("Surface config not set")?;
+        
+        log::info!("Creating wgpu render pipeline");
+        
+        // Load shader
+        let shader_source = self.load_shader();
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Triangle Shader"),
+            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
+        });
+        
+        // Create render pipeline
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Triangle Pipeline"),
+            layout: None, // Auto layout
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: Some("vs_main"),
+                buffers: &[], // No vertex buffers needed (hardcoded in shader)
+                compilation_options: Default::default(),
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: &shader,
+                entry_point: Some("fs_main"),
+                targets: &[Some(wgpu::ColorTargetState {
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                })],
+                compilation_options: Default::default(),
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                unclipped_depth: false,
+                polygon_mode: wgpu::PolygonMode::Fill,
+                conservative: false,
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: 1,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+            cache: None,
+        });
+        
+        self.render_pipeline = Some(pipeline);
+        log::info!("Render pipeline created successfully");
+        
+        Ok(())
     }
 }
 
@@ -26,36 +127,194 @@ impl GraphicsBackend for WgpuBackend {
         BackendType::Wgpu
     }
 
-    fn initialize(&mut self, _window: &winit::window::Window) -> Result<()> {
-        // Stub: will be implemented in M4
+    fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
+        log::info!("Initializing wgpu backend");
+        
+        // Get window size
+        let size = window.inner_size();
+        self.width = size.width;
+        self.height = size.height;
+        
+        // Create instance
+        log::info!("Creating wgpu instance");
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            ..Default::default()
+        });
+        
+        // Create surface
+        // Safety: The surface must not outlive the window. We ensure this by
+        // dropping the surface in cleanup() before the window is dropped.
+        log::info!("Creating surface");
+        let surface = Arc::new(unsafe { instance.create_surface_unsafe(
+            wgpu::SurfaceTargetUnsafe::from_window(window)?
+        )?});
+        // Request adapter
+        log::info!("Requesting adapter");
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: Some(&surface),
+            force_fallback_adapter: false,
+        }))
+        .context("Failed to find appropriate adapter")?;
+        
+        log::info!("Adapter: {:?}", adapter.get_info());
+        
+        // Request device and queue
+        log::info!("Requesting device and queue");
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                label: Some("Primary Device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: Default::default(),
+            },
+            None,
+        ))?;
+        
+        log::info!("Device and queue created");
+        
+        // Get surface capabilities and configure
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.is_srgb())
+            .unwrap_or(surface_caps.formats[0]);
+        
+        log::info!("Surface format: {:?}", surface_format);
+        
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: self.width,
+            height: self.height,
+            present_mode: wgpu::PresentMode::Fifo, // VSync
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        };
+        
+        surface.configure(&device, &config);
+        log::info!("Surface configured: {}x{}", self.width, self.height);
+        
+        // Store everything
+        self.instance = Some(instance);
+        self.surface = Some(surface);
+        self.adapter = Some(adapter);
+        self.device = Some(device);
+        self.queue = Some(queue);
+        self.surface_config = Some(config);
+        
+        // Create render pipeline
+        self.create_render_pipeline()?;
+        
+        log::info!("wgpu backend initialized successfully");
         Ok(())
     }
 
     fn begin_frame(&mut self) -> Result<()> {
-        // Stub: will be implemented in M4
+        // wgpu handles frame synchronization internally
+        // No explicit begin_frame needed
         Ok(())
     }
 
     fn end_frame(&mut self) -> Result<()> {
-        // Stub: will be implemented in M4
+        let surface = self.surface.as_ref().context("Surface not initialized")?;
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let queue = self.queue.as_ref().context("Queue not initialized")?;
+        let pipeline = self.render_pipeline.as_ref().context("Pipeline not initialized")?;
+        
+        // Get current frame
+        let output = surface.get_current_texture()?;
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        
+        // Create command encoder
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+        
+        // Render pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+            
+            render_pass.set_pipeline(pipeline);
+            render_pass.draw(0..3, 0..1); // Draw 3 vertices, 1 instance
+        }
+        
+        // Submit commands
+        queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+        
         Ok(())
     }
 
-    fn resize(&mut self, _width: u32, _height: u32) -> Result<()> {
-        // Stub: will be implemented in M4
+    fn resize(&mut self, width: u32, height: u32) -> Result<()> {
+        if width == 0 || height == 0 {
+            return Ok(());
+        }
+        
+        if self.width == width && self.height == height {
+            return Ok(());
+        }
+        
+        log::info!("Resizing wgpu surface: {}x{} -> {}x{}", 
+            self.width, self.height, width, height);
+        
+        self.width = width;
+        self.height = height;
+        
+        // Reconfigure surface
+        if let (Some(surface), Some(device), Some(config)) = 
+            (&self.surface, &self.device, &mut self.surface_config) {
+            config.width = width;
+            config.height = height;
+            surface.configure(device, config);
+        }
+        
         Ok(())
     }
 
     fn cleanup(&mut self) {
-        // Stub: will be implemented in M4
+        log::info!("Cleaning up wgpu backend");
+        
+        // Drop in reverse order of creation
+        self.render_pipeline = None;
+        self.surface_config = None;
+        self.queue = None;
+        self.device = None;
+        self.adapter = None;
+        self.surface = None;
+        self.instance = None;
+        
+        log::info!("wgpu backend cleaned up");
     }
 
     fn device(&self) -> &dyn Device {
-        &self.device
+        &self.device_wrapper
     }
 
     fn swapchain(&self) -> &dyn Swapchain {
-        &self.swapchain
+        &self.swapchain_wrapper
     }
 }
 
