@@ -84,6 +84,7 @@ fn main() -> anyhow::Result<()> {
     // Create configuration
     let config = RenderConfig {
         backend,
+        scene: "triangle".to_string(),
         width: 800,
         height: 600,
         vsync: true,

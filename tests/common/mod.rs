@@ -18,6 +18,7 @@ pub fn test_config(
 ) -> rusty_renderer::config::Config {
     rusty_renderer::config::Config {
         backend,
+        scene: "test".to_string(),
         width,
         height,
         debug: true,
