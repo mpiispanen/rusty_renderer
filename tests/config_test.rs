@@ -13,6 +13,7 @@ fn test_config_validation_valid() {
 
     let config = Config {
         backend: Backend::Vulkan,
+        scene: "test".to_string(),
         width: 1920,
         height: 1080,
         debug: false,
@@ -29,6 +30,7 @@ fn test_config_validation_zero_width() {
 
     let config = Config {
         backend: Backend::Vulkan,
+        scene: "test".to_string(),
         width: 0,
         height: 720,
         debug: false,
@@ -45,6 +47,7 @@ fn test_config_validation_zero_height() {
 
     let config = Config {
         backend: Backend::Vulkan,
+        scene: "test".to_string(),
         width: 1280,
         height: 0,
         debug: false,

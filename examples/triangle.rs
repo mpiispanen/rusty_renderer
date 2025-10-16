@@ -26,7 +26,7 @@ impl Args {
                 "--backend" | "-b" => {
                     backend = args.next().and_then(|s| match s.to_lowercase().as_str() {
                         "vulkan" | "vk" => Some(RenderBackend::Vulkan),
-                        "directx" | "dx" | "dx12" => Some(RenderBackend::DirectX),
+                        "directx" | "dx" | "dx12" => Some(RenderBackend::DirectX12),
                         "wgpu" => Some(RenderBackend::Wgpu),
                         _ => {
                             eprintln!("Unknown backend: {s}");
