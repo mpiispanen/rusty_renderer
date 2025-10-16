@@ -8,11 +8,14 @@ use winit::event_loop::EventLoop;
 struct Args {
     /// Optional test duration in seconds (for automated testing)
     test_duration: Option<u64>,
+    /// Backend to use (vulkan, directx, wgpu)
+    backend: Option<RenderBackend>,
 }
 
 impl Args {
     fn parse() -> Self {
         let mut test_duration = None;
+        let mut backend = None;
 
         let mut args = std::env::args().skip(1);
         while let Some(arg) = args.next() {
@@ -20,12 +23,30 @@ impl Args {
                 "--test-duration" => {
                     test_duration = args.next().and_then(|s| s.parse().ok());
                 }
+                "--backend" | "-b" => {
+                    backend = args.next().and_then(|s| match s.to_lowercase().as_str() {
+                        "vulkan" | "vk" => Some(RenderBackend::Vulkan),
+                        "directx" | "dx" | "dx12" => Some(RenderBackend::DirectX),
+                        "wgpu" => Some(RenderBackend::Wgpu),
+                        _ => {
+                            eprintln!("Unknown backend: {s}");
+                            eprintln!("Valid backends: vulkan, directx, wgpu");
+                            None
+                        }
+                    });
+                }
                 "--help" | "-h" => {
                     println!("Triangle Example - Rusty Renderer");
                     println!("\nUsage: triangle [OPTIONS]");
                     println!("\nOptions:");
+                    println!("  --backend, -b <backend>    Graphics backend to use");
+                    println!("                             Options: vulkan (default), directx, wgpu");
                     println!("  --test-duration <seconds>  Run for specified duration then exit (for testing)");
                     println!("  --help, -h                 Show this help message");
+                    println!("\nExamples:");
+                    println!("  triangle                   # Use default Vulkan backend");
+                    println!("  triangle --backend wgpu    # Use wgpu backend");
+                    println!("  triangle -b dx12           # Use DirectX 12 backend");
                     std::process::exit(0);
                 }
                 _ => {
@@ -36,7 +57,10 @@ impl Args {
             }
         }
 
-        Self { test_duration }
+        Self {
+            test_duration,
+            backend,
+        }
     }
 }
 
@@ -49,13 +73,17 @@ fn main() -> anyhow::Result<()> {
 
     log::info!("Starting Rusty Renderer Triangle Example");
 
+    // Determine backend
+    let backend = args.backend.unwrap_or(RenderBackend::Vulkan);
+    log::info!("Using backend: {:?}", backend);
+
     if let Some(duration) = args.test_duration {
         log::info!("Test mode: will run for {duration} seconds");
     }
 
     // Create configuration
     let config = RenderConfig {
-        backend: RenderBackend::Vulkan,
+        backend,
         width: 800,
         height: 600,
         vsync: true,

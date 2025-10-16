@@ -34,6 +34,10 @@ pub struct Config {
     /// Graphics backend to use
     #[arg(short, long, value_enum, default_value = "vulkan")]
     pub backend: Backend,
+    
+    /// Scene to render (triangle, cube, etc.)
+    #[arg(short, long, default_value = "triangle")]
+    pub scene: String,
 
     /// Window width
     #[arg(long, default_value = "1280")]
