@@ -5,8 +5,6 @@
 
 use super::*;
 use anyhow::{Context, Result};
-use std::mem;
-use std::ptr;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::{
     core::*,
@@ -216,7 +214,7 @@ impl DirectXBackendImpl {
             // Get HWND from window
             let window_handle = window.window_handle()?;
             let hwnd = match window_handle.as_raw() {
-                RawWindowHandle::Win32(handle) => HWND(handle.hwnd.get() as isize),
+                RawWindowHandle::Win32(handle) => HWND(handle.hwnd.get() as *mut std::ffi::c_void),
                 _ => anyhow::bail!("Not a Windows window"),
             };
             
@@ -345,8 +343,8 @@ impl DirectXBackendImpl {
         
         unsafe {
             if let (Some(swap_chain), Some(command_queue)) = (&self.swap_chain, &self.command_queue) {
-                // For now, just present
-                swap_chain.Present(1, 0).ok()?;
+                // For now, just present (vsync on)
+                swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
                 
                 // Wait for frame
                 self.wait_for_previous_frame()?;
