@@ -165,7 +165,11 @@ impl VulkanBackend {
         // Debug messenger for instance creation/destruction
         let mut debug_info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
-            .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+            )
             .user_callback(Some(debug_callback));
 
         if self.validation_enabled {
@@ -191,7 +195,11 @@ impl VulkanBackend {
 
         let info = vk::DebugUtilsMessengerCreateInfoEXT::builder()
             .message_severity(vk::DebugUtilsMessageSeverityFlagsEXT::all())
-            .message_type(vk::DebugUtilsMessageTypeFlagsEXT::all())
+            .message_type(
+                vk::DebugUtilsMessageTypeFlagsEXT::GENERAL
+                    | vk::DebugUtilsMessageTypeFlagsEXT::VALIDATION
+                    | vk::DebugUtilsMessageTypeFlagsEXT::PERFORMANCE,
+            )
             .user_callback(Some(debug_callback));
 
         let messenger = unsafe { instance.create_debug_utils_messenger_ext(&info, None)? };
@@ -585,17 +593,21 @@ impl VulkanBackend {
 
         self.render_pass = unsafe { device.create_render_pass(&info, None)? };
 
-        log::info!("Render pass created");
+        log::info!("Render pass created successfully");
         Ok(())
     }
 
     /// Create graphics pipeline
     fn create_pipeline(&mut self) -> Result<()> {
+        log::info!("Creating graphics pipeline");
         let device = self.device.as_ref().context("Device not initialized")?;
 
+        log::info!("Creating shader modules");
         // Create shader modules
         let vert_shader_module = self.create_shader_module(shaders::VERTEX_SHADER)?;
+        log::info!("Vertex shader module created");
         let frag_shader_module = self.create_shader_module(shaders::FRAGMENT_SHADER)?;
+        log::info!("Fragment shader module created");
 
         let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::VERTEX)
@@ -663,10 +675,13 @@ impl VulkanBackend {
             .attachments(color_blend_attachments);
 
         // Pipeline layout (no descriptors)
+        log::info!("Creating pipeline layout");
         let layout_info = vk::PipelineLayoutCreateInfo::builder();
         self.pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None)? };
+        log::info!("Pipeline layout created");
 
         // Create pipeline
+        log::info!("Building graphics pipeline create info");
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(stages)
             .vertex_input_state(&vertex_input_info)
@@ -679,11 +694,14 @@ impl VulkanBackend {
             .render_pass(self.render_pass)
             .subpass(0);
 
+        log::info!("Creating graphics pipeline");
         let (pipelines, _) = unsafe {
             device.create_graphics_pipelines(vk::PipelineCache::null(), &[pipeline_info], None)?
         };
+        log::info!("Graphics pipeline created successfully");
 
         self.pipeline = pipelines[0];
+        log::info!("Graphics pipeline created successfully");
 
         // Cleanup shader modules
         unsafe {
@@ -699,7 +717,15 @@ impl VulkanBackend {
     fn create_shader_module(&self, code: &[u32]) -> Result<vk::ShaderModule> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
-        let info = vk::ShaderModuleCreateInfo::builder().code(code);
+        log::info!("Creating shader module with {} u32 words ({} bytes)", code.len(), code.len() * 4);
+        
+        if code.is_empty() {
+            anyhow::bail!("Shader code is empty!");
+        }
+
+        let info = vk::ShaderModuleCreateInfo::builder()
+            .code_size(code.len() * std::mem::size_of::<u32>())
+            .code(code);
 
         Ok(unsafe { device.create_shader_module(&info, None)? })
     }
@@ -907,10 +933,12 @@ impl GraphicsBackend for VulkanBackend {
         // Create render pass
         self.create_render_pass()
             .context("Failed to create render pass")?;
+        log::info!("Render pass completed successfully");
 
+        log::info!("Creating graphics pipeline");
         // Create graphics pipeline
-        self.create_pipeline()
-            .context("Failed to create graphics pipeline")?;
+        self.create_pipeline().context("Failed to create graphics pipeline")?;
+        log::info!("Graphics pipeline creation completed");
 
         // Create framebuffers
         self.create_framebuffers()
@@ -1100,7 +1128,11 @@ unsafe extern "system" fn debug_callback(
     _: *mut c_void,
 ) -> vk::Bool32 {
     let data = *data;
-    let message = CStr::from_ptr(data.message).to_string_lossy();
+    let message = if data.message.is_null() {
+        "<no message>".into()
+    } else {
+        CStr::from_ptr(data.message).to_string_lossy()
+    };
 
     match severity {
         vk::DebugUtilsMessageSeverityFlagsEXT::ERROR => {
