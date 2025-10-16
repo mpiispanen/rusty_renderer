@@ -172,3 +172,49 @@ jobs:
         run: cargo doc --no-deps --verbose
         env:
           RUSTDOCFLAGS: "-D warnings"
+  
+  # Windows build with DirectX 12 support
+  build-windows:
+    name: Build (Windows + DirectX 12)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      
+      - name: Build (debug)
+        run: cargo build --verbose
+      
+      - name: Build (release)
+        run: cargo build --release --verbose
+      
+      - name: Run tests
+        run: cargo test --verbose
+      
+      - name: Test DirectX 12 with WARP
+        run: |
+          echo "Testing DirectX 12 backend with WARP software renderer"
+          $env:RUSTY_RENDERER_USE_WARP = "1"
+          $env:RUST_LOG = "info"
+          # Run for 2 seconds to verify initialization
+          cargo run --release -- --backend directx --test-duration 2
+        shell: powershell
+        continue-on-error: true  # Don't fail CI if DX12 isn't fully working yet
+      
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: rusty_renderer-windows
+          path: target/release/rusty_renderer.exe
