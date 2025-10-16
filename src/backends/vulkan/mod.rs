@@ -966,6 +966,8 @@ impl GraphicsBackend for VulkanBackend {
             None => return Ok(()), // Not initialized yet
         };
 
+        log::debug!("Begin frame {}", self.current_frame);
+
         // Wait for fence
         let in_flight_fence = self.in_flight_fences[self.current_frame];
         unsafe {
@@ -986,6 +988,7 @@ impl GraphicsBackend for VulkanBackend {
         let image_index = match result {
             Ok((index, _)) => index as usize,
             Err(vk::ErrorCode::OUT_OF_DATE_KHR) => {
+                log::warn!("Swapchain out of date in begin_frame");
                 self.swapchain_outdated = true;
                 return Ok(());
             }
@@ -993,6 +996,7 @@ impl GraphicsBackend for VulkanBackend {
         };
 
         self.image_index = image_index as u32;
+        log::debug!("Acquired image {}", image_index);
 
         // Reset fence
         unsafe {
@@ -1001,6 +1005,7 @@ impl GraphicsBackend for VulkanBackend {
 
         // Record command buffer
         self.record_command_buffer(image_index)?;
+        log::debug!("Command buffer recorded");
 
         Ok(())
     }
@@ -1012,8 +1017,11 @@ impl GraphicsBackend for VulkanBackend {
         };
 
         if self.swapchain_outdated {
+            log::warn!("Skipping end_frame - swapchain outdated");
             return Ok(());
         }
+
+        log::debug!("End frame {}", self.current_frame);
 
         let wait_semaphores = &[self.image_available_semaphores[self.current_frame]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
@@ -1031,6 +1039,7 @@ impl GraphicsBackend for VulkanBackend {
         unsafe {
             device.queue_submit(self.graphics_queue, &[submit_info], in_flight_fence)?;
         }
+        log::debug!("Queue submitted");
 
         let swapchains = &[self.swapchain_khr];
         let image_indices = &[self.image_index];
@@ -1043,9 +1052,18 @@ impl GraphicsBackend for VulkanBackend {
         let result = unsafe { device.queue_present_khr(self.present_queue, &present_info) };
 
         let changed = match result {
-            Ok(vk::SuccessCode::SUCCESS) => false,
-            Ok(vk::SuccessCode::SUBOPTIMAL_KHR) => true,
-            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => true,
+            Ok(vk::SuccessCode::SUCCESS) => {
+                log::debug!("Frame presented successfully");
+                false
+            }
+            Ok(vk::SuccessCode::SUBOPTIMAL_KHR) => {
+                log::warn!("Swapchain suboptimal");
+                true
+            }
+            Err(vk::ErrorCode::OUT_OF_DATE_KHR) => {
+                log::warn!("Swapchain out of date in end_frame");
+                true
+            }
             Err(e) => return Err(e.into()),
             Ok(_) => false,
         };
@@ -1061,7 +1079,14 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn resize(&mut self, width: u32, height: u32) -> Result<()> {
-        log::info!("Resize requested: {width}x{height}");
+        // Check if size actually changed
+        if self.swapchain_extent.width == width && self.swapchain_extent.height == height {
+            log::debug!("Resize requested but size unchanged: {width}x{height}");
+            return Ok(());
+        }
+        
+        log::info!("Resize requested: {width}x{height} (was {}x{})", 
+            self.swapchain_extent.width, self.swapchain_extent.height);
         self.swapchain_outdated = true;
         Ok(())
     }

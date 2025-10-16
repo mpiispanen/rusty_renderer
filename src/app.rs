@@ -97,6 +97,10 @@ impl ApplicationHandler for App {
                         log::info!("Backend initialized successfully");
                     }
 
+                    // Request initial redraw
+                    window.request_redraw();
+                    log::debug!("Requested initial redraw");
+
                     self.window = Some(window);
                 }
                 Err(e) => {
@@ -130,6 +134,7 @@ impl ApplicationHandler for App {
                 }
             }
             WindowEvent::RedrawRequested => {
+                log::debug!("RedrawRequested event received");
                 // Render a frame
                 if let Some(backend) = &mut self.backend {
                     if let Err(e) = backend.begin_frame() {
@@ -155,6 +160,7 @@ impl ApplicationHandler for App {
 
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         if let Some(window) = &self.window {
+            log::trace!("about_to_wait - requesting redraw");
             window.request_redraw();
         }
     }
