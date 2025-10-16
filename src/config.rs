@@ -105,6 +105,7 @@ mod tests {
     fn test_config_validation() {
         let mut config = Config {
             backend: Backend::Vulkan,
+            scene: "triangle".to_string(),
             width: 1280,
             height: 720,
             debug: false,
@@ -127,6 +128,7 @@ mod tests {
     fn test_window_size() {
         let config = Config {
             backend: Backend::Vulkan,
+            scene: "triangle".to_string(),
             width: 1920,
             height: 1080,
             debug: false,

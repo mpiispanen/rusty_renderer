@@ -19,6 +19,11 @@
 //! Backends are selected at runtime via [`BackendType`] enum and created
 //! using the [`create_backend()`] factory function.
 //!
+//! # Coordinate Systems
+//!
+//! Different graphics APIs use different coordinate system conventions.
+//! See `docs/COORDINATE_SYSTEMS.md` for detailed information.
+//!
 //! # Example
 //!
 //! ```no_run
@@ -31,6 +36,9 @@
 
 use anyhow::Result;
 use std::any::Any;
+
+// Backend capabilities and quirks
+pub mod capabilities;
 
 // Backend module declarations (implementations in M2+)
 pub mod directx;
