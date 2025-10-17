@@ -2,30 +2,36 @@
 
 Want to test the DirectX 12 backend on Linux? Here's the fastest way to get started using Proton's VKD3D translation layer.
 
-## Prerequisites
+## For Bazzite/Immutable OS Users (RECOMMENDED)
 
-You need:
-- Bazzite/Fedora with Proton installed (you already have this!)
-- MinGW cross-compiler
-- Windows Rust target
+**If you're on Bazzite, Silverblue, or Kinoite**, use Distrobox - no reboot needed!
 
-## 5-Minute Setup
+See [`BAZZITE_SETUP.md`](BAZZITE_SETUP.md) for details. Quick version:
 
 ```bash
-# 1. Install Windows Rust target (fast)
+# One-time setup (5 minutes)
+distrobox create --name fedora-dev --image fedora:41
+distrobox enter fedora-dev
+sudo dnf install -y mingw64-gcc mingw64-winpthreads-static rustup
+rustup-init -y && source ~/.cargo/env
 rustup target add x86_64-pc-windows-gnu
+exit
 
-# 2. Install MinGW cross-compiler (requires reboot)
-rpm-ostree install mingw64-gcc mingw64-winpthreads-static
-sudo systemctl reboot
-
-# After reboot, you're ready!
+# Daily workflow (30 seconds)
+./scripts/build_dx12.sh              # Build in container
+./scripts/test_dx12_proton.sh --release  # Run on host
 ```
 
-## Build and Test
+## For Traditional Linux (Fedora/Ubuntu/etc)
 
 ```bash
-# Build Windows binary and run via Proton (one command!)
+# 1. Install Windows Rust target
+rustup target add x86_64-pc-windows-gnu
+
+# 2. Install MinGW (Fedora)
+sudo dnf install mingw64-gcc mingw64-winpthreads-static
+
+# 3. Build and test
 ./scripts/test_dx12_proton.sh --release
 
 # That's it! You're running DirectX 12 on Linux via VKD3D translation
