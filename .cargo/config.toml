@@ -1,0 +1,10 @@
+# Cargo configuration for rusty_renderer
+
+# Cross-compilation settings for Windows on Linux
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar = "x86_64-w64-mingw32-ar"
+
+# Optional: Add Windows MSVC target settings if needed in the future
+# [target.x86_64-pc-windows-msvc]
+# linker = "lld-link"
