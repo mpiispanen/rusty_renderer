@@ -166,3 +166,46 @@ The multi-backend architecture is solid and working well. We can now:
 - Run comprehensive test suites
 
 Main remaining work is fixing the Vulkan semaphore issue and setting up proper CI/CD for DirectX testing.
+
+---
+
+## EVENING UPDATE: DirectX Backend Incomplete
+
+### Discovery
+Investigation revealed the DirectX 12 backend is **partially implemented but does NOT render the triangle**.
+
+**What works:**
+- Device, command queue, swap chain creation ✅
+- Command buffers and synchronization ✅
+- Cross-compilation ✅
+- Window creation ✅
+
+**What's missing:**
+- Pipeline State Object (PSO) creation ❌
+- Root signature ❌
+- HLSL shader compilation ❌
+- Draw commands ❌
+
+The backend only clears to blue - no geometry is rendered.
+
+### Testing with Wine
+```bash
+wine64 target/x86_64-pc-windows-msvc/release/rusty_renderer.exe --backend directx --max-frames 3
+```
+Result: Black screen (no triangle)
+
+### Documentation Created
+- **`DIRECTX_STATUS.md`** - Full analysis and implementation plan
+- Updated GitHub Issue #31 with current status
+- Issue correctly remains OPEN
+
+### Next Steps for DirectX
+1. Implement shader compilation in `build.rs`
+2. Create root signature in `initialize()`
+3. Create PSO with HLSL shaders
+4. Add `DrawInstanced(3, 1, 0, 0)` commands
+5. Test with Wine/VKD3D
+
+Estimated: 6-8 hours to complete triangle rendering.
+
+**Status:** DirectX backend needs completion before M4 can close.

@@ -10,11 +10,47 @@ use windows::{
     core::*,
     Win32::Foundation::*,
     Win32::Graphics::Direct3D::*,
+    Win32::Graphics::Direct3D::Fxc::*,
     Win32::Graphics::Direct3D12::*,
     Win32::Graphics::Dxgi::Common::*,
     Win32::Graphics::Dxgi::*,
     Win32::System::Threading::*,
 };
+
+// HLSL shader source code - matches triangle.hlsl
+const HLSL_SHADER_SOURCE: &str = r#"
+struct VSOutput {
+    float4 position : SV_POSITION;
+    float3 color : COLOR0;
+};
+
+VSOutput VSMain(uint vertexID : SV_VertexID) {
+    VSOutput output;
+    
+    // Hardcoded triangle vertices (NDC coordinates)
+    float2 positions[3] = {
+        float2(0.0, -0.5),   // Bottom center
+        float2(0.5, 0.5),    // Top right
+        float2(-0.5, 0.5)    // Top left
+    };
+    
+    // Hardcoded vertex colors
+    float3 colors[3] = {
+        float3(1.0, 0.0, 0.0),  // Red
+        float3(0.0, 1.0, 0.0),  // Green
+        float3(0.0, 0.0, 1.0)   // Blue
+    };
+    
+    output.position = float4(positions[vertexID], 0.0, 1.0);
+    output.color = colors[vertexID];
+    
+    return output;
+}
+
+float4 PSMain(VSOutput input) : SV_TARGET {
+    return float4(input.color, 1.0);
+}
+"#;
 
 /// DirectX 12 backend implementation
 pub struct DirectXBackendImpl {
@@ -132,8 +168,8 @@ impl DirectXBackendImpl {
         // Create fence
         self.create_fence()?;
         
-        // TODO: Create pipeline with shaders
-        // This requires compiling HLSL or embedding compiled bytecode
+        // Create pipeline with shaders
+        self.create_pipeline()?;
         
         log::info!("DirectX 12 backend initialized successfully");
         Ok(())
@@ -325,19 +361,210 @@ impl DirectXBackendImpl {
         Ok(())
     }
 
-    pub fn begin_frame(&mut self) -> Result<()> {
-        log::debug!("DirectX: begin_frame");
+    fn create_pipeline(&mut self) -> Result<()> {
+        log::info!("Creating pipeline state and root signature");
         
-        // Reset command allocator
+        unsafe {
+            let device = self.device.as_ref().context("Device not created")?;
+            
+            // Compile shaders at runtime
+            let vs_bytecode = self.compile_shader("VSMain", "vs_5_0")?;
+            let ps_bytecode = self.compile_shader("PSMain", "ps_5_0")?;
+            
+            // Create empty root signature (no parameters needed for this simple triangle)
+            let root_signature_desc = D3D12_ROOT_SIGNATURE_DESC {
+                NumParameters: 0,
+                pParameters: std::ptr::null(),
+                NumStaticSamplers: 0,
+                pStaticSamplers: std::ptr::null(),
+                Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+            };
+            
+            let mut signature_blob: Option<ID3DBlob> = None;
+            let mut error_blob: Option<ID3DBlob> = None;
+            
+            let result = D3D12SerializeRootSignature(
+                &root_signature_desc,
+                D3D_ROOT_SIGNATURE_VERSION_1,
+                &mut signature_blob,
+                Some(&mut error_blob),
+            );
+            
+            if result.is_err() {
+                if let Some(error) = error_blob {
+                    let error_msg = std::slice::from_raw_parts(
+                        error.GetBufferPointer() as *const u8,
+                        error.GetBufferSize(),
+                    );
+                    let error_str = String::from_utf8_lossy(error_msg);
+                    anyhow::bail!("Root signature serialization failed: {}", error_str);
+                }
+                result?;
+            }
+            
+            let signature_blob = signature_blob.context("No signature blob created")?;
+            
+            let root_signature: ID3D12RootSignature = device.CreateRootSignature(
+                0,
+                std::slice::from_raw_parts(
+                    signature_blob.GetBufferPointer() as *const u8,
+                    signature_blob.GetBufferSize(),
+                ),
+            )?;
+            
+            // Create PSO
+            let pso_desc = D3D12_GRAPHICS_PIPELINE_STATE_DESC {
+                pRootSignature: std::mem::ManuallyDrop::new(Some(root_signature.clone())),
+                VS: D3D12_SHADER_BYTECODE {
+                    pShaderBytecode: vs_bytecode.GetBufferPointer(),
+                    BytecodeLength: vs_bytecode.GetBufferSize(),
+                },
+                PS: D3D12_SHADER_BYTECODE {
+                    pShaderBytecode: ps_bytecode.GetBufferPointer(),
+                    BytecodeLength: ps_bytecode.GetBufferSize(),
+                },
+                DS: D3D12_SHADER_BYTECODE::default(),
+                HS: D3D12_SHADER_BYTECODE::default(),
+                GS: D3D12_SHADER_BYTECODE::default(),
+                StreamOutput: D3D12_STREAM_OUTPUT_DESC::default(),
+                BlendState: D3D12_BLEND_DESC {
+                    AlphaToCoverageEnable: FALSE,
+                    IndependentBlendEnable: FALSE,
+                    RenderTarget: [
+                        D3D12_RENDER_TARGET_BLEND_DESC {
+                            BlendEnable: FALSE,
+                            LogicOpEnable: FALSE,
+                            SrcBlend: D3D12_BLEND_ONE,
+                            DestBlend: D3D12_BLEND_ZERO,
+                            BlendOp: D3D12_BLEND_OP_ADD,
+                            SrcBlendAlpha: D3D12_BLEND_ONE,
+                            DestBlendAlpha: D3D12_BLEND_ZERO,
+                            BlendOpAlpha: D3D12_BLEND_OP_ADD,
+                            LogicOp: D3D12_LOGIC_OP_NOOP,
+                            RenderTargetWriteMask: D3D12_COLOR_WRITE_ENABLE_ALL.0 as u8,
+                        },
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                        D3D12_RENDER_TARGET_BLEND_DESC::default(),
+                    ],
+                },
+                SampleMask: u32::MAX,
+                RasterizerState: D3D12_RASTERIZER_DESC {
+                    FillMode: D3D12_FILL_MODE_SOLID,
+                    CullMode: D3D12_CULL_MODE_NONE,
+                    FrontCounterClockwise: FALSE,
+                    DepthBias: 0,
+                    DepthBiasClamp: 0.0,
+                    SlopeScaledDepthBias: 0.0,
+                    DepthClipEnable: TRUE,
+                    MultisampleEnable: FALSE,
+                    AntialiasedLineEnable: FALSE,
+                    ForcedSampleCount: 0,
+                    ConservativeRaster: D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF,
+                },
+                DepthStencilState: D3D12_DEPTH_STENCIL_DESC {
+                    DepthEnable: FALSE,
+                    DepthWriteMask: D3D12_DEPTH_WRITE_MASK_ALL,
+                    DepthFunc: D3D12_COMPARISON_FUNC_LESS,
+                    StencilEnable: FALSE,
+                    StencilReadMask: D3D12_DEFAULT_STENCIL_READ_MASK as u8,
+                    StencilWriteMask: D3D12_DEFAULT_STENCIL_WRITE_MASK as u8,
+                    FrontFace: D3D12_DEPTH_STENCILOP_DESC::default(),
+                    BackFace: D3D12_DEPTH_STENCILOP_DESC::default(),
+                },
+                InputLayout: D3D12_INPUT_LAYOUT_DESC {
+                    pInputElementDescs: std::ptr::null(),
+                    NumElements: 0,
+                },
+                IBStripCutValue: D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED,
+                PrimitiveTopologyType: D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+                NumRenderTargets: 1,
+                RTVFormats: [
+                    DXGI_FORMAT_R8G8B8A8_UNORM,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                    DXGI_FORMAT_UNKNOWN,
+                ],
+                DSVFormat: DXGI_FORMAT_UNKNOWN,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                NodeMask: 0,
+                CachedPSO: D3D12_CACHED_PIPELINE_STATE::default(),
+                Flags: D3D12_PIPELINE_STATE_FLAG_NONE,
+            };
+            
+            let pipeline_state: ID3D12PipelineState = device.CreateGraphicsPipelineState(&pso_desc)?;
+            
+            self.root_signature = Some(root_signature);
+            self.pipeline_state = Some(pipeline_state);
+            
+            log::info!("Pipeline created successfully");
+        }
+        
+        Ok(())
+    }
+    
+    fn compile_shader(&self, entry_point: &str, target: &str) -> Result<ID3DBlob> {
+        unsafe {
+            let entry_cstr = format!("{}\0", entry_point);
+            let target_cstr = format!("{}\0", target);
+            
+            let shader_source = PCSTR::from_raw(HLSL_SHADER_SOURCE.as_ptr());
+            let entry = PCSTR::from_raw(entry_cstr.as_ptr());
+            let target_pcstr = PCSTR::from_raw(target_cstr.as_ptr());
+            
+            let mut shader_blob: Option<ID3DBlob> = None;
+            let mut error_blob: Option<ID3DBlob> = None;
+            
+            let result = D3DCompile(
+                shader_source.as_ptr() as *const _,
+                HLSL_SHADER_SOURCE.len(),
+                None,
+                None,
+                None,
+                entry,
+                target_pcstr,
+                0, // No flags
+                0,
+                &mut shader_blob,
+                Some(&mut error_blob),
+            );
+            
+            if result.is_err() {
+                if let Some(error) = error_blob {
+                    let error_msg = std::slice::from_raw_parts(
+                        error.GetBufferPointer() as *const u8,
+                        error.GetBufferSize(),
+                    );
+                    let error_str = String::from_utf8_lossy(error_msg);
+                    anyhow::bail!("Shader compilation failed for {} ({}): {}", entry_point, target, error_str);
+                }
+                result?;
+            }
+            
+            shader_blob.context(format!("No shader blob created for {} ({})", entry_point, target))
+        }
+    }
+
+    pub fn begin_frame(&mut self) -> Result<()> {
+        // Reset command allocator and list
         unsafe {
             if let Some(allocator) = &self.command_allocator {
                 allocator.Reset()?;
-                log::debug!("Command allocator reset");
             }
             
             if let (Some(command_list), Some(allocator)) = (&self.command_list, &self.command_allocator) {
                 command_list.Reset(allocator, None)?;
-                log::debug!("Command list reset");
             }
         }
         
@@ -345,13 +572,11 @@ impl DirectXBackendImpl {
     }
 
     pub fn end_frame(&mut self) -> Result<()> {
-        log::info!("DirectX: end_frame (frame_index: {})", self.frame_index);
-        
         unsafe {
-            // Record simple clear commands
-            if let (Some(command_list), Some(rtv_heap)) = (&self.command_list, &self.rtv_heap) {
-                log::info!("Recording clear commands");
-                
+            // Record rendering commands
+            if let (Some(command_list), Some(rtv_heap), Some(root_signature), Some(pipeline_state)) = 
+                (&self.command_list, &self.rtv_heap, &self.root_signature, &self.pipeline_state) 
+            {
                 // Get current back buffer
                 let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
                 let rtv_handle = D3D12_CPU_DESCRIPTOR_HANDLE {
@@ -360,7 +585,6 @@ impl DirectXBackendImpl {
                 
                 // Transition to render target
                 if let Some(render_target) = self.render_targets.get(self.frame_index as usize) {
-                    log::info!("Transitioning to render target");
                     let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
                         pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
                         Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
@@ -377,12 +601,40 @@ impl DirectXBackendImpl {
                     };
                     
                     command_list.ResourceBarrier(&[barrier]);
-                    log::info!("Transitioned to render target");
                     
-                    // Clear to a dark blue color so we can see something
-                    let clear_color = [0.0f32, 0.2f32, 0.4f32, 1.0f32];
+                    // Clear to black
+                    let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
                     command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
-                    log::info!("Cleared to blue ({:?})", clear_color);
+                    
+                    // Set pipeline and draw triangle
+                    command_list.SetGraphicsRootSignature(root_signature);
+                    command_list.SetPipelineState(pipeline_state);
+                    command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, None);
+                    
+                    // Set viewport and scissor
+                    let viewport = D3D12_VIEWPORT {
+                        TopLeftX: 0.0,
+                        TopLeftY: 0.0,
+                        Width: self.width as f32,
+                        Height: self.height as f32,
+                        MinDepth: 0.0,
+                        MaxDepth: 1.0,
+                    };
+                    command_list.RSSetViewports(&[viewport]);
+                    
+                    let scissor = RECT {
+                        left: 0,
+                        top: 0,
+                        right: self.width as i32,
+                        bottom: self.height as i32,
+                    };
+                    command_list.RSSetScissorRects(&[scissor]);
+                    
+                    // Set primitive topology
+                    command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+                    
+                    // Draw the triangle (3 vertices)
+                    command_list.DrawInstanced(3, 1, 0, 0);
                     
                     // Transition back to present
                     let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
@@ -401,32 +653,25 @@ impl DirectXBackendImpl {
                     };
                     
                     command_list.ResourceBarrier(&[barrier]);
-                    log::info!("Transitioned to present");
-                    
-                    log::info!("Clear commands recorded");
                 }
                 
                 // Close command list
                 command_list.Close()?;
-                log::info!("Command list closed");
             }
             
             // Execute commands
             if let (Some(command_queue), Some(command_list)) = (&self.command_queue, &self.command_list) {
                 let command_lists = [Some(command_list.cast()?)];
                 command_queue.ExecuteCommandLists(&command_lists);
-                log::info!("Commands executed");
             }
             
             // Present
             if let Some(swap_chain) = &self.swap_chain {
                 swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
-                log::info!("Frame presented");
             }
             
             // Wait for frame
             self.wait_for_previous_frame()?;
-            log::info!("Frame complete");
         }
         
         Ok(())
