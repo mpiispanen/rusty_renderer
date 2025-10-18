@@ -6,7 +6,7 @@ use rusty_renderer::backends::{create_backend, BackendType};
 
 #[test]
 fn test_create_vulkan_backend() {
-    let backend = create_backend(BackendType::Vulkan);
+    let backend = create_backend(BackendType::Vulkan, false);
     assert!(backend.is_ok(), "Failed to create Vulkan backend");
     let backend = backend.unwrap();
     assert_eq!(backend.backend_type(), BackendType::Vulkan);
@@ -14,7 +14,7 @@ fn test_create_vulkan_backend() {
 
 #[test]
 fn test_create_directx_backend() {
-    let backend = create_backend(BackendType::DirectX12);
+    let backend = create_backend(BackendType::DirectX12, false);
     assert!(backend.is_ok(), "Failed to create DirectX backend");
     let backend = backend.unwrap();
     assert_eq!(backend.backend_type(), BackendType::DirectX12);
@@ -22,7 +22,7 @@ fn test_create_directx_backend() {
 
 #[test]
 fn test_create_wgpu_backend() {
-    let backend = create_backend(BackendType::Wgpu);
+    let backend = create_backend(BackendType::Wgpu, false);
     assert!(backend.is_ok(), "Failed to create wgpu backend");
     let backend = backend.unwrap();
     assert_eq!(backend.backend_type(), BackendType::Wgpu);
@@ -30,9 +30,9 @@ fn test_create_wgpu_backend() {
 
 #[test]
 fn test_backend_factory_returns_correct_types() {
-    let vulkan = create_backend(BackendType::Vulkan).unwrap();
-    let directx = create_backend(BackendType::DirectX12).unwrap();
-    let wgpu = create_backend(BackendType::Wgpu).unwrap();
+    let vulkan = create_backend(BackendType::Vulkan, false).unwrap();
+    let directx = create_backend(BackendType::DirectX12, false).unwrap();
+    let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
 
     // Verify each backend has correct type
     assert_eq!(vulkan.backend_type(), BackendType::Vulkan);
@@ -47,7 +47,7 @@ fn test_backend_factory_returns_correct_types() {
 
 #[test]
 fn test_backend_device_access() {
-    let backend = create_backend(BackendType::Vulkan).unwrap();
+    let backend = create_backend(BackendType::Vulkan, false).unwrap();
     let device = backend.device();
 
     // Should have a valid name
@@ -57,7 +57,7 @@ fn test_backend_device_access() {
 
 #[test]
 fn test_backend_swapchain_access() {
-    let backend = create_backend(BackendType::Vulkan).unwrap();
+    let backend = create_backend(BackendType::Vulkan, false).unwrap();
     let swapchain = backend.swapchain();
 
     // Should have valid dimensions
@@ -68,8 +68,8 @@ fn test_backend_swapchain_access() {
 #[test]
 fn test_multiple_backend_instances() {
     // Should be able to create multiple backends
-    let backend1 = create_backend(BackendType::Vulkan).unwrap();
-    let backend2 = create_backend(BackendType::Vulkan).unwrap();
+    let backend1 = create_backend(BackendType::Vulkan, false).unwrap();
+    let backend2 = create_backend(BackendType::Vulkan, false).unwrap();
 
     assert_eq!(backend1.backend_type(), backend2.backend_type());
 }

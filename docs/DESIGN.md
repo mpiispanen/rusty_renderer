@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.1.0  
-**Last Updated:** 2025-10-14  
-**Status:** Initial Design Phase
+**Version:** 0.2.0  
+**Last Updated:** 2025-10-18  
+**Status:** Foundation Complete - Multi-Backend Triangle Rendering
 
 ## Project Vision
 
@@ -18,16 +18,26 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 
 ## Current State
 
-**Phase:** Project Initialization  
-**Status:** Design and planning phase
+**Phase:** Foundation Complete  
+**Status:** Multi-backend triangle rendering operational
 
 ### Completed
-- Initial repository setup
-- Project vision and design document creation
+- Repository setup with CI/CD pipeline
+- Project structure with proper module organization
+- Backend abstraction layer with trait definitions
+- Three working backends: Vulkan (primary), wgpu, DirectX 12
+- Command-line argument parsing for backend selection
+- Validation layer support across all backends
+- Triangle rendering on all backends
+- Cross-compilation setup for Windows targets
+- DirectX 12 testing via Proton on Linux
 
 ### In Progress
-- Design document refinement
-- Architecture planning
+- Planning for next phase (render graph or advanced features)
+- Documentation organization and cleanup
+
+### Coordinate System Handling
+All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
 
 ## Architecture Overview
 
@@ -211,35 +221,45 @@ graph.compile_and_execute(backend);
 
 ### Short Term (Immediate - ~2-4 weeks)
 
-**Milestone 1: Project Foundation**
-- [ ] Set up Cargo project structure with proper module organization
-- [ ] Implement command-line argument parsing (backend selection, window size, etc.)
-- [ ] Create basic application loop with winit
-- [ ] Set up CI/CD pipeline on GitHub with local runner for graphics tests
-- [ ] Implement basic unit test framework
+**Milestone 1: Project Foundation** ✅ COMPLETED
+- [x] Set up Cargo project structure with proper module organization
+- [x] Implement command-line argument parsing (backend selection, window size, etc.)
+- [x] Create basic application loop with winit
+- [x] Set up CI/CD pipeline on GitHub with local runner for graphics tests
+- [x] Implement basic unit test framework
 
-**Milestone 2: Backend Abstraction - Stub Implementation**
-- [ ] Define core backend traits (`GraphicsBackend`, `Device`, `CommandBuffer`, etc.)
-- [ ] Create stub implementations for all three backends (Vulkan, DirectX, wgpu)
-- [ ] Implement backend selection and initialization
-- [ ] Unit tests for backend trait contracts
+**Milestone 2: Backend Abstraction - Stub Implementation** ✅ COMPLETED
+- [x] Define core backend traits (`GraphicsBackend`, `Device`, `CommandBuffer`, etc.)
+- [x] Create stub implementations for all three backends (Vulkan, DirectX, wgpu)
+- [x] Implement backend selection and initialization
+- [x] Unit tests for backend trait contracts
 
-**Milestone 3: Vulkan Triangle**
-- [ ] Implement Vulkan backend (vulkanalia) for basic rendering
-- [ ] Create simple hardcoded vertex buffer (triangle data)
-- [ ] Implement basic shader loading (hardcoded simple vertex/fragment shaders)
-- [ ] Render a single triangle to screen
-- [ ] Integration test: verify triangle renders correctly
+**Milestone 3: Vulkan Triangle** ✅ COMPLETED
+- [x] Implement Vulkan backend (vulkanalia) for basic rendering
+- [x] Create simple hardcoded vertex buffer (triangle data)
+- [x] Implement basic shader loading (hardcoded simple vertex/fragment shaders)
+- [x] Render a single triangle to screen
+- [x] Integration test: verify triangle renders correctly
+- [x] Add validation layer support
 
-**Milestone 4: Multi-Backend Triangle**
-- [ ] Implement DirectX 12 backend for triangle rendering
-- [ ] Test DirectX implementation on Linux via Proton
-- [ ] Implement wgpu backend for triangle rendering
-- [ ] Integration tests for all backends
+**Milestone 4: Multi-Backend Triangle** ✅ COMPLETED
+- [x] Implement DirectX 12 backend for triangle rendering
+- [x] Test DirectX implementation on Linux via Proton
+- [x] Implement wgpu backend for triangle rendering
+- [x] Handle coordinate system differences across backends
+- [x] Integration tests for all backends
+- [x] Cross-compilation setup for Windows
+
+**Milestone 5: Infrastructure and Testing** (IN PLANNING)
+- [ ] Offscreen rendering mode for CI testing
+- [ ] Screenshot functionality for visual validation
+- [ ] Visual correctness testing between backends
+- [ ] Golden reference image comparison
+- [ ] Git LFS setup for test images
 
 ### Medium Term (~1-2 months)
 
-**Milestone 5: Render Graph Foundation**
+**Future Milestone: Render Graph Foundation**
 - [ ] Design and implement core render graph data structures
 - [ ] Implement pass registration and resource declaration
 - [ ] Build dependency resolution and topological sorting
@@ -247,34 +267,34 @@ graph.compile_and_execute(backend);
 - [ ] Refactor triangle demo to use render graph
 - [ ] Unit tests for render graph scheduling and validation
 
-**Milestone 6: Enhanced Graphics Pipeline**
+**Future Milestone: Enhanced Graphics Pipeline**
 - [ ] Abstract vertex/index buffer management
 - [ ] Implement uniform buffer abstraction
 - [ ] Support for multiple shader stages
 - [ ] Texture and sampler abstraction
 - [ ] Render multiple objects with different materials
 
-**Milestone 7: Basic Scene System**
+**Future Milestone: Basic Scene System**
 - [ ] Implement scene graph structure
 - [ ] Create simple glTF loader (using gltf crate)
 - [ ] Mesh abstraction and GPU upload
 - [ ] Transform hierarchy
 - [ ] Load and render a basic glTF model
 
-**Milestone 8: Camera and Controls**
+**Future Milestone: Camera and Controls**
 - [ ] Free-fly camera implementation
 - [ ] Input handling integration (keyboard/mouse)
 - [ ] Camera movement and rotation
 - [ ] View/projection matrix management
 
-**Milestone 9: Debug UI Integration**
+**Future Milestone: Debug UI Integration**
 - [ ] Integrate egui into the application
 - [ ] Basic debug panel with FPS counter
 - [ ] Render pass enable/disable toggles
 - [ ] Camera position/orientation display
-- [ ] Backend selection at runtime (if feasible)
+- [ ] Render graph visualization
 
-**Milestone 10: Shader Hot-Reloading**
+**Future Milestone: Shader Hot-Reloading**
 - [ ] Runtime shader compilation (GLSL/HLSL → SPIR-V)
 - [ ] File watching for shader changes
 - [ ] Hot-reload pipeline without restart
@@ -410,4 +430,10 @@ graph.compile_and_execute(backend);
 This design document is a living document and will evolve as the project progresses. Major architectural changes should be reflected here with version updates and change notes.
 
 ### Change Log
+- **v0.2.0** (2025-10-18): Updated after completing Milestones 1-4
+  - All three backends (Vulkan, wgpu, DirectX 12) now operational
+  - Validation layer support added across all backends
+  - Cross-compilation and Proton testing documented
+  - Coordinate system handling documented
+  - Repository organization improved (session logs moved to separate directory)
 - **v0.1.0** (2025-10-14): Initial design document created

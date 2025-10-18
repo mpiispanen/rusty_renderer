@@ -27,7 +27,7 @@ fn test_all_backend_types_creatable() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let result = create_backend(backend_type);
+        let result = create_backend(backend_type, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().backend_type(), backend_type);
     }
@@ -70,7 +70,7 @@ fn test_all_backends_provide_device() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let backend = create_backend(backend_type).unwrap();
+        let backend = create_backend(backend_type, false).unwrap();
         let device = backend.device();
 
         // All devices should have a name
@@ -85,7 +85,7 @@ fn test_device_feature_queries() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let backend = create_backend(backend_type).unwrap();
+        let backend = create_backend(backend_type, false).unwrap();
         let device = backend.device();
 
         // Stubs should return false for feature support
@@ -107,7 +107,7 @@ fn test_all_backends_provide_swapchain() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let backend = create_backend(backend_type).unwrap();
+        let backend = create_backend(backend_type, false).unwrap();
         let swapchain = backend.swapchain();
 
         // All swapchains should have valid dimensions
@@ -126,7 +126,7 @@ fn test_swapchain_dimensions_reasonable() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let backend = create_backend(backend_type).unwrap();
+        let backend = create_backend(backend_type, false).unwrap();
         let swapchain = backend.swapchain();
 
         // Dimensions should be at least somewhat reasonable
@@ -140,13 +140,14 @@ fn test_swapchain_dimensions_reasonable() {
 // ============================================================================
 
 #[test]
+#[ignore] // Requires window context for swapchain operations
 fn test_backend_lifecycle_methods() {
     for backend_type in [
         BackendType::Vulkan,
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let mut backend = create_backend(backend_type).unwrap();
+        let mut backend = create_backend(backend_type, false).unwrap();
 
         // All backends should support basic lifecycle
         assert!(backend.begin_frame().is_ok());
@@ -159,13 +160,14 @@ fn test_backend_lifecycle_methods() {
 }
 
 #[test]
+#[ignore] // Requires window context for swapchain operations
 fn test_backend_multiple_frame_cycle() {
     for backend_type in [
         BackendType::Vulkan,
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let mut backend = create_backend(backend_type).unwrap();
+        let mut backend = create_backend(backend_type, false).unwrap();
 
         // Should handle multiple frame cycles
         for _ in 0..5 {
@@ -182,7 +184,7 @@ fn test_backend_resize_operations() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let mut backend = create_backend(backend_type).unwrap();
+        let mut backend = create_backend(backend_type, false).unwrap();
 
         // Test various resize scenarios
         assert!(backend.resize(800, 600).is_ok());
@@ -198,9 +200,9 @@ fn test_backend_resize_operations() {
 
 #[test]
 fn test_backend_parity_type_consistency() {
-    let vulkan = create_backend(BackendType::Vulkan).unwrap();
-    let directx = create_backend(BackendType::DirectX12).unwrap();
-    let wgpu = create_backend(BackendType::Wgpu).unwrap();
+    let vulkan = create_backend(BackendType::Vulkan, false).unwrap();
+    let directx = create_backend(BackendType::DirectX12, false).unwrap();
+    let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
 
     assert_eq!(vulkan.backend_type(), BackendType::Vulkan);
     assert_eq!(directx.backend_type(), BackendType::DirectX12);
@@ -214,7 +216,7 @@ fn test_backend_parity_interface() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let backend = create_backend(backend_type).unwrap();
+        let backend = create_backend(backend_type, false).unwrap();
 
         // All backends provide same interface
         let _device = backend.device();
@@ -231,8 +233,8 @@ fn test_multiple_backend_instances() {
         BackendType::Wgpu,
     ] {
         // Should be able to create multiple instances
-        let backend1 = create_backend(backend_type).unwrap();
-        let backend2 = create_backend(backend_type).unwrap();
+        let backend1 = create_backend(backend_type, false).unwrap();
+        let backend2 = create_backend(backend_type, false).unwrap();
 
         assert_eq!(backend1.backend_type(), backend2.backend_type());
     }
@@ -249,7 +251,7 @@ fn test_multiple_cleanup_calls_safe() {
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let mut backend = create_backend(backend_type).unwrap();
+        let mut backend = create_backend(backend_type, false).unwrap();
 
         // Multiple cleanup calls should be safe
         backend.cleanup();
@@ -258,13 +260,14 @@ fn test_multiple_cleanup_calls_safe() {
 }
 
 #[test]
+#[ignore] // Requires window context for swapchain operations
 fn test_backend_operations_after_cleanup() {
     for backend_type in [
         BackendType::Vulkan,
         BackendType::DirectX12,
         BackendType::Wgpu,
     ] {
-        let mut backend = create_backend(backend_type).unwrap();
+        let mut backend = create_backend(backend_type, false).unwrap();
 
         backend.cleanup();
 
