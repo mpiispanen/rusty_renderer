@@ -917,13 +917,13 @@ impl VulkanBackend {
         self.in_flight_fences.clear();
         self.images_in_flight.clear();
     }
-    
+
     // Headless mode helper methods
-    
+
     /// Create Vulkan instance for headless mode (no surface extensions)
     fn create_instance_headless(&mut self) -> Result<()> {
         let entry = self.entry.as_ref().context("Entry not initialized")?;
-        
+
         // Application info
         let app_info = vk::ApplicationInfo::builder()
             .application_name(b"Rusty Renderer\0")
@@ -931,23 +931,23 @@ impl VulkanBackend {
             .engine_name(b"No Engine\0")
             .engine_version(vk::make_version(0, 1, 0))
             .api_version(vk::make_version(1, 0, 0));
-        
+
         // Minimal extensions for headless
         let mut extensions = Vec::new();
-        
+
         // Add debug utils extension if validation is enabled
         if self.validation_enabled {
             extensions.push(vk::EXT_DEBUG_UTILS_EXTENSION.name.as_ptr());
         }
-        
+
         // Validation layers
         let available_layers = unsafe { entry.enumerate_instance_layer_properties()? }
             .iter()
             .map(|l| l.layer_name)
             .collect::<Vec<_>>();
-        
+
         let mut layers = Vec::new();
-        
+
         if self.validation_enabled {
             if available_layers.contains(&VALIDATION_LAYER) {
                 layers.push(VALIDATION_LAYER.as_ptr());
@@ -957,114 +957,114 @@ impl VulkanBackend {
                 self.validation_enabled = false;
             }
         }
-        
+
         let info = vk::InstanceCreateInfo::builder()
             .application_info(&app_info)
             .enabled_layer_names(&layers)
             .enabled_extension_names(&extensions);
-        
+
         // Create instance
         let instance = unsafe { entry.create_instance(&info, None)? };
-        
+
         self.instance = Some(instance);
         log::info!("Vulkan instance created (headless mode)");
         Ok(())
     }
-    
+
     /// Pick physical device for headless mode
     fn pick_physical_device_headless(&mut self) -> Result<()> {
         let instance = self.instance.as_ref().context("Instance not initialized")?;
-        
+
         let devices = unsafe { instance.enumerate_physical_devices()? };
-        
+
         if devices.is_empty() {
             anyhow::bail!("No Vulkan physical devices found");
         }
-        
+
         // Pick first device with graphics queue support
         for device in devices {
             let properties = unsafe { instance.get_physical_device_properties(device) };
             let queue_families =
                 unsafe { instance.get_physical_device_queue_family_properties(device) };
-            
+
             // Find graphics queue
             let graphics_family = queue_families
                 .iter()
                 .position(|f| f.queue_flags.contains(vk::QueueFlags::GRAPHICS));
-            
+
             if graphics_family.is_some() {
                 let device_name = unsafe { CStr::from_ptr(properties.device_name.as_ptr()) }
                     .to_string_lossy()
                     .to_string();
-                
-                log::info!("Selected physical device: {}", device_name);
+
+                log::info!("Selected physical device: {device_name}");
                 self.physical_device = device;
                 return Ok(());
             }
         }
-        
+
         anyhow::bail!("No suitable physical device found")
     }
-    
+
     /// Create logical device for headless mode
     fn create_logical_device_headless(&mut self) -> Result<()> {
         let instance = self.instance.as_ref().context("Instance not initialized")?;
-        
+
         let queue_families =
             unsafe { instance.get_physical_device_queue_family_properties(self.physical_device) };
-        
+
         // Find graphics queue family
         let graphics_family = queue_families
             .iter()
             .position(|f| f.queue_flags.contains(vk::QueueFlags::GRAPHICS))
             .context("No graphics queue family found")? as u32;
-        
+
         // Queue priorities
         let queue_priorities = &[1.0];
-        
+
         // Queue create infos
         let queue_info = vk::DeviceQueueCreateInfo::builder()
             .queue_family_index(graphics_family)
             .queue_priorities(queue_priorities);
-        
+
         let queue_infos = &[queue_info];
-        
+
         // Device features
         let features = vk::PhysicalDeviceFeatures::builder();
-        
+
         // No swapchain extension needed for headless
         let extensions = &[];
-        
+
         // Validation layers for device (deprecated but some implementations need it)
         let layers = if self.validation_enabled {
             vec![VALIDATION_LAYER.as_ptr()]
         } else {
             vec![]
         };
-        
+
         let info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(queue_infos)
             .enabled_layer_names(&layers)
             .enabled_extension_names(extensions)
             .enabled_features(&features);
-        
+
         let device = unsafe { instance.create_device(self.physical_device, &info, None)? };
-        
+
         // Get queue handle
         let graphics_queue = unsafe { device.get_device_queue(graphics_family, 0) };
-        
+
         self.device = Some(device);
         self.graphics_queue = graphics_queue;
         self.present_queue = graphics_queue; // Same as graphics in headless
-        
+
         log::info!("Logical device created (headless mode)");
         Ok(())
     }
-    
+
     /// Create offscreen image for rendering
     fn create_offscreen_image(&mut self, width: u32, height: u32) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         // Create image
         let image_info = vk::ImageCreateInfo::builder()
             .image_type(vk::ImageType::_2D)
@@ -1081,24 +1081,24 @@ impl VulkanBackend {
             .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .initial_layout(vk::ImageLayout::UNDEFINED);
-        
+
         let image = unsafe { device.create_image(&image_info, None)? };
-        
+
         // Allocate memory
         let mem_requirements = unsafe { device.get_image_memory_requirements(image) };
-        
+
         let memory_type_index = self.find_memory_type(
             mem_requirements.memory_type_bits,
             vk::MemoryPropertyFlags::DEVICE_LOCAL,
         )?;
-        
+
         let alloc_info = vk::MemoryAllocateInfo::builder()
             .allocation_size(mem_requirements.size)
             .memory_type_index(memory_type_index);
-        
+
         let image_memory = unsafe { device.allocate_memory(&alloc_info, None)? };
         unsafe { device.bind_image_memory(image, image_memory, 0)? };
-        
+
         // Create image view
         let view_info = vk::ImageViewCreateInfo::builder()
             .image(image)
@@ -1111,63 +1111,63 @@ impl VulkanBackend {
                 base_array_layer: 0,
                 layer_count: 1,
             });
-        
+
         let image_view = unsafe { device.create_image_view(&view_info, None)? };
-        
+
         // Transition image to color attachment layout
         self.transition_image_layout(
             image,
             vk::ImageLayout::UNDEFINED,
             vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
         )?;
-        
+
         self.offscreen_image = image;
         self.offscreen_image_memory = image_memory;
         self.offscreen_image_view = image_view;
         self.swapchain_format = vk::Format::R8G8B8A8_UNORM;
-        
+
         log::info!("Offscreen image created: {width}x{height}");
         Ok(())
     }
-    
+
     /// Create framebuffer for offscreen rendering
     fn create_framebuffer_offscreen(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         let attachments = &[self.offscreen_image_view];
-        
+
         let framebuffer_info = vk::FramebufferCreateInfo::builder()
             .render_pass(self.render_pass)
             .attachments(attachments)
             .width(self.swapchain_extent.width)
             .height(self.swapchain_extent.height)
             .layers(1);
-        
+
         let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None)? };
-        
+
         self.framebuffers = vec![framebuffer];
-        
+
         log::info!("Offscreen framebuffer created");
         Ok(())
     }
-    
+
     /// Create command buffer for offscreen rendering
     fn create_command_buffer_offscreen(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(self.command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
-        
+
         let command_buffers = unsafe { device.allocate_command_buffers(&alloc_info)? };
-        
+
         self.command_buffers = command_buffers;
-        
+
         log::info!("Offscreen command buffer created");
         Ok(())
     }
-    
+
     /// Transition image layout
     fn transition_image_layout(
         &self,
@@ -1176,22 +1176,22 @@ impl VulkanBackend {
         new_layout: vk::ImageLayout,
     ) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         // Create temporary command buffer
         let alloc_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(self.command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
-        
+
         let cmd_buffers = unsafe { device.allocate_command_buffers(&alloc_info)? };
         let cmd_buffer = cmd_buffers[0];
-        
+
         // Begin command buffer
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        
+
         unsafe { device.begin_command_buffer(cmd_buffer, &begin_info)? };
-        
+
         // Create barrier
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(old_layout)
@@ -1208,7 +1208,7 @@ impl VulkanBackend {
             })
             .src_access_mask(vk::AccessFlags::empty())
             .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
-        
+
         unsafe {
             device.cmd_pipeline_barrier(
                 cmd_buffer,
@@ -1220,22 +1220,22 @@ impl VulkanBackend {
                 &[barrier],
             );
         }
-        
+
         // End and submit
         unsafe { device.end_command_buffer(cmd_buffer)? };
-        
+
         let cmd_buffers = [cmd_buffer];
         let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buffers);
-        
+
         unsafe {
             device.queue_submit(self.graphics_queue, &[submit_info], vk::Fence::null())?;
             device.queue_wait_idle(self.graphics_queue)?;
             device.free_command_buffers(self.command_pool, &[cmd_buffer]);
         }
-        
+
         Ok(())
     }
-    
+
     /// Find suitable memory type
     fn find_memory_type(
         &self,
@@ -1243,10 +1243,10 @@ impl VulkanBackend {
         properties: vk::MemoryPropertyFlags,
     ) -> Result<u32> {
         let instance = self.instance.as_ref().context("Instance not initialized")?;
-        
+
         let mem_properties =
             unsafe { instance.get_physical_device_memory_properties(self.physical_device) };
-        
+
         for i in 0..mem_properties.memory_type_count {
             if (type_filter & (1 << i)) != 0
                 && mem_properties.memory_types[i as usize]
@@ -1256,7 +1256,7 @@ impl VulkanBackend {
                 return Ok(i);
             }
         }
-        
+
         anyhow::bail!("Failed to find suitable memory type")
     }
 }
@@ -1404,7 +1404,7 @@ impl GraphicsBackend for VulkanBackend {
         if self.headless {
             let command_buffers = &[self.command_buffers[0]];
             let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
-            
+
             unsafe {
                 device.queue_submit(self.graphics_queue, &[submit_info], vk::Fence::null())?;
                 device.queue_wait_idle(self.graphics_queue)?;
@@ -1482,42 +1482,42 @@ impl GraphicsBackend for VulkanBackend {
 
     fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
         log::info!("Initializing Vulkan backend in headless mode: {width}x{height}");
-        
+
         self.headless = true;
         self.swapchain_extent = vk::Extent2D { width, height };
-        
+
         // Create headless instance (no surface extensions needed)
         self.create_instance_headless()?;
-        
+
         // Setup debug messenger if validation enabled
         if self.validation_enabled {
             self.create_debug_messenger()?;
         }
-        
+
         // Pick physical device (headless)
         self.pick_physical_device_headless()?;
-        
+
         // Create logical device (headless)
         self.create_logical_device_headless()?;
-        
+
         // Create offscreen render target
         self.create_offscreen_image(width, height)?;
-        
+
         // Create render pass (for offscreen)
         self.create_render_pass()?;
-        
+
         // Create pipeline
         self.create_pipeline()?;
-        
+
         // Create framebuffer for offscreen image
         self.create_framebuffer_offscreen()?;
-        
+
         // Create command pool
         self.create_command_pool()?;
-        
+
         // Create command buffer
         self.create_command_buffer_offscreen()?;
-        
+
         log::info!("Vulkan backend initialized successfully in headless mode");
         Ok(())
     }
@@ -1526,53 +1526,53 @@ impl GraphicsBackend for VulkanBackend {
         if !self.headless {
             anyhow::bail!("Frame capture is only available in headless mode");
         }
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
         let width = self.swapchain_extent.width;
         let height = self.swapchain_extent.height;
-        
+
         log::info!("Capturing frame: {width}x{height}");
-        
+
         // Create staging buffer for readback
         let buffer_size = (width * height * 4) as vk::DeviceSize; // RGBA8
-        
+
         let buffer_info = vk::BufferCreateInfo::builder()
             .size(buffer_size)
             .usage(vk::BufferUsageFlags::TRANSFER_DST)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
-        
+
         let buffer = unsafe { device.create_buffer(&buffer_info, None)? };
-        
+
         // Allocate memory for buffer
         let mem_requirements = unsafe { device.get_buffer_memory_requirements(buffer) };
-        
+
         let memory_type_index = self.find_memory_type(
             mem_requirements.memory_type_bits,
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
         )?;
-        
+
         let alloc_info = vk::MemoryAllocateInfo::builder()
             .allocation_size(mem_requirements.size)
             .memory_type_index(memory_type_index);
-        
+
         let buffer_memory = unsafe { device.allocate_memory(&alloc_info, None)? };
         unsafe { device.bind_buffer_memory(buffer, buffer_memory, 0)? };
-        
+
         // Create command buffer for copy operation
         let cmd_buffer_info = vk::CommandBufferAllocateInfo::builder()
             .command_pool(self.command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_buffer_count(1);
-        
+
         let cmd_buffers = unsafe { device.allocate_command_buffers(&cmd_buffer_info)? };
         let cmd_buffer = cmd_buffers[0];
-        
+
         // Begin command buffer
         let begin_info = vk::CommandBufferBeginInfo::builder()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
-        
+
         unsafe { device.begin_command_buffer(cmd_buffer, &begin_info)? };
-        
+
         // Transition image layout for transfer
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -1589,7 +1589,7 @@ impl GraphicsBackend for VulkanBackend {
             })
             .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
             .dst_access_mask(vk::AccessFlags::TRANSFER_READ);
-        
+
         unsafe {
             device.cmd_pipeline_barrier(
                 cmd_buffer,
@@ -1601,7 +1601,7 @@ impl GraphicsBackend for VulkanBackend {
                 &[barrier],
             );
         }
-        
+
         // Copy image to buffer
         let region = vk::BufferImageCopy::builder()
             .buffer_offset(0)
@@ -1619,7 +1619,7 @@ impl GraphicsBackend for VulkanBackend {
                 height,
                 depth: 1,
             });
-        
+
         unsafe {
             device.cmd_copy_image_to_buffer(
                 cmd_buffer,
@@ -1629,7 +1629,7 @@ impl GraphicsBackend for VulkanBackend {
                 &[region],
             );
         }
-        
+
         // Transition back to color attachment
         let barrier = vk::ImageMemoryBarrier::builder()
             .old_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
@@ -1646,7 +1646,7 @@ impl GraphicsBackend for VulkanBackend {
             })
             .src_access_mask(vk::AccessFlags::TRANSFER_READ)
             .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
-        
+
         unsafe {
             device.cmd_pipeline_barrier(
                 cmd_buffer,
@@ -1658,23 +1658,23 @@ impl GraphicsBackend for VulkanBackend {
                 &[barrier],
             );
         }
-        
+
         // End and submit command buffer
         unsafe { device.end_command_buffer(cmd_buffer)? };
-        
+
         let cmd_buffers = [cmd_buffer];
         let submit_info = vk::SubmitInfo::builder().command_buffers(&cmd_buffers);
-        
+
         unsafe {
             device.queue_submit(self.graphics_queue, &[submit_info], vk::Fence::null())?;
             device.queue_wait_idle(self.graphics_queue)?;
         }
-        
+
         // Map and read buffer
         let data_ptr = unsafe {
             device.map_memory(buffer_memory, 0, buffer_size, vk::MemoryMapFlags::empty())?
         };
-        
+
         let mut pixels = vec![0u8; buffer_size as usize];
         unsafe {
             std::ptr::copy_nonoverlapping(
@@ -1684,16 +1684,16 @@ impl GraphicsBackend for VulkanBackend {
             );
             device.unmap_memory(buffer_memory);
         }
-        
+
         // Cleanup
         unsafe {
             device.free_command_buffers(self.command_pool, &[cmd_buffer]);
             device.destroy_buffer(buffer, None);
             device.free_memory(buffer_memory, None);
         }
-        
+
         log::info!("Frame captured: {width}x{height}, {} bytes", pixels.len());
-        
+
         Ok((width, height, pixels))
     }
 

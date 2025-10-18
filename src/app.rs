@@ -94,16 +94,16 @@ impl App {
             log::info!("Capturing screenshot to {}", path.display());
             if let Some(backend) = &mut self.backend {
                 let (width, height, pixels) = backend.capture_frame()?;
-                
+
                 // Save as PNG using image crate
                 use image::ImageBuffer;
                 let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
                     .context("Failed to create image from captured pixels")?;
-                
+
                 img.save(path)
                     .with_context(|| format!("Failed to save screenshot to {}", path.display()))?;
-                
-                log::info!("Screenshot saved: {}x{}", width, height);
+
+                log::info!("Screenshot saved: {width}x{height}");
             }
         }
 
@@ -188,7 +188,7 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 log::info!("Close requested, shutting down");
-                
+
                 // Capture screenshot if requested
                 if let Some(ref path) = self.config.screenshot {
                     log::info!("Capturing screenshot to {}", path.display());
@@ -196,12 +196,14 @@ impl ApplicationHandler for App {
                         match backend.capture_frame() {
                             Ok((width, height, pixels)) => {
                                 use image::ImageBuffer;
-                                match ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels) {
+                                match ImageBuffer::<image::Rgba<u8>, _>::from_raw(
+                                    width, height, pixels,
+                                ) {
                                     Some(img) => {
                                         if let Err(e) = img.save(path) {
                                             log::error!("Failed to save screenshot: {e}");
                                         } else {
-                                            log::info!("Screenshot saved: {}x{}", width, height);
+                                            log::info!("Screenshot saved: {width}x{height}");
                                         }
                                     }
                                     None => {
@@ -215,7 +217,7 @@ impl ApplicationHandler for App {
                         }
                     }
                 }
-                
+
                 if let Some(backend) = &mut self.backend {
                     backend.cleanup();
                 }
@@ -249,7 +251,7 @@ impl ApplicationHandler for App {
                 if let Some(max_frames) = self.config.max_frames {
                     if self.frame_count >= max_frames {
                         log::info!("Rendered {} frames, exiting", self.frame_count);
-                        
+
                         // Capture screenshot if requested
                         if let Some(ref path) = self.config.screenshot {
                             log::info!("Capturing screenshot to {}", path.display());
@@ -257,16 +259,22 @@ impl ApplicationHandler for App {
                                 match backend.capture_frame() {
                                     Ok((width, height, pixels)) => {
                                         use image::ImageBuffer;
-                                        match ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels) {
+                                        match ImageBuffer::<image::Rgba<u8>, _>::from_raw(
+                                            width, height, pixels,
+                                        ) {
                                             Some(img) => {
                                                 if let Err(e) = img.save(path) {
                                                     log::error!("Failed to save screenshot: {e}");
                                                 } else {
-                                                    log::info!("Screenshot saved: {}x{}", width, height);
+                                                    log::info!(
+                                                        "Screenshot saved: {width}x{height}"
+                                                    );
                                                 }
                                             }
                                             None => {
-                                                log::error!("Failed to create image from captured pixels");
+                                                log::error!(
+                                                    "Failed to create image from captured pixels"
+                                                );
                                             }
                                         }
                                     }
@@ -276,7 +284,7 @@ impl ApplicationHandler for App {
                                 }
                             }
                         }
-                        
+
                         if let Some(backend) = &mut self.backend {
                             backend.cleanup();
                         }

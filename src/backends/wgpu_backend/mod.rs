@@ -455,7 +455,7 @@ impl GraphicsBackend for WgpuBackend {
         // wgpu requires COPY_BYTES_PER_ROW_ALIGNMENT (256 bytes)
         const ALIGNMENT: u32 = 256;
         let bytes_per_row_unaligned = 4 * width; // RGBA8
-        let bytes_per_row = ((bytes_per_row_unaligned + ALIGNMENT - 1) / ALIGNMENT) * ALIGNMENT;
+        let bytes_per_row = bytes_per_row_unaligned.div_ceil(ALIGNMENT) * ALIGNMENT;
 
         // Create buffer to copy texture data to
         let buffer_size = (bytes_per_row * height) as u64;
@@ -508,7 +508,7 @@ impl GraphicsBackend for WgpuBackend {
             .context("Failed to receive buffer mapping result")??;
 
         let data = buffer_slice.get_mapped_range();
-        
+
         // If padded, we need to remove padding
         let mut pixels = Vec::with_capacity((width * height * 4) as usize);
         if bytes_per_row != bytes_per_row_unaligned {
@@ -522,7 +522,7 @@ impl GraphicsBackend for WgpuBackend {
             // No padding, copy directly
             pixels.extend_from_slice(&data);
         }
-        
+
         drop(data);
         buffer.unmap();
 
