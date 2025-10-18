@@ -36,10 +36,6 @@ pub struct DirectXBackendImpl {
     pipeline_state: Option<ID3D12PipelineState>,
     root_signature: Option<ID3D12RootSignature>,
     
-    // Viewport and scissor
-    viewport: D3D12_VIEWPORT,
-    scissor_rect: RECT,
-    
     // Synchronization
     fence: Option<ID3D12Fence>,
     fence_value: u64,
@@ -80,8 +76,6 @@ impl DirectXBackendImpl {
             rtv_descriptor_size: 0,
             pipeline_state: None,
             root_signature: None,
-            viewport: D3D12_VIEWPORT::default(),
-            scissor_rect: RECT::default(),
             fence: None,
             fence_value: 0,
             fence_event: HANDLE::default(),
@@ -332,23 +326,107 @@ impl DirectXBackendImpl {
     }
 
     pub fn begin_frame(&mut self) -> Result<()> {
-        // DirectX 12 doesn't have explicit begin_frame
-        // We reset command allocator here
+        log::debug!("DirectX: begin_frame");
+        
+        // Reset command allocator
+        unsafe {
+            if let Some(allocator) = &self.command_allocator {
+                allocator.Reset()?;
+                log::debug!("Command allocator reset");
+            }
+            
+            if let (Some(command_list), Some(allocator)) = (&self.command_list, &self.command_allocator) {
+                command_list.Reset(allocator, None)?;
+                log::debug!("Command list reset");
+            }
+        }
+        
         Ok(())
     }
 
     pub fn end_frame(&mut self) -> Result<()> {
-        // TODO: Record and execute commands, present
-        // This requires the pipeline to be set up
+        log::info!("DirectX: end_frame (frame_index: {})", self.frame_index);
         
         unsafe {
-            if let (Some(swap_chain), Some(command_queue)) = (&self.swap_chain, &self.command_queue) {
-                // For now, just present (vsync on)
-                swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
+            // Record simple clear commands
+            if let (Some(command_list), Some(rtv_heap)) = (&self.command_list, &self.rtv_heap) {
+                log::info!("Recording clear commands");
                 
-                // Wait for frame
-                self.wait_for_previous_frame()?;
+                // Get current back buffer
+                let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
+                let rtv_handle = D3D12_CPU_DESCRIPTOR_HANDLE {
+                    ptr: rtv_handle.ptr + (self.frame_index * self.rtv_descriptor_size) as usize,
+                };
+                
+                // Transition to render target
+                if let Some(render_target) = self.render_targets.get(self.frame_index as usize) {
+                    log::info!("Transitioning to render target");
+                    let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                        StateBefore: D3D12_RESOURCE_STATE_PRESENT,
+                        StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    };
+                    
+                    let barrier = D3D12_RESOURCE_BARRIER {
+                        Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                        Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                        Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                            Transition: std::mem::ManuallyDrop::new(transition_to_rt),
+                        },
+                    };
+                    
+                    command_list.ResourceBarrier(&[barrier]);
+                    log::info!("Transitioned to render target");
+                    
+                    // Clear to a dark blue color so we can see something
+                    let clear_color = [0.0f32, 0.2f32, 0.4f32, 1.0f32];
+                    command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
+                    log::info!("Cleared to blue ({:?})", clear_color);
+                    
+                    // Transition back to present
+                    let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                        StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        StateAfter: D3D12_RESOURCE_STATE_PRESENT,
+                    };
+                    
+                    let barrier = D3D12_RESOURCE_BARRIER {
+                        Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                        Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                        Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                            Transition: std::mem::ManuallyDrop::new(transition_to_present),
+                        },
+                    };
+                    
+                    command_list.ResourceBarrier(&[barrier]);
+                    log::info!("Transitioned to present");
+                    
+                    log::info!("Clear commands recorded");
+                }
+                
+                // Close command list
+                command_list.Close()?;
+                log::info!("Command list closed");
             }
+            
+            // Execute commands
+            if let (Some(command_queue), Some(command_list)) = (&self.command_queue, &self.command_list) {
+                let command_lists = [Some(command_list.cast()?)];
+                command_queue.ExecuteCommandLists(&command_lists);
+                log::info!("Commands executed");
+            }
+            
+            // Present
+            if let Some(swap_chain) = &self.swap_chain {
+                swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
+                log::info!("Frame presented");
+            }
+            
+            // Wait for frame
+            self.wait_for_previous_frame()?;
+            log::info!("Frame complete");
         }
         
         Ok(())

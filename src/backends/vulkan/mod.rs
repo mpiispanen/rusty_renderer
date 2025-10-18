@@ -58,9 +58,13 @@ pub struct VulkanBackend {
     // Command buffers and synchronization
     command_pool: vk::CommandPool,
     command_buffers: Vec<vk::CommandBuffer>,
+    // Per-swapchain-image semaphores (one set per swapchain image)
     image_available_semaphores: Vec<vk::Semaphore>,
     render_finished_semaphores: Vec<vk::Semaphore>,
+    // Per-frame-in-flight fences
     in_flight_fences: Vec<vk::Fence>,
+    // Track which fence is associated with each swapchain image
+    images_in_flight: Vec<Option<vk::Fence>>,
     current_frame: usize,
     image_index: u32,
 
@@ -105,6 +109,7 @@ impl VulkanBackend {
             image_available_semaphores: vec![],
             render_finished_semaphores: vec![],
             in_flight_fences: vec![],
+            images_in_flight: vec![],
             current_frame: 0,
             image_index: 0,
             device_wrapper: VulkanDevice::new(),
@@ -549,6 +554,10 @@ impl VulkanBackend {
         self.create_swapchain(window)?;
         self.create_swapchain_image_views()?;
 
+        // Reset images_in_flight tracking for new swapchain
+        let swapchain_image_count = self.swapchain_images.len();
+        self.images_in_flight = vec![None; swapchain_image_count];
+
         Ok(())
     }
 
@@ -805,20 +814,33 @@ impl VulkanBackend {
         let device = self.device.as_ref().context("Device not initialized")?;
 
         const MAX_FRAMES_IN_FLIGHT: usize = 2;
+        let swapchain_image_count = self.swapchain_images.len();
 
         let semaphore_info = vk::SemaphoreCreateInfo::builder();
         let fence_info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
 
-        for _ in 0..MAX_FRAMES_IN_FLIGHT {
+        // Create per-swapchain-image semaphores
+        for _ in 0..swapchain_image_count {
             self.image_available_semaphores
                 .push(unsafe { device.create_semaphore(&semaphore_info, None)? });
             self.render_finished_semaphores
                 .push(unsafe { device.create_semaphore(&semaphore_info, None)? });
+        }
+
+        // Create per-frame-in-flight fences
+        for _ in 0..MAX_FRAMES_IN_FLIGHT {
             self.in_flight_fences
                 .push(unsafe { device.create_fence(&fence_info, None)? });
         }
 
-        log::info!("Created synchronization objects for {MAX_FRAMES_IN_FLIGHT} frames in flight");
+        // Initialize images_in_flight tracking
+        self.images_in_flight = vec![None; swapchain_image_count];
+
+        log::info!(
+            "Created synchronization objects: {} semaphore pairs (per swapchain image), {} fences (frames in flight)",
+            swapchain_image_count,
+            MAX_FRAMES_IN_FLIGHT
+        );
         Ok(())
     }
 
@@ -889,6 +911,7 @@ impl VulkanBackend {
         self.image_available_semaphores.clear();
         self.render_finished_semaphores.clear();
         self.in_flight_fences.clear();
+        self.images_in_flight.clear();
     }
 }
 
@@ -965,14 +988,15 @@ impl GraphicsBackend for VulkanBackend {
             None => return Ok(()), // Not initialized yet
         };
 
-        // Wait for fence
+        // Wait for the current frame's fence
         let in_flight_fence = self.in_flight_fences[self.current_frame];
         unsafe {
             device.wait_for_fences(&[in_flight_fence], true, u64::MAX)?;
         }
 
-        // Acquire next image
-        let image_available = self.image_available_semaphores[self.current_frame];
+        // Acquire next image - we don't know which image yet, so we use current_frame semaphore temporarily
+        // This is a limitation - ideally we'd use a fence here but that's more complex
+        let image_available = self.image_available_semaphores[self.current_frame % self.image_available_semaphores.len()];
         let result = unsafe {
             device.acquire_next_image_khr(
                 self.swapchain_khr,
@@ -991,9 +1015,21 @@ impl GraphicsBackend for VulkanBackend {
             Err(e) => return Err(e.into()),
         };
 
+        // Wait for the image-specific fence if this image is still in use
+        if let Some(image_fence) = self.images_in_flight[image_index] {
+            if image_fence != in_flight_fence {
+                unsafe {
+                    device.wait_for_fences(&[image_fence], true, u64::MAX)?;
+                }
+            }
+        }
+
+        // Mark this image as now being used by this frame's fence
+        self.images_in_flight[image_index] = Some(in_flight_fence);
+
         self.image_index = image_index as u32;
 
-        // Reset fence
+        // Reset fence only after we're sure we can use it
         unsafe {
             device.reset_fences(&[in_flight_fence])?;
         }
@@ -1014,10 +1050,13 @@ impl GraphicsBackend for VulkanBackend {
             return Ok(());
         }
 
-        let wait_semaphores = &[self.image_available_semaphores[self.current_frame]];
+        let image_index = self.image_index as usize;
+
+        // Use the image-specific semaphores for this swapchain image
+        let wait_semaphores = &[self.image_available_semaphores[self.current_frame % self.image_available_semaphores.len()]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
-        let command_buffers = &[self.command_buffers[self.image_index as usize]];
-        let signal_semaphores = &[self.render_finished_semaphores[self.current_frame]];
+        let command_buffers = &[self.command_buffers[image_index]];
+        let signal_semaphores = &[self.render_finished_semaphores[image_index]];
 
         let submit_info = vk::SubmitInfo::builder()
             .wait_semaphores(wait_semaphores)

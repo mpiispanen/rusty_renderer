@@ -180,10 +180,9 @@ echo -e "${BLUE}Running DirectX 12 binary via Proton...${NC}"
 echo ""
 
 PROTON_CMD="$PROTON_PATH/proton"
-RUN_CMD="$PROTON_CMD run $BINARY_PATH -- --backend directx"
 
 if [ "$DRY_RUN" = true ]; then
-    echo "Would run: $RUN_CMD"
+    echo "Would run: \"$PROTON_CMD\" run \"$BINARY_PATH\" -- --backend directx --max-frames 10"
     echo ""
     echo "Environment:"
     env | grep -E "VKD3D|WINE|RUST_LOG|PROTON" | sort
@@ -195,8 +194,8 @@ echo ""
 echo "---"
 echo ""
 
-# Run the application
-if $RUN_CMD; then
+# Run the application (with proper quoting for paths with spaces)
+if "$PROTON_CMD" run "$BINARY_PATH" -- --backend directx --max-frames 10; then
     echo ""
     echo "---"
     echo ""
