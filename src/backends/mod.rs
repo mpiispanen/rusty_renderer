@@ -87,6 +87,16 @@ pub trait GraphicsBackend: Send + Sync {
     /// the backend for rendering.
     fn initialize(&mut self, window: &winit::window::Window) -> Result<()>;
 
+    /// Initialize the backend in headless mode (no window)
+    ///
+    /// This creates an offscreen rendering target for CI testing and
+    /// screenshot capture without requiring a display.
+    ///
+    /// # Arguments
+    /// * `width` - Width of the offscreen surface
+    /// * `height` - Height of the offscreen surface
+    fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()>;
+
     /// Begin a new frame
     ///
     /// Called at the start of each frame. Acquires the next swapchain image
@@ -97,6 +107,15 @@ pub trait GraphicsBackend: Send + Sync {
     ///
     /// Submits recorded commands and presents the rendered image.
     fn end_frame(&mut self) -> Result<()>;
+
+    /// Capture the current frame to an image buffer
+    ///
+    /// This reads back the rendered image from the GPU and returns it as
+    /// RGBA8 pixel data that can be saved to a file.
+    ///
+    /// # Returns
+    /// A tuple of (width, height, RGBA pixel data)
+    fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)>;
 
     /// Handle window resize
     ///

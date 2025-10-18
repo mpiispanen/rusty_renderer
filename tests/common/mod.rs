@@ -25,6 +25,8 @@ pub fn test_config(
         vsync: false,
         log_level: log::LevelFilter::Debug,
         max_frames: None,
+        headless: false,
+        screenshot: None,
     }
 }
 

@@ -111,6 +111,37 @@ impl GraphicsBackend for DirectXBackend {
         }
     }
 
+    fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.initialize_headless(width, height)
+        }
+
+        #[cfg(not(windows))]
+        {
+            anyhow::bail!(
+                "Headless rendering not yet implemented for DirectX backend (planned for M5). \
+                 Requested size: {width}x{height}. \
+                 See issue #27 for implementation status."
+            )
+        }
+    }
+
+    fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)> {
+        #[cfg(windows)]
+        {
+            self.inner.capture_frame()
+        }
+
+        #[cfg(not(windows))]
+        {
+            anyhow::bail!(
+                "Frame capture not yet implemented for DirectX backend (planned for M5). \
+                 See issue #27 for implementation status."
+            )
+        }
+    }
+
     fn cleanup(&mut self) {
         #[cfg(windows)]
         {

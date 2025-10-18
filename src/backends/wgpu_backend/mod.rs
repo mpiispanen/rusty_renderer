@@ -321,6 +321,21 @@ impl GraphicsBackend for WgpuBackend {
         Ok(())
     }
 
+    fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
+        anyhow::bail!(
+            "Headless rendering not yet implemented for wgpu backend (planned for M5). \
+             Requested size: {width}x{height}. \
+             See issue #27 for implementation status."
+        )
+    }
+
+    fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)> {
+        anyhow::bail!(
+            "Frame capture not yet implemented for wgpu backend (planned for M5). \
+             See issue #27 for implementation status."
+        )
+    }
+
     fn cleanup(&mut self) {
         log::info!("Cleaning up wgpu backend");
 

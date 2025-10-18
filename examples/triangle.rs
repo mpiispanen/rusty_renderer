@@ -100,6 +100,8 @@ fn main() -> anyhow::Result<()> {
         debug: true,
         log_level: log::LevelFilter::Info,
         max_frames: args.test_duration.map(|d| d * 60), // Approximate frames for duration
+        headless: false,
+        screenshot: None,
     };
 
     // Create app

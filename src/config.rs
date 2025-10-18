@@ -62,6 +62,14 @@ pub struct Config {
     /// Maximum number of frames to render (for testing)
     #[arg(long)]
     pub max_frames: Option<u64>,
+
+    /// Run in headless mode (no window, for CI testing)
+    #[arg(long, default_value = "false")]
+    pub headless: bool,
+
+    /// Save screenshot to file path (requires headless or captures last frame)
+    #[arg(long)]
+    pub screenshot: Option<std::path::PathBuf>,
 }
 
 impl Config {
@@ -116,6 +124,8 @@ mod tests {
             vsync: true,
             log_level: log::LevelFilter::Info,
             max_frames: None,
+            headless: false,
+            screenshot: None,
         };
 
         assert!(config.validate().is_ok());
@@ -140,6 +150,8 @@ mod tests {
             vsync: true,
             log_level: log::LevelFilter::Info,
             max_frames: None,
+            headless: false,
+            screenshot: None,
         };
 
         assert_eq!(config.window_size(), (1920, 1080));
