@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.2.0  
+**Version:** 0.3.0  
 **Last Updated:** 2025-10-18  
-**Status:** Foundation Complete - Multi-Backend Triangle Rendering
+**Status:** Multi-Backend Complete - Planning Infrastructure & Testing Phase
 
 ## Project Vision
 
@@ -33,8 +33,8 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - DirectX 12 testing via Proton on Linux
 
 ### In Progress
-- Planning for next phase (render graph or advanced features)
-- Documentation organization and cleanup
+- Milestone 5: Infrastructure improvements (offscreen rendering, visual testing)
+- Documentation organization and maintenance
 
 ### Coordinate System Handling
 All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
@@ -250,12 +250,14 @@ graph.compile_and_execute(backend);
 - [x] Integration tests for all backends
 - [x] Cross-compilation setup for Windows
 
-**Milestone 5: Infrastructure and Testing** (IN PLANNING)
-- [ ] Offscreen rendering mode for CI testing
+**Milestone 5: Infrastructure and Testing** (IN PROGRESS)
+- [ ] Offscreen rendering mode for CI testing without window display
 - [ ] Screenshot functionality for visual validation
 - [ ] Visual correctness testing between backends
-- [ ] Golden reference image comparison
+- [ ] Golden reference image comparison system
 - [ ] Git LFS setup for test images
+- [ ] Documentation organization (move docs to docs/)
+- [ ] Keep design document updated with progress
 
 ### Medium Term (~1-2 months)
 
@@ -295,10 +297,11 @@ graph.compile_and_execute(backend);
 - [ ] Render graph visualization
 
 **Future Milestone: Shader Hot-Reloading**
-- [ ] Runtime shader compilation (GLSL/HLSL → SPIR-V)
+- [ ] Online shader compilation (runtime GLSL/HLSL → SPIR-V)
 - [ ] File watching for shader changes
-- [ ] Hot-reload pipeline without restart
+- [ ] Hot-reload pipeline without application restart
 - [ ] Error reporting in debug UI
+- [ ] Shader editor integration
 
 ### Long Term (3+ months)
 
@@ -379,6 +382,12 @@ graph.compile_and_execute(backend);
    - Implement in wgpu (ensure portability)
    - Avoid over-investing in single backend before validating across APIs
 
+5. **Documentation Maintenance**
+   - Keep DESIGN.md updated as architecture evolves
+   - Move documentation files to docs/ directory (avoid root clutter)
+   - Create retrospectives after each milestone
+   - Always ensure CI passes before closing issues
+
 ## Open Questions and Future Considerations
 
 ### Render Graph
@@ -430,6 +439,13 @@ graph.compile_and_execute(backend);
 This design document is a living document and will evolve as the project progresses. Major architectural changes should be reflected here with version updates and change notes.
 
 ### Change Log
+- **v0.3.0** (2025-10-18): Milestone 4 complete, planning Milestone 5
+  - DirectX 12 backend complete with triangle rendering
+  - All backends tested and working (Vulkan, wgpu, DirectX)
+  - Y-axis coordinate handling standardized across backends
+  - Cross-platform testing verified (DirectX on Linux via Proton)
+  - Documentation workflow established (keep DESIGN.md updated, docs in docs/)
+  - Milestone 5 scoped: offscreen rendering, visual testing infrastructure
 - **v0.2.0** (2025-10-18): Updated after completing Milestones 1-4
   - All three backends (Vulkan, wgpu, DirectX 12) now operational
   - Validation layer support added across all backends
