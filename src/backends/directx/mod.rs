@@ -6,7 +6,7 @@
 //! ## Testing with WARP
 //!
 //! Set the environment variable to use WARP software renderer:
-//! ```
+//! ```text
 //! set RUSTY_RENDERER_USE_WARP=1
 //! rusty_renderer --backend directx
 //! ```

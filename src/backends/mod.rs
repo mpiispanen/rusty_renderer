@@ -29,8 +29,8 @@
 //! ```no_run
 //! use rusty_renderer::backends::{BackendType, create_backend};
 //!
-//! // Create a Vulkan backend
-//! let backend = create_backend(BackendType::Vulkan)?;
+//! // Create a Vulkan backend with validation disabled
+//! let backend = create_backend(BackendType::Vulkan, false)?;
 //! # Ok::<(), anyhow::Error>(())
 //! ```
 
