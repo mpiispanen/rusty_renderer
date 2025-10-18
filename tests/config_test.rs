@@ -22,6 +22,7 @@ fn test_config_validation_valid() {
         max_frames: None,
         headless: false,
         screenshot: None,
+        screenshot_interval: 0,
     };
 
     assert!(config.validate().is_ok());
@@ -42,6 +43,7 @@ fn test_config_validation_zero_width() {
         max_frames: None,
         headless: false,
         screenshot: None,
+        screenshot_interval: 0,
     };
 
     assert!(config.validate().is_err());
@@ -62,6 +64,7 @@ fn test_config_validation_zero_height() {
         max_frames: None,
         headless: false,
         screenshot: None,
+        screenshot_interval: 0,
     };
 
     assert!(config.validate().is_err());

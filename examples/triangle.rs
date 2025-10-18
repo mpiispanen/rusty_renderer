@@ -102,6 +102,7 @@ fn main() -> anyhow::Result<()> {
         max_frames: args.test_duration.map(|d| d * 60), // Approximate frames for duration
         headless: false,
         screenshot: None,
+        screenshot_interval: 0,
     };
 
     // Create app

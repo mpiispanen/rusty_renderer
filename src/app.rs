@@ -75,6 +75,16 @@ impl App {
         let max_frames = self.config.max_frames.unwrap_or(10);
         log::info!("Will render {max_frames} frames");
 
+        // Determine screenshot mode
+        let screenshot_interval = self.config.screenshot_interval;
+        let capture_sequence = screenshot_interval > 0 && self.config.screenshot.is_some();
+
+        if capture_sequence {
+            log::info!(
+                "Will capture screenshots every {screenshot_interval} frames",
+            );
+        }
+
         while self.frame_count < max_frames {
             if let Some(backend) = &mut self.backend {
                 backend.begin_frame()?;
@@ -84,32 +94,76 @@ impl App {
                 if self.frame_count.is_multiple_of(100) {
                     log::debug!("Rendered {} frames", self.frame_count);
                 }
+
+                // Capture screenshot at interval if requested
+                if capture_sequence && self.frame_count.is_multiple_of(screenshot_interval) {
+                    self.capture_screenshot_frame(self.frame_count)?;
+                }
             }
         }
 
         log::info!("Rendered {} frames", self.frame_count);
 
-        // Capture screenshot if requested
-        if let Some(ref path) = self.config.screenshot {
-            log::info!("Capturing screenshot to {}", path.display());
-            if let Some(backend) = &mut self.backend {
-                let (width, height, pixels) = backend.capture_frame()?;
-
-                // Save as PNG using image crate
-                use image::ImageBuffer;
-                let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
-                    .context("Failed to create image from captured pixels")?;
-
-                img.save(path)
-                    .with_context(|| format!("Failed to save screenshot to {}", path.display()))?;
-
-                log::info!("Screenshot saved: {width}x{height}");
-            }
+        // Capture final screenshot if not capturing sequence
+        if !capture_sequence && self.config.screenshot.is_some() {
+            self.capture_screenshot_frame(self.frame_count)?;
         }
 
         // Cleanup
         if let Some(backend) = &mut self.backend {
             backend.cleanup();
+        }
+
+        Ok(())
+    }
+
+    /// Capture and save a screenshot for a specific frame
+    fn capture_screenshot_frame(&mut self, frame_number: u64) -> Result<()> {
+        if let (Some(ref base_path), Some(backend)) = (&self.config.screenshot, &mut self.backend) {
+            // Generate filename with frame number
+            let path = if self.config.screenshot_interval > 0 {
+                // For sequences, add frame number to filename
+                let parent = base_path.parent();
+                let stem = base_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("screenshot");
+                let ext = base_path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("png");
+
+                let filename = format!("{stem}-{frame_number:04}.{ext}");
+
+                if let Some(p) = parent {
+                    p.join(filename)
+                } else {
+                    std::path::PathBuf::from(filename)
+                }
+            } else {
+                // For single screenshot, use original path
+                base_path.clone()
+            };
+
+            log::info!("Capturing screenshot to {}", path.display());
+
+            let (width, height, pixels) = backend.capture_frame()?;
+
+            // Save as PNG using image crate
+            use image::ImageBuffer;
+            let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
+                .context("Failed to create image from captured pixels")?;
+
+            // Create parent directory if it doesn't exist
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)
+                    .with_context(|| format!("Failed to create directory {}", parent.display()))?;
+            }
+
+            img.save(&path)
+                .with_context(|| format!("Failed to save screenshot to {}", path.display()))?;
+
+            log::info!("Screenshot saved: {width}x{height} -> {}", path.display());
         }
 
         Ok(())

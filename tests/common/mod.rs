@@ -27,6 +27,7 @@ pub fn test_config(
         max_frames: None,
         headless: false,
         screenshot: None,
+        screenshot_interval: 0,
     }
 }
 

@@ -70,6 +70,10 @@ pub struct Config {
     /// Save screenshot to file path (requires headless or captures last frame)
     #[arg(long)]
     pub screenshot: Option<std::path::PathBuf>,
+
+    /// Capture screenshot every N frames (0 = only last frame)
+    #[arg(long, default_value = "0")]
+    pub screenshot_interval: u64,
 }
 
 impl Config {
@@ -126,6 +130,7 @@ mod tests {
             max_frames: None,
             headless: false,
             screenshot: None,
+            screenshot_interval: 0,
         };
 
         assert!(config.validate().is_ok());
@@ -152,6 +157,7 @@ mod tests {
             max_frames: None,
             headless: false,
             screenshot: None,
+            screenshot_interval: 0,
         };
 
         assert_eq!(config.window_size(), (1920, 1080));
