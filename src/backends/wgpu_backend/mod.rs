@@ -28,9 +28,16 @@ pub struct WgpuBackend {
     // Rendering pipeline
     render_pipeline: Option<wgpu::RenderPipeline>,
 
+    // Offscreen rendering target
+    offscreen_texture: Option<wgpu::Texture>,
+    offscreen_view: Option<wgpu::TextureView>,
+
     // Window size
     width: u32,
     height: u32,
+
+    // Mode
+    headless: bool,
 
     // Configuration
     enable_validation: bool,
@@ -53,8 +60,11 @@ impl WgpuBackend {
             queue: None,
             surface_config: None,
             render_pipeline: None,
+            offscreen_texture: None,
+            offscreen_view: None,
             width: 800,
             height: 600,
+            headless: false,
             enable_validation,
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
@@ -237,7 +247,6 @@ impl GraphicsBackend for WgpuBackend {
     }
 
     fn end_frame(&mut self) -> Result<()> {
-        let surface = self.surface.as_ref().context("Surface not initialized")?;
         let device = self.device.as_ref().context("Device not initialized")?;
         let queue = self.queue.as_ref().context("Queue not initialized")?;
         let pipeline = self
@@ -245,11 +254,26 @@ impl GraphicsBackend for WgpuBackend {
             .as_ref()
             .context("Pipeline not initialized")?;
 
-        // Get current frame
-        let output = surface.get_current_texture()?;
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        // Get render target (surface or offscreen)
+        let (view, output) = if self.headless {
+            // Headless mode: render to offscreen texture
+            let view = self
+                .offscreen_view
+                .as_ref()
+                .context("Offscreen view not initialized")?;
+            (view, None)
+        } else {
+            // Window mode: render to surface
+            let surface = self.surface.as_ref().context("Surface not initialized")?;
+            let output = surface.get_current_texture()?;
+            let view = output
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default());
+            // Store view in a temporary to ensure it lives long enough
+            self.offscreen_view = Some(view);
+            let view_ref = self.offscreen_view.as_ref().unwrap();
+            (view_ref, Some(output))
+        };
 
         // Create command encoder
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -261,7 +285,7 @@ impl GraphicsBackend for WgpuBackend {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view,
                     resolve_target: None,
                     ops: wgpu::Operations {
                         load: wgpu::LoadOp::Clear(wgpu::Color {
@@ -284,7 +308,11 @@ impl GraphicsBackend for WgpuBackend {
 
         // Submit commands
         queue.submit(std::iter::once(encoder.finish()));
-        output.present();
+
+        // Present if not headless
+        if let Some(output) = output {
+            output.present();
+        }
 
         Ok(())
     }
@@ -322,18 +350,185 @@ impl GraphicsBackend for WgpuBackend {
     }
 
     fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
-        anyhow::bail!(
-            "Headless rendering not yet implemented for wgpu backend (planned for M5). \
-             Requested size: {width}x{height}. \
-             See issue #27 for implementation status."
-        )
+        log::info!("Initializing wgpu backend in headless mode: {width}x{height}");
+
+        self.width = width;
+        self.height = height;
+        self.headless = true;
+
+        // Create instance
+        log::info!("Creating wgpu instance");
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::all(),
+            flags: if self.enable_validation {
+                wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
+            } else {
+                wgpu::InstanceFlags::empty()
+            },
+            ..Default::default()
+        });
+
+        // Request adapter (no surface needed)
+        log::info!("Requesting adapter for headless mode");
+        let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            compatible_surface: None, // Headless!
+            force_fallback_adapter: false,
+        }))
+        .context("Failed to find appropriate adapter")?;
+
+        log::info!("Adapter: {:?}", adapter.get_info());
+
+        // Request device and queue
+        log::info!("Requesting device and queue");
+        let (device, queue) = pollster::block_on(adapter.request_device(
+            &wgpu::DeviceDescriptor {
+                label: Some("Primary Device (Headless)"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::default(),
+                memory_hints: Default::default(),
+            },
+            None,
+        ))?;
+
+        log::info!("Device and queue created");
+
+        // Create offscreen render target
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Offscreen Render Target"),
+            size: wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+        log::info!("Offscreen render target created: {width}x{height}");
+
+        // Store everything
+        self.instance = Some(instance);
+        self.adapter = Some(adapter);
+        self.device = Some(device);
+        self.queue = Some(queue);
+        self.offscreen_texture = Some(texture);
+        self.offscreen_view = Some(view);
+
+        // Create surface config (for pipeline compatibility)
+        self.surface_config = Some(wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            width: self.width,
+            height: self.height,
+            present_mode: wgpu::PresentMode::Fifo,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
+            desired_maximum_frame_latency: 2,
+        });
+
+        // Create render pipeline
+        self.create_render_pipeline()?;
+
+        log::info!("wgpu backend initialized successfully in headless mode");
+        Ok(())
     }
 
     fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)> {
-        anyhow::bail!(
-            "Frame capture not yet implemented for wgpu backend (planned for M5). \
-             See issue #27 for implementation status."
-        )
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let queue = self.queue.as_ref().context("Queue not initialized")?;
+        let texture = self
+            .offscreen_texture
+            .as_ref()
+            .context("Offscreen texture not available (not in headless mode?)")?;
+
+        let width = self.width;
+        let height = self.height;
+
+        // Calculate aligned bytes per row
+        // wgpu requires COPY_BYTES_PER_ROW_ALIGNMENT (256 bytes)
+        const ALIGNMENT: u32 = 256;
+        let bytes_per_row_unaligned = 4 * width; // RGBA8
+        let bytes_per_row = ((bytes_per_row_unaligned + ALIGNMENT - 1) / ALIGNMENT) * ALIGNMENT;
+
+        // Create buffer to copy texture data to
+        let buffer_size = (bytes_per_row * height) as u64;
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("Frame Capture Buffer"),
+            size: buffer_size,
+            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
+            mapped_at_creation: false,
+        });
+
+        // Create command encoder for copy
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Frame Capture Encoder"),
+        });
+
+        // Copy texture to buffer
+        encoder.copy_texture_to_buffer(
+            wgpu::ImageCopyTexture {
+                texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::ImageCopyBuffer {
+                buffer: &buffer,
+                layout: wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(height),
+                },
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        queue.submit(std::iter::once(encoder.finish()));
+
+        // Map buffer and read data
+        let buffer_slice = buffer.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        buffer_slice.map_async(wgpu::MapMode::Read, move |result| {
+            tx.send(result).unwrap();
+        });
+
+        device.poll(wgpu::Maintain::Wait);
+        rx.recv()
+            .context("Failed to receive buffer mapping result")??;
+
+        let data = buffer_slice.get_mapped_range();
+        
+        // If padded, we need to remove padding
+        let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+        if bytes_per_row != bytes_per_row_unaligned {
+            // Remove padding from each row
+            for y in 0..height {
+                let start = (y * bytes_per_row) as usize;
+                let end = start + bytes_per_row_unaligned as usize;
+                pixels.extend_from_slice(&data[start..end]);
+            }
+        } else {
+            // No padding, copy directly
+            pixels.extend_from_slice(&data);
+        }
+        
+        drop(data);
+        buffer.unmap();
+
+        log::info!("Frame captured: {width}x{height}, {} bytes", pixels.len());
+
+        Ok((width, height, pixels))
     }
 
     fn cleanup(&mut self) {

@@ -33,6 +33,10 @@ impl App {
         );
         log::info!("Debug mode: {}", config.debug);
         log::info!("VSync: {}", config.vsync);
+        log::info!("Headless: {}", config.headless);
+        if let Some(ref path) = config.screenshot {
+            log::info!("Screenshot: {}", path.display());
+        }
 
         // Create backend based on config
         let backend_type = match config.backend {
@@ -42,10 +46,19 @@ impl App {
             Backend::Wgpu => BackendType::Wgpu,
         };
 
-        let backend = backends::create_backend(backend_type, config.debug)
+        let mut backend = backends::create_backend(backend_type, config.debug)
             .with_context(|| format!("Failed to create {backend_type} backend"))?;
 
         log::info!("Successfully created {} backend", backend.backend_type());
+
+        // If headless, initialize immediately
+        if config.headless {
+            log::info!("Initializing backend in headless mode");
+            backend
+                .initialize_headless(config.width, config.height)
+                .context("Failed to initialize headless mode")?;
+            log::info!("Backend initialized in headless mode");
+        }
 
         Ok(Self {
             window: None,
@@ -55,10 +68,64 @@ impl App {
         })
     }
 
+    /// Run the application in headless mode (no window)
+    pub fn run_headless(&mut self) -> Result<()> {
+        log::info!("Running in headless mode");
+
+        let max_frames = self.config.max_frames.unwrap_or(10);
+        log::info!("Will render {max_frames} frames");
+
+        while self.frame_count < max_frames {
+            if let Some(backend) = &mut self.backend {
+                backend.begin_frame()?;
+                backend.end_frame()?;
+                self.frame_count += 1;
+
+                if self.frame_count % 100 == 0 {
+                    log::debug!("Rendered {} frames", self.frame_count);
+                }
+            }
+        }
+
+        log::info!("Rendered {} frames", self.frame_count);
+
+        // Capture screenshot if requested
+        if let Some(ref path) = self.config.screenshot {
+            log::info!("Capturing screenshot to {}", path.display());
+            if let Some(backend) = &mut self.backend {
+                let (width, height, pixels) = backend.capture_frame()?;
+                
+                // Save as PNG using image crate
+                use image::ImageBuffer;
+                let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
+                    .context("Failed to create image from captured pixels")?;
+                
+                img.save(path)
+                    .with_context(|| format!("Failed to save screenshot to {}", path.display()))?;
+                
+                log::info!("Screenshot saved: {}x{}", width, height);
+            }
+        }
+
+        // Cleanup
+        if let Some(backend) = &mut self.backend {
+            backend.cleanup();
+        }
+
+        Ok(())
+    }
+
     /// Run the application event loop
     pub fn run(config: Config) -> Result<()> {
         log::info!("Starting Rusty Renderer");
 
+        // If headless, run without event loop
+        if config.headless {
+            let mut app = App::new(config)?;
+            return app.run_headless();
+        }
+
+        // Otherwise, run with event loop
         let event_loop = EventLoop::new()?;
         event_loop.set_control_flow(ControlFlow::Poll);
 
@@ -121,6 +188,34 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {
                 log::info!("Close requested, shutting down");
+                
+                // Capture screenshot if requested
+                if let Some(ref path) = self.config.screenshot {
+                    log::info!("Capturing screenshot to {}", path.display());
+                    if let Some(backend) = &mut self.backend {
+                        match backend.capture_frame() {
+                            Ok((width, height, pixels)) => {
+                                use image::ImageBuffer;
+                                match ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels) {
+                                    Some(img) => {
+                                        if let Err(e) = img.save(path) {
+                                            log::error!("Failed to save screenshot: {e}");
+                                        } else {
+                                            log::info!("Screenshot saved: {}x{}", width, height);
+                                        }
+                                    }
+                                    None => {
+                                        log::error!("Failed to create image from captured pixels");
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to capture frame: {e}");
+                            }
+                        }
+                    }
+                }
+                
                 if let Some(backend) = &mut self.backend {
                     backend.cleanup();
                 }
@@ -154,6 +249,34 @@ impl ApplicationHandler for App {
                 if let Some(max_frames) = self.config.max_frames {
                     if self.frame_count >= max_frames {
                         log::info!("Rendered {} frames, exiting", self.frame_count);
+                        
+                        // Capture screenshot if requested
+                        if let Some(ref path) = self.config.screenshot {
+                            log::info!("Capturing screenshot to {}", path.display());
+                            if let Some(backend) = &mut self.backend {
+                                match backend.capture_frame() {
+                                    Ok((width, height, pixels)) => {
+                                        use image::ImageBuffer;
+                                        match ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels) {
+                                            Some(img) => {
+                                                if let Err(e) = img.save(path) {
+                                                    log::error!("Failed to save screenshot: {e}");
+                                                } else {
+                                                    log::info!("Screenshot saved: {}x{}", width, height);
+                                                }
+                                            }
+                                            None => {
+                                                log::error!("Failed to create image from captured pixels");
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to capture frame: {e}");
+                                    }
+                                }
+                            }
+                        }
+                        
                         if let Some(backend) = &mut self.backend {
                             backend.cleanup();
                         }
