@@ -24,6 +24,7 @@ pub fn test_config(
         debug: true,
         vsync: false,
         log_level: log::LevelFilter::Debug,
+        max_frames: None,
     }
 }
 

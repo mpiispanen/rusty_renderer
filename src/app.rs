@@ -18,6 +18,7 @@ pub struct App {
     window: Option<Window>,
     backend: Option<Box<dyn GraphicsBackend>>,
     config: Config,
+    frame_count: u64,
 }
 
 impl App {
@@ -50,6 +51,7 @@ impl App {
             window: None,
             backend: Some(backend),
             config,
+            frame_count: 0,
         })
     }
 
@@ -142,6 +144,20 @@ impl ApplicationHandler for App {
 
                     if let Err(e) = backend.end_frame() {
                         log::error!("Failed to end frame: {e}");
+                        return;
+                    }
+                }
+
+                self.frame_count += 1;
+
+                // Check if we've reached max frames
+                if let Some(max_frames) = self.config.max_frames {
+                    if self.frame_count >= max_frames {
+                        log::info!("Rendered {} frames, exiting", self.frame_count);
+                        if let Some(backend) = &mut self.backend {
+                            backend.cleanup();
+                        }
+                        event_loop.exit();
                         return;
                     }
                 }

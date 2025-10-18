@@ -58,6 +58,10 @@ pub struct Config {
     /// Log level (off, error, warn, info, debug, trace)
     #[arg(long, default_value = "info")]
     pub log_level: log::LevelFilter,
+
+    /// Maximum number of frames to render (for testing)
+    #[arg(long)]
+    pub max_frames: Option<u64>,
 }
 
 impl Config {
@@ -111,6 +115,7 @@ mod tests {
             debug: false,
             vsync: true,
             log_level: log::LevelFilter::Info,
+            max_frames: None,
         };
 
         assert!(config.validate().is_ok());
@@ -134,6 +139,7 @@ mod tests {
             debug: false,
             vsync: true,
             log_level: log::LevelFilter::Info,
+            max_frames: None,
         };
 
         assert_eq!(config.window_size(), (1920, 1080));

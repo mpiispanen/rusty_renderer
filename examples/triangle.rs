@@ -26,11 +26,15 @@ impl Args {
                 "--backend" | "-b" => {
                     backend = args.next().and_then(|s| match s.to_lowercase().as_str() {
                         "vulkan" | "vk" => Some(RenderBackend::Vulkan),
+                        #[cfg(target_os = "windows")]
                         "directx" | "dx" | "dx12" => Some(RenderBackend::DirectX),
                         "wgpu" => Some(RenderBackend::Wgpu),
                         _ => {
                             eprintln!("Unknown backend: {s}");
+                            #[cfg(target_os = "windows")]
                             eprintln!("Valid backends: vulkan, directx, wgpu");
+                            #[cfg(not(target_os = "windows"))]
+                            eprintln!("Valid backends: vulkan, wgpu");
                             None
                         }
                     });
@@ -40,7 +44,10 @@ impl Args {
                     println!("\nUsage: triangle [OPTIONS]");
                     println!("\nOptions:");
                     println!("  --backend, -b <backend>    Graphics backend to use");
+                    #[cfg(target_os = "windows")]
                     println!("                             Options: vulkan (default), directx, wgpu");
+                    #[cfg(not(target_os = "windows"))]
+                    println!("                             Options: vulkan (default), wgpu");
                     println!("  --test-duration <seconds>  Run for specified duration then exit (for testing)");
                     println!("  --help, -h                 Show this help message");
                     println!("\nExamples:");
@@ -90,6 +97,7 @@ fn main() -> anyhow::Result<()> {
         vsync: true,
         debug: true,
         log_level: log::LevelFilter::Info,
+        max_frames: args.test_duration.map(|d| d * 60), // Approximate frames for duration
     };
 
     // Create app

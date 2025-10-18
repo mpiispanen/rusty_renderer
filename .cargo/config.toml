@@ -1,10 +1,15 @@
 # Cargo configuration for rusty_renderer
 
-# Cross-compilation settings for Windows on Linux
-[target.x86_64-pc-windows-gnu]
-linker = "x86_64-w64-mingw32-gcc"
-ar = "x86_64-w64-mingw32-ar"
+# Cross-compilation to Windows using xwin (no mingw needed!)
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld"
+rustflags = [
+    "-Lnative=/home/matpii01/.xwin/crt/lib/x86_64",
+    "-Lnative=/home/matpii01/.xwin/sdk/lib/um/x86_64",
+    "-Lnative=/home/matpii01/.xwin/sdk/lib/ucrt/x86_64"
+]
 
-# Optional: Add Windows MSVC target settings if needed in the future
-# [target.x86_64-pc-windows-msvc]
-# linker = "lld-link"
+# Alternative: GNU target (requires mingw - not recommended for Bazzite)
+# [target.x86_64-pc-windows-gnu]
+# linker = "x86_64-w64-mingw32-gcc"
+# ar = "x86_64-w64-mingw32-ar"

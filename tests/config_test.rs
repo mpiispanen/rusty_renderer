@@ -19,6 +19,7 @@ fn test_config_validation_valid() {
         debug: false,
         vsync: true,
         log_level: log::LevelFilter::Info,
+        max_frames: None,
     };
 
     assert!(config.validate().is_ok());
@@ -36,6 +37,7 @@ fn test_config_validation_zero_width() {
         debug: false,
         vsync: true,
         log_level: log::LevelFilter::Info,
+        max_frames: None,
     };
 
     assert!(config.validate().is_err());
@@ -53,6 +55,7 @@ fn test_config_validation_zero_height() {
         debug: false,
         vsync: true,
         log_level: log::LevelFilter::Info,
+        max_frames: None,
     };
 
     assert!(config.validate().is_err());
