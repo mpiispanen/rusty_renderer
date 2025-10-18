@@ -28,6 +28,7 @@ You should see a colorful RGB triangle! 🎨
 - **Cross-platform**: Linux, Windows, and macOS support
 - **Well-tested**: Comprehensive unit and integration tests
 - **CI/CD**: Automated builds, tests, and GPU validation
+- **Validation layers**: Debug mode with validation on all backends (see [docs/VALIDATION_LAYERS.md](docs/VALIDATION_LAYERS.md))
 
 ## Building
 
@@ -57,6 +58,13 @@ cargo run --example triangle --release
 
 # Run with detailed logging
 RUST_LOG=debug cargo run --example triangle
+
+# Run with validation layers (for debugging)
+cargo run -- --debug
+
+# Try different backends
+cargo run -- --backend wgpu
+cargo run -- --backend directx  # Windows only
 ```
 
 For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md).
@@ -67,15 +75,19 @@ For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](doc
 Usage: rusty_renderer [OPTIONS]
 
 Options:
-  -b, --backend <BACKEND>    Graphics backend [default: vulkan] [possible values: vulkan, wgpu]
+  -b, --backend <BACKEND>    Graphics backend [default: vulkan] [possible values: vulkan, directx, wgpu]
+  -s, --scene <SCENE>        Scene to render [default: triangle]
       --width <WIDTH>        Window width [default: 1280]
       --height <HEIGHT>      Window height [default: 720]
   -d, --debug                Enable debug mode and validation layers
       --vsync                Enable VSync [default: true]
       --log-level <LEVEL>    Log level [default: info] [possible values: off, error, warn, info, debug, trace]
+      --max-frames <N>       Maximum frames to render (for testing)
   -h, --help                 Print help
   -V, --version              Print version
 ```
+
+Note: `directx` backend is only available on Windows.
 
 ## Testing
 

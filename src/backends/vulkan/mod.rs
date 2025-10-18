@@ -20,7 +20,6 @@ use vulkanalia::window as vk_window;
 // Alias to avoid name collision with our Device trait
 type VkDevice = vulkanalia::Device;
 
-const VALIDATION_ENABLED: bool = cfg!(debug_assertions);
 const VALIDATION_LAYER: vk::ExtensionName =
     vk::ExtensionName::from_bytes(b"VK_LAYER_KHRONOS_validation");
 
@@ -75,8 +74,8 @@ pub struct VulkanBackend {
 
 impl VulkanBackend {
     /// Create a new Vulkan backend
-    pub fn new() -> Result<Self> {
-        log::info!("Creating Vulkan backend");
+    pub fn new(enable_validation: bool) -> Result<Self> {
+        log::info!("Creating Vulkan backend (validation: {})", enable_validation);
 
         // Load Vulkan library
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
@@ -88,7 +87,7 @@ impl VulkanBackend {
             entry: Some(entry),
             instance: None,
             messenger: None,
-            validation_enabled: false, // Will be set during instance creation
+            validation_enabled: enable_validation, // Set from parameter
             physical_device: vk::PhysicalDevice::null(),
             device: None,
             graphics_queue: vk::Queue::null(),
@@ -135,8 +134,8 @@ impl VulkanBackend {
             .map(|e| e.as_ptr())
             .collect::<Vec<_>>();
 
-        // Add debug utils extension in debug mode
-        if VALIDATION_ENABLED {
+        // Add debug utils extension if validation is enabled
+        if self.validation_enabled {
             extensions.push(vk::EXT_DEBUG_UTILS_EXTENSION.name.as_ptr());
         }
 
@@ -148,17 +147,14 @@ impl VulkanBackend {
 
         let mut layers = Vec::new();
 
-        if VALIDATION_ENABLED {
+        if self.validation_enabled {
             if available_layers.contains(&VALIDATION_LAYER) {
                 layers.push(VALIDATION_LAYER.as_ptr());
-                self.validation_enabled = true;
                 log::info!("Validation layers enabled");
             } else {
                 self.validation_enabled = false;
                 log::warn!("Validation layers requested but not available");
             }
-        } else {
-            self.validation_enabled = false;
         }
 
         // Create instance

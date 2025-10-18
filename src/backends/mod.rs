@@ -220,6 +220,7 @@ pub trait Swapchain: Send + Sync {
 ///
 /// # Arguments
 /// * `backend_type` - The type of backend to create
+/// * `enable_validation` - Enable validation/debug layers
 ///
 /// # Returns
 /// A boxed graphics backend ready for initialization
@@ -228,14 +229,14 @@ pub trait Swapchain: Send + Sync {
 /// ```no_run
 /// use rusty_renderer::backends::{BackendType, create_backend};
 ///
-/// let backend = create_backend(BackendType::Vulkan)?;
+/// let backend = create_backend(BackendType::Vulkan, true)?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn create_backend(backend_type: BackendType) -> Result<Box<dyn GraphicsBackend>> {
+pub fn create_backend(backend_type: BackendType, enable_validation: bool) -> Result<Box<dyn GraphicsBackend>> {
     match backend_type {
-        BackendType::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new()?)),
-        BackendType::DirectX12 => Ok(Box::new(directx::DirectXBackend::new()?)),
-        BackendType::Wgpu => Ok(Box::new(wgpu_backend::WgpuBackend::new()?)),
+        BackendType::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(enable_validation)?)),
+        BackendType::DirectX12 => Ok(Box::new(directx::DirectXBackend::new(enable_validation)?)),
+        BackendType::Wgpu => Ok(Box::new(wgpu_backend::WgpuBackend::new(enable_validation)?)),
     }
 }
 

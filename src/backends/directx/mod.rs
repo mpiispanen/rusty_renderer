@@ -32,18 +32,18 @@ pub struct DirectXBackend {
 
 impl DirectXBackend {
     /// Create a new DirectX 12 backend
-    pub fn new() -> Result<Self> {
+    pub fn new(enable_validation: bool) -> Result<Self> {
         #[cfg(windows)]
         {
-            log::info!("Creating DirectX 12 backend");
+            log::info!("Creating DirectX 12 backend (validation: {})", enable_validation);
             Ok(Self {
-                inner: dx12_impl::DirectXBackendImpl::new()?,
+                inner: dx12_impl::DirectXBackendImpl::new(enable_validation)?,
             })
         }
         
         #[cfg(not(windows))]
         {
-            log::warn!("DirectX 12 backend is only available on Windows");
+            log::warn!("DirectX 12 backend is only available on Windows (validation: {})", enable_validation);
             Ok(Self {
                 device: DirectXDevice::new(),
                 swapchain: DirectXSwapchain::new(),

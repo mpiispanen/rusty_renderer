@@ -32,6 +32,9 @@ pub struct WgpuBackend {
     width: u32,
     height: u32,
     
+    // Configuration
+    enable_validation: bool,
+    
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
     swapchain_wrapper: WgpuSwapchain,
@@ -39,8 +42,8 @@ pub struct WgpuBackend {
 
 impl WgpuBackend {
     /// Create a new wgpu backend
-    pub fn new() -> Result<Self> {
-        log::info!("Creating wgpu backend");
+    pub fn new(enable_validation: bool) -> Result<Self> {
+        log::info!("Creating wgpu backend (validation: {})", enable_validation);
         
         Ok(Self {
             instance: None,
@@ -52,6 +55,7 @@ impl WgpuBackend {
             render_pipeline: None,
             width: 800,
             height: 600,
+            enable_validation,
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
         })
@@ -135,12 +139,21 @@ impl GraphicsBackend for WgpuBackend {
         self.width = size.width;
         self.height = size.height;
         
-        // Create instance
+        // Create instance with validation if requested
         log::info!("Creating wgpu instance");
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
+            flags: if self.enable_validation {
+                wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
+            } else {
+                wgpu::InstanceFlags::empty()
+            },
             ..Default::default()
         });
+        
+        if self.enable_validation {
+            log::info!("wgpu validation and debug enabled");
+        }
         
         // Create surface
         // Safety: The surface must not outlive the window. We ensure this by

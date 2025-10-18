@@ -42,7 +42,7 @@ impl App {
             Backend::Wgpu => BackendType::Wgpu,
         };
 
-        let backend = backends::create_backend(backend_type)
+        let backend = backends::create_backend(backend_type, config.debug)
             .with_context(|| format!("Failed to create {backend_type} backend"))?;
 
         log::info!("Successfully created {} backend", backend.backend_type());

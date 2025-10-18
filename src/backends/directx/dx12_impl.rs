@@ -82,6 +82,7 @@ pub struct DirectXBackendImpl {
     height: u32,
     frame_count: u32,
     use_warp: bool,
+    enable_validation: bool,
     
     // Trait implementations
     device_wrapper: DirectXDevice,
@@ -94,10 +95,10 @@ unsafe impl Send for DirectXBackendImpl {}
 unsafe impl Sync for DirectXBackendImpl {}
 
 impl DirectXBackendImpl {
-    pub fn new() -> Result<Self> {
+    pub fn new(enable_validation: bool) -> Result<Self> {
         let use_warp = std::env::var("RUSTY_RENDERER_USE_WARP").is_ok();
         
-        log::info!("Creating DirectX 12 backend (WARP: {})", use_warp);
+        log::info!("Creating DirectX 12 backend (WARP: {}, validation: {})", use_warp, enable_validation);
         
         Ok(Self {
             device: None,
@@ -119,6 +120,7 @@ impl DirectXBackendImpl {
             height: 600,
             frame_count: 2, // Double buffering
             use_warp,
+            enable_validation,
             device_wrapper: DirectXDevice,
             swapchain_wrapper: DirectXSwapchain {
                 width: 800,
@@ -135,14 +137,17 @@ impl DirectXBackendImpl {
         self.width = size.width;
         self.height = size.height;
         
-        // Enable debug layer in debug builds
-        #[cfg(debug_assertions)]
-        unsafe {
-            let mut debug: Option<ID3D12Debug> = None;
-            if D3D12GetDebugInterface(&mut debug).is_ok() {
-                if let Some(debug) = debug {
-                    debug.EnableDebugLayer();
-                    log::info!("DirectX 12 debug layer enabled");
+        // Enable debug layer if requested
+        if self.enable_validation {
+            unsafe {
+                let mut debug: Option<ID3D12Debug> = None;
+                if D3D12GetDebugInterface(&mut debug).is_ok() {
+                    if let Some(debug) = debug {
+                        debug.EnableDebugLayer();
+                        log::info!("DirectX 12 debug layer enabled");
+                    }
+                } else {
+                    log::warn!("DirectX 12 debug layer requested but not available");
                 }
             }
         }
@@ -179,11 +184,11 @@ impl DirectXBackendImpl {
         log::info!("Creating DXGI factory");
         
         unsafe {
-            #[cfg(debug_assertions)]
-            let flags = DXGI_CREATE_FACTORY_DEBUG;
-            
-            #[cfg(not(debug_assertions))]
-            let flags = DXGI_CREATE_FACTORY_FLAGS(0);
+            let flags = if self.enable_validation {
+                DXGI_CREATE_FACTORY_DEBUG
+            } else {
+                DXGI_CREATE_FACTORY_FLAGS(0)
+            };
             
             let factory: IDXGIFactory4 = CreateDXGIFactory2(flags)?;
             self.dxgi_factory = Some(factory);
