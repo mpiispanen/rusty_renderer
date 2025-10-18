@@ -875,7 +875,7 @@ impl DirectXBackendImpl {
                 self.readback_buffer = readback;
             }
 
-            let readback = self.readback_buffer.as_ref().unwrap();
+            let readback = self.readback_buffer.as_ref().unwrap().clone();
 
             // Reset command allocator and list
             let allocator = self.command_allocator.as_ref().unwrap();

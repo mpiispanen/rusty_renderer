@@ -81,7 +81,7 @@ impl App {
                 backend.end_frame()?;
                 self.frame_count += 1;
 
-                if self.frame_count % 100 == 0 {
+                if self.frame_count.is_multiple_of(100) {
                     log::debug!("Rendered {} frames", self.frame_count);
                 }
             }
