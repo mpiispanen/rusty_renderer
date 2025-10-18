@@ -80,9 +80,7 @@ impl App {
         let capture_sequence = screenshot_interval > 0 && self.config.screenshot.is_some();
 
         if capture_sequence {
-            log::info!(
-                "Will capture screenshots every {screenshot_interval} frames",
-            );
+            log::info!("Will capture screenshots every {screenshot_interval} frames",);
         }
 
         while self.frame_count < max_frames {
