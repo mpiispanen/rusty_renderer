@@ -78,6 +78,11 @@ pub struct DirectXBackendImpl {
     frame_count: u32,
     use_warp: bool,
     enable_validation: bool,
+    headless: bool,
+
+    // Offscreen rendering (headless mode)
+    offscreen_resource: Option<ID3D12Resource>,
+    readback_buffer: Option<ID3D12Resource>,
 
     // Trait implementations
     device_wrapper: DirectXDevice,
@@ -120,6 +125,9 @@ impl DirectXBackendImpl {
             frame_count: 2, // Double buffering
             use_warp,
             enable_validation,
+            headless: false,
+            offscreen_resource: None,
+            readback_buffer: None,
             device_wrapper: DirectXDevice,
             swapchain_wrapper: DirectXSwapchain {
                 width: 800,
@@ -601,30 +609,40 @@ impl DirectXBackendImpl {
                 &self.root_signature,
                 &self.pipeline_state,
             ) {
-                // Get current back buffer
+                // Get current render target (offscreen for headless, swapchain for windowed)
                 let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
-                let rtv_handle = D3D12_CPU_DESCRIPTOR_HANDLE {
-                    ptr: rtv_handle.ptr + (self.frame_index * self.rtv_descriptor_size) as usize,
+                let rtv_handle = if self.headless {
+                    // Headless: use single offscreen target
+                    rtv_handle
+                } else {
+                    // Windowed: use current swapchain target
+                    D3D12_CPU_DESCRIPTOR_HANDLE {
+                        ptr: rtv_handle.ptr + (self.frame_index * self.rtv_descriptor_size) as usize,
+                    }
                 };
 
-                // Transition to render target
-                if let Some(render_target) = self.render_targets.get(self.frame_index as usize) {
-                    let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
-                        pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
-                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                        StateBefore: D3D12_RESOURCE_STATE_PRESENT,
-                        StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
-                    };
+                // Get render target resource
+                let frame_idx = if self.headless { 0 } else { self.frame_index as usize };
+                if let Some(render_target) = self.render_targets.get(frame_idx) {
+                    // Transition to render target (only for windowed mode from PRESENT state)
+                    if !self.headless {
+                        let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
+                            pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                            Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                            StateBefore: D3D12_RESOURCE_STATE_PRESENT,
+                            StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        };
 
-                    let barrier = D3D12_RESOURCE_BARRIER {
-                        Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                        Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                        Anonymous: D3D12_RESOURCE_BARRIER_0 {
-                            Transition: std::mem::ManuallyDrop::new(transition_to_rt),
-                        },
-                    };
+                        let barrier = D3D12_RESOURCE_BARRIER {
+                            Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                            Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                            Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                                Transition: std::mem::ManuallyDrop::new(transition_to_rt),
+                            },
+                        };
 
-                    command_list.ResourceBarrier(&[barrier]);
+                        command_list.ResourceBarrier(&[barrier]);
+                    }
 
                     // Clear to black
                     let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
@@ -660,23 +678,25 @@ impl DirectXBackendImpl {
                     // Draw the triangle (3 vertices)
                     command_list.DrawInstanced(3, 1, 0, 0);
 
-                    // Transition back to present
-                    let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
-                        pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
-                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                        StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
-                        StateAfter: D3D12_RESOURCE_STATE_PRESENT,
-                    };
+                    // Transition back to present (only for windowed mode)
+                    if !self.headless {
+                        let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
+                            pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                            Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                            StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                            StateAfter: D3D12_RESOURCE_STATE_PRESENT,
+                        };
 
-                    let barrier = D3D12_RESOURCE_BARRIER {
-                        Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                        Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                        Anonymous: D3D12_RESOURCE_BARRIER_0 {
-                            Transition: std::mem::ManuallyDrop::new(transition_to_present),
-                        },
-                    };
+                        let barrier = D3D12_RESOURCE_BARRIER {
+                            Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                            Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                            Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                                Transition: std::mem::ManuallyDrop::new(transition_to_present),
+                            },
+                        };
 
-                    command_list.ResourceBarrier(&[barrier]);
+                        command_list.ResourceBarrier(&[barrier]);
+                    }
                 }
 
                 // Close command list
@@ -691,9 +711,11 @@ impl DirectXBackendImpl {
                 command_queue.ExecuteCommandLists(&command_lists);
             }
 
-            // Present
-            if let Some(swap_chain) = &self.swap_chain {
-                swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
+            // Present (only for windowed mode)
+            if !self.headless {
+                if let Some(swap_chain) = &self.swap_chain {
+                    swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
+                }
             }
 
             // Wait for frame
@@ -750,18 +772,193 @@ impl DirectXBackendImpl {
     }
 
     pub fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
-        anyhow::bail!(
-            "Headless rendering not yet implemented for DirectX backend (planned for M5). \
-             Requested size: {width}x{height}. \
-             See issue #27 for implementation status."
-        )
+        log::info!("Initializing DirectX 12 backend in headless mode: {width}x{height}");
+        
+        self.headless = true;
+        self.width = width;
+        self.height = height;
+        
+        unsafe {
+            // Create DXGI factory
+            self.create_factory()?;
+            
+            // Create device
+            self.create_device()?;
+            
+            // Create command queue
+            self.create_command_queue()?;
+            
+            // Create offscreen render target
+            self.create_offscreen_render_target()?;
+            
+            // Create RTV heap
+            self.create_rtv_heap_headless()?;
+            
+            // Create command objects
+            self.create_command_objects()?;
+            
+            // Create fence
+            self.create_fence()?;
+            
+            // Create pipeline
+            self.create_pipeline()?;
+            
+            log::info!("DirectX 12 backend initialized successfully in headless mode");
+            Ok(())
+        }
     }
 
     pub fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)> {
-        anyhow::bail!(
-            "Frame capture not yet implemented for DirectX backend (planned for M5). \
-             See issue #27 for implementation status."
-        )
+        if !self.headless {
+            anyhow::bail!("Frame capture is only available in headless mode");
+        }
+        
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let command_list = self.command_list.as_ref().context("Command list not initialized")?;
+        let offscreen = self.offscreen_resource.as_ref().context("Offscreen resource not initialized")?;
+        
+        let width = self.width;
+        let height = self.height;
+        let row_pitch = ((width * 4 + 255) / 256) * 256; // Align to 256 bytes
+        let buffer_size = (row_pitch * height) as u64;
+        
+        log::info!("Capturing frame: {width}x{height}");
+        
+        unsafe {
+            // Create readback buffer if not exists
+            if self.readback_buffer.is_none() {
+                let heap_props = D3D12_HEAP_PROPERTIES {
+                    Type: D3D12_HEAP_TYPE_READBACK,
+                    CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                    MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
+                    CreationNodeMask: 0,
+                    VisibleNodeMask: 0,
+                };
+                
+                let desc = D3D12_RESOURCE_DESC {
+                    Dimension: D3D12_RESOURCE_DIMENSION_BUFFER,
+                    Alignment: 0,
+                    Width: buffer_size,
+                    Height: 1,
+                    DepthOrArraySize: 1,
+                    MipLevels: 1,
+                    Format: DXGI_FORMAT_UNKNOWN,
+                    SampleDesc: DXGI_SAMPLE_DESC {
+                        Count: 1,
+                        Quality: 0,
+                    },
+                    Layout: D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+                    Flags: D3D12_RESOURCE_FLAG_NONE,
+                };
+                
+                let mut readback: Option<ID3D12Resource> = None;
+                device.CreateCommittedResource(
+                    &heap_props,
+                    D3D12_HEAP_FLAG_NONE,
+                    &desc,
+                    D3D12_RESOURCE_STATE_COPY_DEST,
+                    None,
+                    &mut readback,
+                )?;
+                
+                self.readback_buffer = readback;
+            }
+            
+            let readback = self.readback_buffer.as_ref().unwrap();
+            
+            // Reset command allocator and list
+            let allocator = self.command_allocator.as_ref().unwrap();
+            allocator.Reset()?;
+            command_list.Reset(allocator, None)?;
+            
+            // Transition offscreen resource to COPY_SOURCE
+            let barrier_to_copy = D3D12_RESOURCE_BARRIER {
+                Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                    Transition: std::mem::ManuallyDrop::new(D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: std::mem::ManuallyDrop::new(Some(offscreen.clone())),
+                        StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        StateAfter: D3D12_RESOURCE_STATE_COPY_SOURCE,
+                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                    }),
+                },
+            };
+            
+            command_list.ResourceBarrier(&[barrier_to_copy]);
+            
+            // Copy texture to buffer
+            let src_location = D3D12_TEXTURE_COPY_LOCATION {
+                pResource: std::mem::ManuallyDrop::new(Some(offscreen.clone())),
+                Type: D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+                Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                    SubresourceIndex: 0,
+                },
+            };
+            
+            let dst_location = D3D12_TEXTURE_COPY_LOCATION {
+                pResource: std::mem::ManuallyDrop::new(Some(readback.clone())),
+                Type: D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+                Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                    PlacedFootprint: D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
+                        Offset: 0,
+                        Footprint: D3D12_SUBRESOURCE_FOOTPRINT {
+                            Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                            Width: width,
+                            Height: height,
+                            Depth: 1,
+                            RowPitch: row_pitch,
+                        },
+                    },
+                },
+            };
+            
+            command_list.CopyTextureRegion(&dst_location, 0, 0, 0, &src_location, None);
+            
+            // Transition back to RENDER_TARGET
+            let barrier_to_rt = D3D12_RESOURCE_BARRIER {
+                Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                    Transition: std::mem::ManuallyDrop::new(D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: std::mem::ManuallyDrop::new(Some(offscreen.clone())),
+                        StateBefore: D3D12_RESOURCE_STATE_COPY_SOURCE,
+                        StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                        Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                    }),
+                },
+            };
+            
+            command_list.ResourceBarrier(&[barrier_to_rt]);
+            
+            // Close and execute command list
+            command_list.Close()?;
+            let command_queue = self.command_queue.as_ref().unwrap();
+            command_queue.ExecuteCommandLists(&[Some(command_list.cast()?)]);
+            
+            // Wait for completion
+            self.wait_for_previous_frame()?;
+            
+            // Map and read buffer
+            let mut data_ptr = std::ptr::null_mut();
+            readback.Map(0, None, Some(&mut data_ptr))?;
+            
+            let mut pixels = Vec::with_capacity((width * height * 4) as usize);
+            
+            // Copy data, removing row padding if necessary
+            for y in 0..height {
+                let src_offset = (y * row_pitch) as isize;
+                let src_ptr = (data_ptr as *const u8).offset(src_offset);
+                let row_data = std::slice::from_raw_parts(src_ptr, (width * 4) as usize);
+                pixels.extend_from_slice(row_data);
+            }
+            
+            readback.Unmap(0, None);
+            
+            log::info!("Frame captured: {width}x{height}, {} bytes", pixels.len());
+            
+            Ok((width, height, pixels))
+        }
     }
 
     pub fn cleanup(&mut self) {
@@ -786,7 +983,15 @@ impl DirectXBackendImpl {
         self.command_allocator = None;
         self.render_targets.clear();
         self.rtv_heap = None;
-        self.swap_chain = None;
+        
+        // Headless-specific cleanup
+        if self.headless {
+            self.readback_buffer = None;
+            self.offscreen_resource = None;
+        } else {
+            self.swap_chain = None;
+        }
+        
         self.command_queue = None;
         self.fence = None;
         self.device = None;
@@ -801,6 +1006,88 @@ impl DirectXBackendImpl {
 
     pub fn swapchain(&self) -> &dyn Swapchain {
         &self.swapchain_wrapper
+    }
+    
+    // Headless mode helper methods
+    
+    /// Create offscreen render target for headless mode
+    fn create_offscreen_render_target(&mut self) -> Result<()> {
+        unsafe {
+            let device = self.device.as_ref().context("Device not initialized")?;
+            
+            let heap_props = D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_DEFAULT,
+                CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
+                CreationNodeMask: 0,
+                VisibleNodeMask: 0,
+            };
+            
+            let desc = D3D12_RESOURCE_DESC {
+                Dimension: D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                Alignment: 0,
+                Width: self.width as u64,
+                Height: self.height,
+                DepthOrArraySize: 1,
+                MipLevels: 1,
+                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Layout: D3D12_TEXTURE_LAYOUT_UNKNOWN,
+                Flags: D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET,
+            };
+            
+            let clear_value = D3D12_CLEAR_VALUE {
+                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                Anonymous: D3D12_CLEAR_VALUE_0 {
+                    Color: [0.0, 0.2, 0.4, 1.0],
+                },
+            };
+            
+            let mut resource: Option<ID3D12Resource> = None;
+            device.CreateCommittedResource(
+                &heap_props,
+                D3D12_HEAP_FLAG_NONE,
+                &desc,
+                D3D12_RESOURCE_STATE_RENDER_TARGET,
+                Some(&clear_value),
+                &mut resource,
+            )?;
+            
+            self.offscreen_resource = resource;
+            
+            log::info!("Offscreen render target created: {}x{}", self.width, self.height);
+            Ok(())
+        }
+    }
+    
+    /// Create RTV heap for headless mode
+    fn create_rtv_heap_headless(&mut self) -> Result<()> {
+        unsafe {
+            let device = self.device.as_ref().context("Device not initialized")?;
+            
+            let desc = D3D12_DESCRIPTOR_HEAP_DESC {
+                Type: D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
+                NumDescriptors: 1, // Single offscreen target
+                Flags: D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+                NodeMask: 0,
+            };
+            
+            let rtv_heap: ID3D12DescriptorHeap = device.CreateDescriptorHeap(&desc)?;
+            self.rtv_descriptor_size = device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+            
+            // Create RTV for offscreen resource
+            let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
+            device.CreateRenderTargetView(self.offscreen_resource.as_ref().unwrap(), None, rtv_handle);
+            
+            self.rtv_heap = Some(rtv_heap);
+            self.render_targets = vec![self.offscreen_resource.as_ref().unwrap().clone()];
+            
+            log::info!("RTV heap created for headless mode");
+            Ok(())
+        }
     }
 }
 
