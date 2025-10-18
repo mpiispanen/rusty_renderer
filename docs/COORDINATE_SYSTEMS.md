@@ -1,180 +1,93 @@
-# Coordinate System Differences Across Graphics APIs
+# Graphics API Coordinate Systems
 
-## Overview
+Different graphics APIs use different coordinate system conventions. This document explains these differences and how we handle them in Rusty Renderer.
 
-Different graphics APIs use different coordinate system conventions. This document describes these differences and how Rusty Renderer handles them to ensure consistent output across all backends.
+## NDC (Normalized Device Coordinates) Systems
 
-## NDC (Normalized Device Coordinates)
+### Vulkan
+- **X-axis**: -1 (left) to +1 (right)
+- **Y-axis**: -1 (top) to +1 (bottom) - **Y points DOWN**
+- **Z-axis**: 0 (near) to 1 (far)
 
-### X-Axis (Consistent)
-All backends use the same X-axis convention:
-- `-1.0` = Left edge
-- `+1.0` = Right edge
+### DirectX 12
+- **X-axis**: -1 (left) to +1 (right)
+- **Y-axis**: -1 (bottom) to +1 (top) - **Y points UP**
+- **Z-axis**: 0 (near) to 1 (far)
 
-### Y-Axis (Different!)
+### wgpu (WebGPU)
+- **X-axis**: -1 (left) to +1 (right)
+- **Y-axis**: -1 (bottom) to +1 (top) - **Y points UP**
+- **Z-axis**: 0 (near) to 1 (far)
 
-| Backend | Y-Axis Direction | Top | Bottom | Origin Style |
-|---------|------------------|-----|--------|--------------|
-| **Vulkan** | DOWN | `-1.0` | `+1.0` | DirectX-style |
-| **DirectX 12** | DOWN | `-1.0` | `+1.0` | DirectX-style |
-| **wgpu/WebGPU** | UP | `+1.0` | `-1.0` | OpenGL-style |
-| **OpenGL** | UP | `+1.0` | `-1.0` | OpenGL-style |
+## Key Differences
 
-### Z-Axis (Depth)
+The main difference is the **Y-axis direction**:
+- **Vulkan**: Y points DOWN (top = -1, bottom = +1)
+- **DirectX 12**: Y points UP (top = +1, bottom = -1)
+- **wgpu**: Y points UP (top = +1, bottom = -1)
 
-| Backend | Near | Far | Range |
-|---------|------|-----|-------|
-| **Vulkan** | `0.0` | `1.0` | `[0, 1]` |
-| **DirectX 12** | `0.0` | `1.0` | `[0, 1]` |
-| **wgpu/WebGPU** | `0.0` | `1.0` | `[0, 1]` |
-| **OpenGL** | `-1.0` | `+1.0` | `[-1, 1]` |
+## Our Solution
 
-## Window/Screen Coordinates
+We use **Vulkan as the reference coordinate system** and flip Y coordinates in shaders for other backends:
 
-### Origin
+### Triangle Example
 
-| Backend | Origin | Y-Direction |
-|---------|--------|-------------|
-| **Vulkan** | Top-Left | DOWN |
-| **DirectX 12** | Top-Left | DOWN |
-| **wgpu/WebGPU** | Top-Left | DOWN |
-
-All backends use top-left origin for window/screen space (pixel coordinates).
-
-## Impact on Implementation
-
-### 1. Vertex Shaders
-
-When hardcoding vertices, Y coordinates must be adjusted per backend:
-
+**Vulkan shader** (`shaders/triangle.vert`):
 ```glsl
-// Vulkan GLSL - Y points DOWN
 vec2 positions[3] = vec2[](
-    vec2(0.0, -0.5),  // Bottom center
-    vec2(0.5, 0.5),   // Top right
-    vec2(-0.5, 0.5)   // Top left
+    vec2(0.0, -0.5),  // Bottom center (Y = -0.5, renders at bottom)
+    vec2(0.5, 0.5),   // Top right (Y = 0.5, renders at top)
+    vec2(-0.5, 0.5)   // Top left (Y = 0.5, renders at top)
 );
 ```
 
+**DirectX shader** (`shaders/hlsl/triangle.hlsl`):
+```hlsl
+float2 positions[3] = {
+    float2(0.0, 0.5),    // Bottom center (flipped from -0.5)
+    float2(0.5, -0.5),   // Top right (flipped from 0.5)
+    float2(-0.5, -0.5)   // Top left (flipped from 0.5)
+};
+```
+
+**wgpu shader** (`shaders/wgsl/triangle.wgsl`):
 ```wgsl
-// wgpu WGSL - Y points UP (flip Y!)
 var positions = array<vec2<f32>, 3>(
-    vec2<f32>(0.0, 0.5),    // Bottom center (flipped)
-    vec2<f32>(0.5, -0.5),   // Top right (flipped)
-    vec2<f32>(-0.5, -0.5)   // Top left (flipped)
+    vec2<f32>(0.0, 0.5),    // Bottom center (flipped from -0.5)
+    vec2<f32>(0.5, -0.5),   // Top right (flipped from 0.5)
+    vec2<f32>(-0.5, -0.5)   // Top left (flipped from 0.5)
 );
 ```
 
-### 2. Projection Matrices
+## Implementation Notes
 
-Projection matrices must account for Y-axis differences:
+1. **Shader-level flipping**: We flip Y coordinates in the vertex shader for DirectX and wgpu backends. This is the most efficient approach as it happens once per vertex.
 
-**Vulkan/DirectX:**
-```rust
-let projection = Mat4::perspective_lh(fov, aspect, near, far);
-```
+2. **Consistent output**: All backends render the same visual output with red at the bottom center, green at top right, and blue at top left.
 
-**wgpu/WebGPU:**
-```rust
-let projection = Mat4::perspective_rh(fov, aspect, near, far);
-// Or flip Y in the projection matrix
-projection[1][1] *= -1.0;
-```
+3. **Future camera systems**: When implementing camera/projection matrices, we'll need to account for these differences in the projection matrix construction.
 
-### 3. Texture Coordinates
+4. **Documentation**: Each shader file includes comments explaining the coordinate system and any transformations applied.
 
-UV coordinates are typically consistent (origin at top-left), but sampling may differ.
+## Testing
 
-## Rusty Renderer's Approach
+To verify coordinate system consistency:
 
-### Current Implementation (M4)
-
-For the triangle example, we handle Y-flip in shaders:
-- Each backend's shader is adjusted to produce identical output
-- Vulkan: Y values as-is
-- wgpu: Y values flipped
-
-### Future Implementation (M5+)
-
-When we add a render graph and vertex buffers, we'll implement:
-
-1. **Backend Capabilities Enum:**
-```rust
-pub struct BackendCapabilities {
-    pub y_axis_up: bool,  // true for wgpu/OpenGL, false for Vulkan/DX
-    pub depth_range_zero_to_one: bool,  // true for most modern APIs
-    pub clip_space_origin: ClipSpaceOrigin,
-}
-```
-
-2. **Automatic Coordinate Transformation:**
-```rust
-impl Pipeline {
-    fn adjust_for_backend(&mut self, caps: &BackendCapabilities) {
-        if caps.y_axis_up {
-            // Automatically flip Y in vertex shader or projection matrix
-            self.flip_y_axis = true;
-        }
-    }
-}
-```
-
-3. **Unified Vertex Format:**
-- Application provides vertices in a canonical format (e.g., Y-up)
-- Engine automatically transforms for each backend
-
-## Best Practices
-
-### For Application Developers
-
-1. **Use engine-provided coordinate system** - Don't worry about backend differences
-2. **Provide assets in canonical format** - Engine handles conversion
-3. **Use engine's projection matrix helpers** - Automatically correct
-
-### For Engine Developers
-
-1. **Document assumptions** - Make coordinate system clear in comments
-2. **Test cross-backend** - Ensure identical output across backends
-3. **Centralize transformations** - Don't scatter Y-flip logic everywhere
-4. **Use backend capabilities** - Query rather than hard-code
-
-## Testing Cross-Backend Consistency
-
-### Visual Verification
 ```bash
-# Render same scene with different backends
-rusty_renderer --backend vulkan --scene test
-rusty_renderer --backend wgpu --scene test
-rusty_renderer --backend directx --scene test
+# Test Vulkan (reference)
+cargo run --release -- --backend vulkan --max-frames 5
 
-# Compare outputs visually or via screenshots
+# Test DirectX (on Windows or with Proton)
+cargo run --release -- --backend directx --max-frames 5
+
+# Test wgpu (cross-platform)
+cargo run --release -- --backend wgpu --max-frames 5
 ```
 
-### Automated Testing
-```rust
-#[test]
-fn test_coordinate_consistency() {
-    // Render triangle with each backend
-    // Compare vertex positions in screen space
-    // Ensure identical output
-}
-```
+All three should render the same triangle orientation.
 
 ## References
 
-- Vulkan Specification: https://registry.khronos.org/vulkan/specs/1.3/html/
-- WebGPU Specification: https://www.w3.org/TR/webgpu/
-- DirectX 12 Documentation: https://docs.microsoft.com/en-us/windows/win32/direct3d12/
-- "Coordinate Systems in Graphics" (Real-Time Rendering, 4th Ed.)
-
-## Related Files
-
-- `shaders/triangle.vert` - Vulkan vertex shader
-- `shaders/wgsl/triangle.wgsl` - wgpu vertex shader (Y-flipped)
-- `src/backends/mod.rs` - Backend traits (future: add capabilities)
-- `docs/DESIGN.md` - Overall architecture
-
----
-
-**Last Updated:** 2025-10-16  
-**Milestone:** M4 (Multi-Backend Triangle)
+- [Vulkan Coordinate Systems](https://www.khronos.org/registry/vulkan/specs/1.3/html/chap24.html#vertexpostproc-clipping)
+- [DirectX Coordinate Systems](https://docs.microsoft.com/en-us/windows/win32/direct3d9/coordinate-systems)
+- [WebGPU Coordinate Systems](https://gpuweb.github.io/gpuweb/#coordinate-systems)
