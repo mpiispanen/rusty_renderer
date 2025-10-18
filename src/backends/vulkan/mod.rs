@@ -38,6 +38,7 @@ pub struct VulkanBackend {
     device: Option<VkDevice>,
     graphics_queue: vk::Queue,
     present_queue: vk::Queue,
+    graphics_queue_family: u32, // Store queue family index for command pool creation
 
     // Surface and swapchain
     surface: vk::SurfaceKHR,
@@ -98,6 +99,7 @@ impl VulkanBackend {
             device: None,
             graphics_queue: vk::Queue::null(),
             present_queue: vk::Queue::null(),
+            graphics_queue_family: 0,
             surface: vk::SurfaceKHR::null(),
             swapchain_khr: vk::SwapchainKHR::null(),
             swapchain_format: vk::Format::default(),
@@ -362,6 +364,7 @@ impl VulkanBackend {
         self.device = Some(device);
         self.graphics_queue = graphics_queue;
         self.present_queue = present_queue;
+        self.graphics_queue_family = indices.graphics; // Store for command pool creation
 
         // Clean up temporary surface
         unsafe {
@@ -786,12 +789,9 @@ impl VulkanBackend {
     /// Create command pool
     fn create_command_pool(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        let instance = self.instance.as_ref().context("Instance not initialized")?;
-
-        let indices = QueueFamilyIndices::get(instance, self.physical_device, self.surface);
 
         let info = vk::CommandPoolCreateInfo::builder()
-            .queue_family_index(indices.graphics)
+            .queue_family_index(self.graphics_queue_family)
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
 
         self.command_pool = unsafe { device.create_command_pool(&info, None)? };
@@ -1056,6 +1056,7 @@ impl VulkanBackend {
         self.device = Some(device);
         self.graphics_queue = graphics_queue;
         self.present_queue = graphics_queue; // Same as graphics in headless
+        self.graphics_queue_family = graphics_family; // Store for command pool creation
 
         log::info!("Logical device created (headless mode)");
         Ok(())
@@ -1500,6 +1501,9 @@ impl GraphicsBackend for VulkanBackend {
         // Create logical device (headless)
         self.create_logical_device_headless()?;
 
+        // Create command pool (needed for image transitions)
+        self.create_command_pool()?;
+
         // Create offscreen render target
         self.create_offscreen_image(width, height)?;
 
@@ -1511,9 +1515,6 @@ impl GraphicsBackend for VulkanBackend {
 
         // Create framebuffer for offscreen image
         self.create_framebuffer_offscreen()?;
-
-        // Create command pool
-        self.create_command_pool()?;
 
         // Create command buffer
         self.create_command_buffer_offscreen()?;
