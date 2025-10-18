@@ -88,26 +88,67 @@ jobs:
 
   test-gpu:
     name: Test (GPU)
-    runs-on: [self-hosted, gpu]
+    runs-on: ubuntu-latest
     needs: build
-    if: false  # Disabled until we have GPU-specific tests
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download release binary
-        uses: actions/download-artifact@v4
-        with:
-          name: rusty_renderer-release-linux
-          path: ./bin
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
       
-      - name: Make binary executable
-        run: chmod +x ./bin/rusty_renderer
-      
-      - name: Run GPU tests
+      - name: Install Vulkan software renderer (lavapipe)
         run: |
-          # Future: GPU-specific integration tests will go here
-          ./bin/rusty_renderer --help
-          echo "GPU tests not yet implemented (placeholder for M3+)"
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-gpu-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-gpu-test-
+      
+      - name: Build release binary
+        run: cargo build --release
+      
+      - name: Test Vulkan headless rendering
+        run: |
+          mkdir -p screenshots
+          RUST_LOG=info ./target/release/rusty_renderer \
+            --backend vulkan \
+            --headless \
+            --screenshot screenshots/vulkan-triangle.png \
+            --frames 1
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+      
+      - name: Test wgpu headless rendering
+        run: |
+          RUST_LOG=info ./target/release/rusty_renderer \
+            --backend wgpu \
+            --headless \
+            --screenshot screenshots/wgpu-triangle.png \
+            --frames 1
+      
+      - name: Verify screenshots were created
+        run: |
+          ls -lh screenshots/
+          test -f screenshots/vulkan-triangle.png
+          test -s screenshots/vulkan-triangle.png
+          test -f screenshots/wgpu-triangle.png
+          test -s screenshots/wgpu-triangle.png
+          echo "✅ All screenshots created successfully"
+      
+      - name: Upload GPU test screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpu-test-screenshots
+          path: screenshots/
+          retention-days: 30
 
   clippy:
     name: Clippy
@@ -203,15 +244,38 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
       
-      - name: Test DirectX 12 with WARP
+      - name: Test DirectX 12 with WARP (headless)
         run: |
-          echo "Testing DirectX 12 backend with WARP software renderer"
+          echo "Testing DirectX 12 backend with WARP software renderer (headless)"
+          mkdir screenshots
           $env:RUSTY_RENDERER_USE_WARP = "1"
           $env:RUST_LOG = "info"
-          # Run for 2 seconds to verify initialization
-          cargo run --release -- --backend directx --test-duration 2
+          ./target/release/rusty_renderer.exe --backend directx --headless --screenshot screenshots/directx-triangle.png --frames 1
         shell: powershell
-        continue-on-error: true  # Don't fail CI if DX12 isn't fully working yet
+      
+      - name: Verify DirectX screenshot
+        run: |
+          if (Test-Path screenshots/directx-triangle.png) {
+            $fileSize = (Get-Item screenshots/directx-triangle.png).Length
+            Write-Host "DirectX screenshot size: $fileSize bytes"
+            if ($fileSize -gt 0) {
+              Write-Host "✅ DirectX screenshot created successfully"
+            } else {
+              Write-Host "❌ DirectX screenshot is empty"
+              exit 1
+            }
+          } else {
+            Write-Host "❌ DirectX screenshot not found"
+            exit 1
+          }
+        shell: powershell
+      
+      - name: Upload DirectX screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: directx-screenshot
+          path: screenshots/directx-triangle.png
+          retention-days: 30
       
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
