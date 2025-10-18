@@ -122,7 +122,7 @@ jobs:
             --backend vulkan \
             --headless \
             --screenshot screenshots/vulkan-triangle.png \
-            --frames 1
+            --max-frames 1
         env:
           VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
       
@@ -132,7 +132,7 @@ jobs:
             --backend wgpu \
             --headless \
             --screenshot screenshots/wgpu-triangle.png \
-            --frames 1
+            --max-frames 1
       
       - name: Verify screenshots were created
         run: |
@@ -250,7 +250,7 @@ jobs:
           mkdir screenshots
           $env:RUSTY_RENDERER_USE_WARP = "1"
           $env:RUST_LOG = "info"
-          ./target/release/rusty_renderer.exe --backend directx --headless --screenshot screenshots/directx-triangle.png --frames 1
+          ./target/release/rusty_renderer.exe --backend direct-x --headless --screenshot screenshots/directx-triangle.png --max-frames 1
         shell: powershell
       
       - name: Verify DirectX screenshot
