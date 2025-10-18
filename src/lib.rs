@@ -11,6 +11,7 @@ pub mod profiling;
 pub mod render_graph;
 pub mod scene;
 pub mod shaders;
+pub mod testing;
 pub mod ui;
 
 // Re-export main types for convenience
