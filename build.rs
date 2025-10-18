@@ -10,11 +10,11 @@ fn main() {
     println!("cargo:rerun-if-changed=shaders/hlsl/triangle.hlsl");
 
     let out_dir = env::var("OUT_DIR").unwrap();
-    
+
     // Compile HLSL shaders for DirectX (Windows only)
     #[cfg(target_os = "windows")]
     compile_hlsl_shaders(&out_dir);
-    
+
     // Note: For cross-compilation from Linux, we skip HLSL compilation
     // and embed pre-compiled bytecode instead
 
@@ -163,70 +163,82 @@ fn main() {
 #[cfg(target_os = "windows")]
 fn compile_hlsl_shaders(out_dir: &str) {
     use std::process::Command;
-    
+
     let hlsl_src = "shaders/hlsl/triangle.hlsl";
     let vs_out = Path::new(out_dir).join("triangle_vs.cso");
     let ps_out = Path::new(out_dir).join("triangle_ps.cso");
-    
+
     // Try to find dxc (DirectX Shader Compiler)
     let dxc_result = Command::new("dxc")
-        .arg("/T").arg("vs_6_0")  // Vertex shader model 6.0
-        .arg("/E").arg("VSMain")   // Entry point
-        .arg("/Fo").arg(&vs_out)   // Output file
+        .arg("/T")
+        .arg("vs_6_0") // Vertex shader model 6.0
+        .arg("/E")
+        .arg("VSMain") // Entry point
+        .arg("/Fo")
+        .arg(&vs_out) // Output file
         .arg(hlsl_src)
         .output();
-    
+
     match dxc_result {
         Ok(output) if output.status.success() => {
             println!("cargo:warning=Compiled vertex shader with dxc");
-            
+
             // Compile pixel shader
             let ps_result = Command::new("dxc")
-                .arg("/T").arg("ps_6_0")  // Pixel shader model 6.0
-                .arg("/E").arg("PSMain")   // Entry point
-                .arg("/Fo").arg(&ps_out)   // Output file
+                .arg("/T")
+                .arg("ps_6_0") // Pixel shader model 6.0
+                .arg("/E")
+                .arg("PSMain") // Entry point
+                .arg("/Fo")
+                .arg(&ps_out) // Output file
                 .arg(hlsl_src)
                 .output()
                 .expect("Failed to compile pixel shader");
-            
+
             if !ps_result.status.success() {
                 panic!(
                     "Pixel shader compilation failed:\n{}",
                     String::from_utf8_lossy(&ps_result.stderr)
                 );
             }
-            
+
             println!("cargo:warning=HLSL shaders compiled successfully");
         }
         _ => {
             // dxc not available, try fxc
             let fxc_result = Command::new("fxc")
-                .arg("/T").arg("vs_5_0")  // Vertex shader model 5.0
-                .arg("/E").arg("VSMain")   // Entry point
-                .arg("/Fo").arg(&vs_out)   // Output file
+                .arg("/T")
+                .arg("vs_5_0") // Vertex shader model 5.0
+                .arg("/E")
+                .arg("VSMain") // Entry point
+                .arg("/Fo")
+                .arg(&vs_out) // Output file
                 .arg(hlsl_src)
                 .output();
-            
+
             match fxc_result {
                 Ok(output) if output.status.success() => {
                     println!("cargo:warning=Compiled vertex shader with fxc");
-                    
+
                     // Compile pixel shader
                     let ps_result = Command::new("fxc")
-                        .arg("/T").arg("ps_5_0")  // Pixel shader model 5.0
-                        .arg("/E").arg("PSMain")   // Entry point
-                        .arg("/Fo").arg(&ps_out)   // Output file
+                        .arg("/T")
+                        .arg("ps_5_0") // Pixel shader model 5.0
+                        .arg("/E")
+                        .arg("PSMain") // Entry point
+                        .arg("/Fo")
+                        .arg(&ps_out) // Output file
                         .arg(hlsl_src)
                         .output()
                         .expect("Failed to compile pixel shader");
-                    
+
                     if !ps_result.status.success() {
                         panic!(
                             "Pixel shader compilation failed:\n{}",
                             String::from_utf8_lossy(&ps_result.stderr)
                         );
                     }
-                    
+
                     println!("cargo:warning=HLSL shaders compiled successfully with fxc");
                 }
                 _ => {

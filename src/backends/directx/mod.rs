@@ -23,7 +23,7 @@ mod dx12_impl;
 pub struct DirectXBackend {
     #[cfg(windows)]
     inner: dx12_impl::DirectXBackendImpl,
-    
+
     #[cfg(not(windows))]
     device: DirectXDevice,
     #[cfg(not(windows))]
@@ -35,15 +35,20 @@ impl DirectXBackend {
     pub fn new(enable_validation: bool) -> Result<Self> {
         #[cfg(windows)]
         {
-            log::info!("Creating DirectX 12 backend (validation: {})", enable_validation);
+            log::info!(
+                "Creating DirectX 12 backend (validation: {})",
+                enable_validation
+            );
             Ok(Self {
                 inner: dx12_impl::DirectXBackendImpl::new(enable_validation)?,
             })
         }
-        
+
         #[cfg(not(windows))]
         {
-            log::warn!("DirectX 12 backend is only available on Windows (validation: {})", enable_validation);
+            log::warn!(
+                "DirectX 12 backend is only available on Windows (validation: {enable_validation})"
+            );
             Ok(Self {
                 device: DirectXDevice::new(),
                 swapchain: DirectXSwapchain::new(),
@@ -62,7 +67,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.initialize(_window)
         }
-        
+
         #[cfg(not(windows))]
         {
             anyhow::bail!("DirectX 12 backend is only available on Windows")
@@ -74,7 +79,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.begin_frame()
         }
-        
+
         #[cfg(not(windows))]
         {
             Ok(())
@@ -86,7 +91,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.end_frame()
         }
-        
+
         #[cfg(not(windows))]
         {
             Ok(())
@@ -98,7 +103,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.resize(width, height)
         }
-        
+
         #[cfg(not(windows))]
         {
             self.swapchain.resize(width, height);
@@ -118,7 +123,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.device()
         }
-        
+
         #[cfg(not(windows))]
         {
             &self.device
@@ -130,7 +135,7 @@ impl GraphicsBackend for DirectXBackend {
         {
             self.inner.swapchain()
         }
-        
+
         #[cfg(not(windows))]
         {
             &self.swapchain
@@ -142,37 +147,37 @@ impl GraphicsBackend for DirectXBackend {
 #[cfg(not(windows))]
 mod stubs {
     use super::*;
-    
+
     /// Stub Device implementation
     pub struct DirectXDevice;
-    
+
     impl DirectXDevice {
         pub fn new() -> Self {
             Self
         }
     }
-    
+
     impl Device for DirectXDevice {
         fn name(&self) -> &str {
             "directx-stub-device"
         }
-        
+
         fn supports_feature(&self, _feature: &str) -> bool {
             false
         }
-        
+
         fn as_any(&self) -> &dyn Any {
             self
         }
     }
-    
+
     /// Stub Swapchain implementation
     pub struct DirectXSwapchain {
         width: u32,
         height: u32,
         current_frame: usize,
     }
-    
+
     impl DirectXSwapchain {
         pub fn new() -> Self {
             Self {
@@ -181,35 +186,35 @@ mod stubs {
                 current_frame: 0,
             }
         }
-        
+
         pub fn resize(&mut self, width: u32, height: u32) {
             self.width = width;
             self.height = height;
         }
     }
-    
+
     impl Swapchain for DirectXSwapchain {
         fn width(&self) -> u32 {
             self.width
         }
-        
+
         fn height(&self) -> u32 {
             self.height
         }
-        
+
         fn current_frame(&self) -> usize {
             self.current_frame
         }
-        
+
         fn acquire_next_image(&mut self) -> Result<()> {
             self.current_frame = (self.current_frame + 1) % 3;
             Ok(())
         }
-        
+
         fn present(&mut self) -> Result<()> {
             Ok(())
         }
-        
+
         fn recreate(&mut self, width: u32, height: u32) -> Result<()> {
             self.width = width;
             self.height = height;
@@ -228,17 +233,20 @@ mod tests {
 
     #[test]
     fn test_directx_backend_creation() {
-        let backend = DirectXBackend::new();
+        let backend = DirectXBackend::new(false);
         #[cfg(not(windows))]
         assert!(backend.is_ok(), "Failed to create DirectX backend stub");
-        
+
         #[cfg(windows)]
-        assert!(backend.is_ok() || backend.is_err(), "DirectX creation should succeed or fail gracefully");
+        assert!(
+            backend.is_ok() || backend.is_err(),
+            "DirectX creation should succeed or fail gracefully"
+        );
     }
 
     #[test]
     fn test_directx_backend_type() {
-        let backend = DirectXBackend::new().unwrap();
+        let backend = DirectXBackend::new(false).unwrap();
         assert_eq!(backend.backend_type(), BackendType::DirectX12);
     }
 }

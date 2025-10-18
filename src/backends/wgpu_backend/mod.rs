@@ -21,20 +21,20 @@ pub struct WgpuBackend {
     adapter: Option<wgpu::Adapter>,
     device: Option<wgpu::Device>,
     queue: Option<wgpu::Queue>,
-    
+
     // Surface configuration
     surface_config: Option<wgpu::SurfaceConfiguration>,
-    
+
     // Rendering pipeline
     render_pipeline: Option<wgpu::RenderPipeline>,
-    
+
     // Window size
     width: u32,
     height: u32,
-    
+
     // Configuration
     enable_validation: bool,
-    
+
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
     swapchain_wrapper: WgpuSwapchain,
@@ -43,8 +43,8 @@ pub struct WgpuBackend {
 impl WgpuBackend {
     /// Create a new wgpu backend
     pub fn new(enable_validation: bool) -> Result<Self> {
-        log::info!("Creating wgpu backend (validation: {})", enable_validation);
-        
+        log::info!("Creating wgpu backend (validation: {enable_validation})");
+
         Ok(Self {
             instance: None,
             surface: None,
@@ -60,26 +60,29 @@ impl WgpuBackend {
             swapchain_wrapper: WgpuSwapchain::new(),
         })
     }
-    
+
     /// Load WGSL shader
     fn load_shader(&self) -> &'static str {
         include_str!("../../../shaders/wgsl/triangle.wgsl")
     }
-    
+
     /// Create render pipeline
     fn create_render_pipeline(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        let config = self.surface_config.as_ref().context("Surface config not set")?;
-        
+        let config = self
+            .surface_config
+            .as_ref()
+            .context("Surface config not set")?;
+
         log::info!("Creating wgpu render pipeline");
-        
+
         // Load shader
         let shader_source = self.load_shader();
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("Triangle Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
-        
+
         // Create render pipeline
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Triangle Pipeline"),
@@ -118,10 +121,10 @@ impl WgpuBackend {
             multiview: None,
             cache: None,
         });
-        
+
         self.render_pipeline = Some(pipeline);
         log::info!("Render pipeline created successfully");
-        
+
         Ok(())
     }
 }
@@ -133,12 +136,12 @@ impl GraphicsBackend for WgpuBackend {
 
     fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
         log::info!("Initializing wgpu backend");
-        
+
         // Get window size
         let size = window.inner_size();
         self.width = size.width;
         self.height = size.height;
-        
+
         // Create instance with validation if requested
         log::info!("Creating wgpu instance");
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -150,18 +153,18 @@ impl GraphicsBackend for WgpuBackend {
             },
             ..Default::default()
         });
-        
+
         if self.enable_validation {
             log::info!("wgpu validation and debug enabled");
         }
-        
+
         // Create surface
         // Safety: The surface must not outlive the window. We ensure this by
         // dropping the surface in cleanup() before the window is dropped.
         log::info!("Creating surface");
-        let surface = Arc::new(unsafe { instance.create_surface_unsafe(
-            wgpu::SurfaceTargetUnsafe::from_window(window)?
-        )?});
+        let surface = Arc::new(unsafe {
+            instance.create_surface_unsafe(wgpu::SurfaceTargetUnsafe::from_window(window)?)?
+        });
         // Request adapter
         log::info!("Requesting adapter");
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
@@ -170,9 +173,9 @@ impl GraphicsBackend for WgpuBackend {
             force_fallback_adapter: false,
         }))
         .context("Failed to find appropriate adapter")?;
-        
+
         log::info!("Adapter: {:?}", adapter.get_info());
-        
+
         // Request device and queue
         log::info!("Requesting device and queue");
         let (device, queue) = pollster::block_on(adapter.request_device(
@@ -184,9 +187,9 @@ impl GraphicsBackend for WgpuBackend {
             },
             None,
         ))?;
-        
+
         log::info!("Device and queue created");
-        
+
         // Get surface capabilities and configure
         let surface_caps = surface.get_capabilities(&adapter);
         let surface_format = surface_caps
@@ -195,9 +198,9 @@ impl GraphicsBackend for WgpuBackend {
             .copied()
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
-        
-        log::info!("Surface format: {:?}", surface_format);
-        
+
+        log::info!("Surface format: {surface_format:?}");
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -208,10 +211,10 @@ impl GraphicsBackend for WgpuBackend {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
-        
+
         surface.configure(&device, &config);
         log::info!("Surface configured: {}x{}", self.width, self.height);
-        
+
         // Store everything
         self.instance = Some(instance);
         self.surface = Some(surface);
@@ -219,10 +222,10 @@ impl GraphicsBackend for WgpuBackend {
         self.device = Some(device);
         self.queue = Some(queue);
         self.surface_config = Some(config);
-        
+
         // Create render pipeline
         self.create_render_pipeline()?;
-        
+
         log::info!("wgpu backend initialized successfully");
         Ok(())
     }
@@ -237,17 +240,22 @@ impl GraphicsBackend for WgpuBackend {
         let surface = self.surface.as_ref().context("Surface not initialized")?;
         let device = self.device.as_ref().context("Device not initialized")?;
         let queue = self.queue.as_ref().context("Queue not initialized")?;
-        let pipeline = self.render_pipeline.as_ref().context("Pipeline not initialized")?;
-        
+        let pipeline = self
+            .render_pipeline
+            .as_ref()
+            .context("Pipeline not initialized")?;
+
         // Get current frame
         let output = surface.get_current_texture()?;
-        let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
-        
+        let view = output
+            .texture
+            .create_view(&wgpu::TextureViewDescriptor::default());
+
         // Create command encoder
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
-        
+
         // Render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -269,15 +277,15 @@ impl GraphicsBackend for WgpuBackend {
                 timestamp_writes: None,
                 occlusion_query_set: None,
             });
-            
+
             render_pass.set_pipeline(pipeline);
             render_pass.draw(0..3, 0..1); // Draw 3 vertices, 1 instance
         }
-        
+
         // Submit commands
         queue.submit(std::iter::once(encoder.finish()));
         output.present();
-        
+
         Ok(())
     }
 
@@ -285,31 +293,37 @@ impl GraphicsBackend for WgpuBackend {
         if width == 0 || height == 0 {
             return Ok(());
         }
-        
+
         if self.width == width && self.height == height {
             return Ok(());
         }
-        
-        log::info!("Resizing wgpu surface: {}x{} -> {}x{}", 
-            self.width, self.height, width, height);
-        
+
+        log::info!(
+            "Resizing wgpu surface: {}x{} -> {}x{}",
+            self.width,
+            self.height,
+            width,
+            height
+        );
+
         self.width = width;
         self.height = height;
-        
+
         // Reconfigure surface
-        if let (Some(surface), Some(device), Some(config)) = 
-            (&self.surface, &self.device, &mut self.surface_config) {
+        if let (Some(surface), Some(device), Some(config)) =
+            (&self.surface, &self.device, &mut self.surface_config)
+        {
             config.width = width;
             config.height = height;
             surface.configure(device, config);
         }
-        
+
         Ok(())
     }
 
     fn cleanup(&mut self) {
         log::info!("Cleaning up wgpu backend");
-        
+
         // Drop in reverse order of creation
         self.render_pipeline = None;
         self.surface_config = None;
@@ -318,7 +332,7 @@ impl GraphicsBackend for WgpuBackend {
         self.adapter = None;
         self.surface = None;
         self.instance = None;
-        
+
         log::info!("wgpu backend cleaned up");
     }
 
@@ -493,13 +507,13 @@ mod tests {
 
     #[test]
     fn test_wgpu_backend_creation() {
-        let backend = WgpuBackend::new();
+        let backend = WgpuBackend::new(false);
         assert!(backend.is_ok(), "Failed to create wgpu backend");
     }
 
     #[test]
     fn test_wgpu_backend_type() {
-        let backend = WgpuBackend::new().unwrap();
+        let backend = WgpuBackend::new(false).unwrap();
         assert_eq!(backend.backend_type(), BackendType::Wgpu);
     }
 
@@ -593,14 +607,14 @@ mod tests {
 
     #[test]
     fn test_wgpu_backend_device_access() {
-        let backend = WgpuBackend::new().unwrap();
+        let backend = WgpuBackend::new(false).unwrap();
         let device = backend.device();
         assert_eq!(device.name(), "wgpu-stub-device");
     }
 
     #[test]
     fn test_wgpu_backend_swapchain_access() {
-        let backend = WgpuBackend::new().unwrap();
+        let backend = WgpuBackend::new(false).unwrap();
         let swapchain = backend.swapchain();
         assert_eq!(swapchain.width(), 800);
         assert_eq!(swapchain.height(), 600);
@@ -612,7 +626,7 @@ mod tests {
 
     #[test]
     fn test_wgpu_backend_frame_lifecycle() {
-        let mut backend = WgpuBackend::new().unwrap();
+        let mut backend = WgpuBackend::new(false).unwrap();
         assert!(backend.begin_frame().is_ok());
         // Note: end_frame() requires initialization with a window, which is not
         // suitable for unit tests. This is tested in integration tests.
@@ -621,13 +635,13 @@ mod tests {
 
     #[test]
     fn test_wgpu_backend_resize() {
-        let mut backend = WgpuBackend::new().unwrap();
+        let mut backend = WgpuBackend::new(false).unwrap();
         assert!(backend.resize(1920, 1080).is_ok());
     }
 
     #[test]
     fn test_wgpu_backend_cleanup() {
-        let mut backend = WgpuBackend::new().unwrap();
+        let mut backend = WgpuBackend::new(false).unwrap();
         backend.cleanup(); // Should not panic
     }
 }

@@ -5,17 +5,12 @@
 
 use super::*;
 use anyhow::{Context, Result};
-use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use windows::{
-    core::*,
-    Win32::Foundation::*,
-    Win32::Graphics::Direct3D::*,
-    Win32::Graphics::Direct3D::Fxc::*,
-    Win32::Graphics::Direct3D12::*,
-    Win32::Graphics::Dxgi::Common::*,
-    Win32::Graphics::Dxgi::*,
+    core::*, Win32::Foundation::*, Win32::Graphics::Direct3D::Fxc::*, Win32::Graphics::Direct3D::*,
+    Win32::Graphics::Direct3D12::*, Win32::Graphics::Dxgi::Common::*, Win32::Graphics::Dxgi::*,
     Win32::System::Threading::*,
 };
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
 // HLSL shader source code - matches triangle.hlsl
 const HLSL_SHADER_SOURCE: &str = r#"
@@ -59,7 +54,7 @@ pub struct DirectXBackendImpl {
     command_queue: Option<ID3D12CommandQueue>,
     command_allocator: Option<ID3D12CommandAllocator>,
     command_list: Option<ID3D12GraphicsCommandList>,
-    
+
     // Swap chain
     dxgi_factory: Option<IDXGIFactory4>,
     swap_chain: Option<IDXGISwapChain3>,
@@ -67,23 +62,23 @@ pub struct DirectXBackendImpl {
     render_targets: Vec<ID3D12Resource>,
     rtv_heap: Option<ID3D12DescriptorHeap>,
     rtv_descriptor_size: u32,
-    
+
     // Pipeline (will be created with embedded HLSL bytecode)
     pipeline_state: Option<ID3D12PipelineState>,
     root_signature: Option<ID3D12RootSignature>,
-    
+
     // Synchronization
     fence: Option<ID3D12Fence>,
     fence_value: u64,
     fence_event: HANDLE,
-    
+
     // Configuration
     width: u32,
     height: u32,
     frame_count: u32,
     use_warp: bool,
     enable_validation: bool,
-    
+
     // Trait implementations
     device_wrapper: DirectXDevice,
     swapchain_wrapper: DirectXSwapchain,
@@ -97,9 +92,13 @@ unsafe impl Sync for DirectXBackendImpl {}
 impl DirectXBackendImpl {
     pub fn new(enable_validation: bool) -> Result<Self> {
         let use_warp = std::env::var("RUSTY_RENDERER_USE_WARP").is_ok();
-        
-        log::info!("Creating DirectX 12 backend (WARP: {}, validation: {})", use_warp, enable_validation);
-        
+
+        log::info!(
+            "Creating DirectX 12 backend (WARP: {}, validation: {})",
+            use_warp,
+            enable_validation
+        );
+
         Ok(Self {
             device: None,
             command_queue: None,
@@ -132,11 +131,11 @@ impl DirectXBackendImpl {
 
     pub fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
         log::info!("Initializing DirectX 12 backend");
-        
+
         let size = window.inner_size();
         self.width = size.width;
         self.height = size.height;
-        
+
         // Enable debug layer if requested
         if self.enable_validation {
             unsafe {
@@ -151,108 +150,111 @@ impl DirectXBackendImpl {
                 }
             }
         }
-        
+
         // Create DXGI factory
         self.create_factory()?;
-        
+
         // Create device
         self.create_device()?;
-        
+
         // Create command queue
         self.create_command_queue()?;
-        
+
         // Create swap chain
         self.create_swap_chain(window)?;
-        
+
         // Create render target views
         self.create_render_targets()?;
-        
+
         // Create command objects
         self.create_command_objects()?;
-        
+
         // Create fence
         self.create_fence()?;
-        
+
         // Create pipeline with shaders
         self.create_pipeline()?;
-        
+
         log::info!("DirectX 12 backend initialized successfully");
         Ok(())
     }
 
     fn create_factory(&mut self) -> Result<()> {
         log::info!("Creating DXGI factory");
-        
+
         unsafe {
             let flags = if self.enable_validation {
                 DXGI_CREATE_FACTORY_DEBUG
             } else {
                 DXGI_CREATE_FACTORY_FLAGS(0)
             };
-            
+
             let factory: IDXGIFactory4 = CreateDXGIFactory2(flags)?;
             self.dxgi_factory = Some(factory);
         }
-        
+
         Ok(())
     }
 
     fn create_device(&mut self) -> Result<()> {
         log::info!("Creating D3D12 device");
-        
+
         unsafe {
             let factory = self.dxgi_factory.as_ref().context("Factory not created")?;
-            
+
             let adapter: IDXGIAdapter1 = if self.use_warp {
                 log::info!("Using WARP software renderer");
                 factory.EnumWarpAdapter()?
             } else {
                 factory.EnumAdapters1(0)?
             };
-            
+
             let mut device: Option<ID3D12Device> = None;
             D3D12CreateDevice(&adapter, D3D_FEATURE_LEVEL_11_0, &mut device)?;
-            
+
             self.device = device;
             log::info!("D3D12 device created");
         }
-        
+
         Ok(())
     }
 
     fn create_command_queue(&mut self) -> Result<()> {
         log::info!("Creating command queue");
-        
+
         unsafe {
             let device = self.device.as_ref().context("Device not created")?;
-            
+
             let desc = D3D12_COMMAND_QUEUE_DESC {
                 Type: D3D12_COMMAND_LIST_TYPE_DIRECT,
                 Priority: D3D12_COMMAND_QUEUE_PRIORITY_NORMAL.0,
                 Flags: D3D12_COMMAND_QUEUE_FLAG_NONE,
                 NodeMask: 0,
             };
-            
+
             self.command_queue = Some(device.CreateCommandQueue(&desc)?);
         }
-        
+
         Ok(())
     }
 
     fn create_swap_chain(&mut self, window: &winit::window::Window) -> Result<()> {
         log::info!("Creating swap chain");
-        
+
         unsafe {
             let factory = self.dxgi_factory.as_ref().context("Factory not created")?;
-            let command_queue = self.command_queue.as_ref().context("Command queue not created")?;
-            
+            let command_queue = self
+                .command_queue
+                .as_ref()
+                .context("Command queue not created")?;
+
             // Get HWND from window
             let window_handle = window.window_handle()?;
             let hwnd = match window_handle.as_raw() {
                 RawWindowHandle::Win32(handle) => HWND(handle.hwnd.get() as *mut std::ffi::c_void),
                 _ => anyhow::bail!("Not a Windows window"),
             };
-            
+
             let swap_chain_desc = DXGI_SWAP_CHAIN_DESC1 {
                 Width: self.width,
                 Height: self.height,
@@ -269,7 +271,7 @@ impl DirectXBackendImpl {
                 AlphaMode: DXGI_ALPHA_MODE_UNSPECIFIED,
                 Flags: 0,
             };
-            
+
             let swap_chain: IDXGISwapChain1 = factory.CreateSwapChainForHwnd(
                 command_queue,
                 hwnd,
@@ -277,24 +279,24 @@ impl DirectXBackendImpl {
                 None,
                 None,
             )?;
-            
+
             let swap_chain: IDXGISwapChain3 = swap_chain.cast()?;
             self.frame_index = swap_chain.GetCurrentBackBufferIndex();
             self.swap_chain = Some(swap_chain);
-            
+
             log::info!("Swap chain created: {}x{}", self.width, self.height);
         }
-        
+
         Ok(())
     }
 
     fn create_render_targets(&mut self) -> Result<()> {
         log::info!("Creating render target views");
-        
+
         unsafe {
             let device = self.device.as_ref().context("Device not created")?;
             let swap_chain = self.swap_chain.as_ref().context("Swap chain not created")?;
-            
+
             // Create descriptor heap for RTVs
             let heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
                 Type: D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
@@ -302,80 +304,78 @@ impl DirectXBackendImpl {
                 Flags: D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
                 NodeMask: 0,
             };
-            
+
             let rtv_heap: ID3D12DescriptorHeap = device.CreateDescriptorHeap(&heap_desc)?;
-            self.rtv_descriptor_size = device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-            
+            self.rtv_descriptor_size =
+                device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
             // Create RTVs for each frame
             let mut rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
-            
+
             for i in 0..self.frame_count {
                 let render_target: ID3D12Resource = swap_chain.GetBuffer(i)?;
                 device.CreateRenderTargetView(&render_target, None, rtv_handle);
-                
+
                 rtv_handle.ptr += self.rtv_descriptor_size as usize;
                 self.render_targets.push(render_target);
             }
-            
+
             self.rtv_heap = Some(rtv_heap);
             log::info!("Created {} render target views", self.frame_count);
         }
-        
+
         Ok(())
     }
 
     fn create_command_objects(&mut self) -> Result<()> {
         log::info!("Creating command allocator and list");
-        
+
         unsafe {
             let device = self.device.as_ref().context("Device not created")?;
-            
-            let allocator: ID3D12CommandAllocator = device.CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT)?;
-            
-            let command_list: ID3D12GraphicsCommandList = device.CreateCommandList(
-                0,
-                D3D12_COMMAND_LIST_TYPE_DIRECT,
-                &allocator,
-                None,
-            )?;
-            
+
+            let allocator: ID3D12CommandAllocator =
+                device.CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT)?;
+
+            let command_list: ID3D12GraphicsCommandList =
+                device.CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, &allocator, None)?;
+
             // Close the command list initially
             command_list.Close()?;
-            
+
             self.command_allocator = Some(allocator);
             self.command_list = Some(command_list);
         }
-        
+
         Ok(())
     }
 
     fn create_fence(&mut self) -> Result<()> {
         log::info!("Creating fence for synchronization");
-        
+
         unsafe {
             let device = self.device.as_ref().context("Device not created")?;
-            
+
             let fence: ID3D12Fence = device.CreateFence(0, D3D12_FENCE_FLAG_NONE)?;
             self.fence = Some(fence);
             self.fence_value = 1;
-            
+
             // Create event for fence signaling
             self.fence_event = CreateEventA(None, false, false, None)?;
         }
-        
+
         Ok(())
     }
 
     fn create_pipeline(&mut self) -> Result<()> {
         log::info!("Creating pipeline state and root signature");
-        
+
         unsafe {
             let device = self.device.as_ref().context("Device not created")?;
-            
+
             // Compile shaders at runtime
             let vs_bytecode = self.compile_shader("VSMain", "vs_5_0")?;
             let ps_bytecode = self.compile_shader("PSMain", "ps_5_0")?;
-            
+
             // Create empty root signature (no parameters needed for this simple triangle)
             let root_signature_desc = D3D12_ROOT_SIGNATURE_DESC {
                 NumParameters: 0,
@@ -384,17 +384,17 @@ impl DirectXBackendImpl {
                 pStaticSamplers: std::ptr::null(),
                 Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
             };
-            
+
             let mut signature_blob: Option<ID3DBlob> = None;
             let mut error_blob: Option<ID3DBlob> = None;
-            
+
             let result = D3D12SerializeRootSignature(
                 &root_signature_desc,
                 D3D_ROOT_SIGNATURE_VERSION_1,
                 &mut signature_blob,
                 Some(&mut error_blob),
             );
-            
+
             if result.is_err() {
                 if let Some(error) = error_blob {
                     let error_msg = std::slice::from_raw_parts(
@@ -406,9 +406,9 @@ impl DirectXBackendImpl {
                 }
                 result?;
             }
-            
+
             let signature_blob = signature_blob.context("No signature blob created")?;
-            
+
             let root_signature: ID3D12RootSignature = device.CreateRootSignature(
                 0,
                 std::slice::from_raw_parts(
@@ -416,7 +416,7 @@ impl DirectXBackendImpl {
                     signature_blob.GetBufferSize(),
                 ),
             )?;
-            
+
             // Create PSO
             let pso_desc = D3D12_GRAPHICS_PIPELINE_STATE_DESC {
                 pRootSignature: std::mem::ManuallyDrop::new(Some(root_signature.clone())),
@@ -507,30 +507,31 @@ impl DirectXBackendImpl {
                 CachedPSO: D3D12_CACHED_PIPELINE_STATE::default(),
                 Flags: D3D12_PIPELINE_STATE_FLAG_NONE,
             };
-            
-            let pipeline_state: ID3D12PipelineState = device.CreateGraphicsPipelineState(&pso_desc)?;
-            
+
+            let pipeline_state: ID3D12PipelineState =
+                device.CreateGraphicsPipelineState(&pso_desc)?;
+
             self.root_signature = Some(root_signature);
             self.pipeline_state = Some(pipeline_state);
-            
+
             log::info!("Pipeline created successfully");
         }
-        
+
         Ok(())
     }
-    
+
     fn compile_shader(&self, entry_point: &str, target: &str) -> Result<ID3DBlob> {
         unsafe {
             let entry_cstr = format!("{}\0", entry_point);
             let target_cstr = format!("{}\0", target);
-            
+
             let shader_source = PCSTR::from_raw(HLSL_SHADER_SOURCE.as_ptr());
             let entry = PCSTR::from_raw(entry_cstr.as_ptr());
             let target_pcstr = PCSTR::from_raw(target_cstr.as_ptr());
-            
+
             let mut shader_blob: Option<ID3DBlob> = None;
             let mut error_blob: Option<ID3DBlob> = None;
-            
+
             let result = D3DCompile(
                 shader_source.as_ptr() as *const _,
                 HLSL_SHADER_SOURCE.len(),
@@ -544,7 +545,7 @@ impl DirectXBackendImpl {
                 &mut shader_blob,
                 Some(&mut error_blob),
             );
-            
+
             if result.is_err() {
                 if let Some(error) = error_blob {
                     let error_msg = std::slice::from_raw_parts(
@@ -552,12 +553,20 @@ impl DirectXBackendImpl {
                         error.GetBufferSize(),
                     );
                     let error_str = String::from_utf8_lossy(error_msg);
-                    anyhow::bail!("Shader compilation failed for {} ({}): {}", entry_point, target, error_str);
+                    anyhow::bail!(
+                        "Shader compilation failed for {} ({}): {}",
+                        entry_point,
+                        target,
+                        error_str
+                    );
                 }
                 result?;
             }
-            
-            shader_blob.context(format!("No shader blob created for {} ({})", entry_point, target))
+
+            shader_blob.context(format!(
+                "No shader blob created for {} ({})",
+                entry_point, target
+            ))
         }
     }
 
@@ -567,27 +576,37 @@ impl DirectXBackendImpl {
             if let Some(allocator) = &self.command_allocator {
                 allocator.Reset()?;
             }
-            
-            if let (Some(command_list), Some(allocator)) = (&self.command_list, &self.command_allocator) {
+
+            if let (Some(command_list), Some(allocator)) =
+                (&self.command_list, &self.command_allocator)
+            {
                 command_list.Reset(allocator, None)?;
             }
         }
-        
+
         Ok(())
     }
 
     pub fn end_frame(&mut self) -> Result<()> {
         unsafe {
             // Record rendering commands
-            if let (Some(command_list), Some(rtv_heap), Some(root_signature), Some(pipeline_state)) = 
-                (&self.command_list, &self.rtv_heap, &self.root_signature, &self.pipeline_state) 
-            {
+            if let (
+                Some(command_list),
+                Some(rtv_heap),
+                Some(root_signature),
+                Some(pipeline_state),
+            ) = (
+                &self.command_list,
+                &self.rtv_heap,
+                &self.root_signature,
+                &self.pipeline_state,
+            ) {
                 // Get current back buffer
                 let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
                 let rtv_handle = D3D12_CPU_DESCRIPTOR_HANDLE {
                     ptr: rtv_handle.ptr + (self.frame_index * self.rtv_descriptor_size) as usize,
                 };
-                
+
                 // Transition to render target
                 if let Some(render_target) = self.render_targets.get(self.frame_index as usize) {
                     let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
@@ -596,7 +615,7 @@ impl DirectXBackendImpl {
                         StateBefore: D3D12_RESOURCE_STATE_PRESENT,
                         StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
                     };
-                    
+
                     let barrier = D3D12_RESOURCE_BARRIER {
                         Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
                         Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
@@ -604,18 +623,18 @@ impl DirectXBackendImpl {
                             Transition: std::mem::ManuallyDrop::new(transition_to_rt),
                         },
                     };
-                    
+
                     command_list.ResourceBarrier(&[barrier]);
-                    
+
                     // Clear to black
                     let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
                     command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
-                    
+
                     // Set pipeline and draw triangle
                     command_list.SetGraphicsRootSignature(root_signature);
                     command_list.SetPipelineState(pipeline_state);
                     command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, None);
-                    
+
                     // Set viewport and scissor
                     let viewport = D3D12_VIEWPORT {
                         TopLeftX: 0.0,
@@ -626,7 +645,7 @@ impl DirectXBackendImpl {
                         MaxDepth: 1.0,
                     };
                     command_list.RSSetViewports(&[viewport]);
-                    
+
                     let scissor = RECT {
                         left: 0,
                         top: 0,
@@ -634,13 +653,13 @@ impl DirectXBackendImpl {
                         bottom: self.height as i32,
                     };
                     command_list.RSSetScissorRects(&[scissor]);
-                    
+
                     // Set primitive topology
                     command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-                    
+
                     // Draw the triangle (3 vertices)
                     command_list.DrawInstanced(3, 1, 0, 0);
-                    
+
                     // Transition back to present
                     let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
                         pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
@@ -648,7 +667,7 @@ impl DirectXBackendImpl {
                         StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
                         StateAfter: D3D12_RESOURCE_STATE_PRESENT,
                     };
-                    
+
                     let barrier = D3D12_RESOURCE_BARRIER {
                         Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
                         Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
@@ -656,29 +675,31 @@ impl DirectXBackendImpl {
                             Transition: std::mem::ManuallyDrop::new(transition_to_present),
                         },
                     };
-                    
+
                     command_list.ResourceBarrier(&[barrier]);
                 }
-                
+
                 // Close command list
                 command_list.Close()?;
             }
-            
+
             // Execute commands
-            if let (Some(command_queue), Some(command_list)) = (&self.command_queue, &self.command_list) {
+            if let (Some(command_queue), Some(command_list)) =
+                (&self.command_queue, &self.command_list)
+            {
                 let command_lists = [Some(command_list.cast()?)];
                 command_queue.ExecuteCommandLists(&command_lists);
             }
-            
+
             // Present
             if let Some(swap_chain) = &self.swap_chain {
                 swap_chain.Present(1, DXGI_PRESENT(0)).ok()?;
             }
-            
+
             // Wait for frame
             self.wait_for_previous_frame()?;
         }
-        
+
         Ok(())
     }
 
@@ -688,18 +709,18 @@ impl DirectXBackendImpl {
                 let fence_value = self.fence_value;
                 command_queue.Signal(fence, fence_value)?;
                 self.fence_value += 1;
-                
+
                 if fence.GetCompletedValue() < fence_value {
                     fence.SetEventOnCompletion(fence_value, self.fence_event)?;
                     WaitForSingleObject(self.fence_event, INFINITE);
                 }
-                
+
                 if let Some(swap_chain) = &self.swap_chain {
                     self.frame_index = swap_chain.GetCurrentBackBufferIndex();
                 }
             }
         }
-        
+
         Ok(())
     }
 
@@ -707,37 +728,42 @@ impl DirectXBackendImpl {
         if width == 0 || height == 0 {
             return Ok(());
         }
-        
+
         if self.width == width && self.height == height {
             return Ok(());
         }
-        
-        log::info!("Resizing DirectX swap chain: {}x{} -> {}x{}", 
-            self.width, self.height, width, height);
-        
+
+        log::info!(
+            "Resizing DirectX swap chain: {}x{} -> {}x{}",
+            self.width,
+            self.height,
+            width,
+            height
+        );
+
         self.width = width;
         self.height = height;
-        
+
         // TODO: Recreate swap chain
-        
+
         Ok(())
     }
 
     pub fn cleanup(&mut self) {
         log::info!("Cleaning up DirectX 12 backend");
-        
+
         // Wait for GPU to finish
         if self.fence.is_some() {
             let _ = self.wait_for_previous_frame();
         }
-        
+
         // Close fence event
         if !self.fence_event.is_invalid() {
             unsafe {
                 let _ = CloseHandle(self.fence_event);
             }
         }
-        
+
         // Release resources in reverse order
         self.pipeline_state = None;
         self.root_signature = None;
@@ -750,7 +776,7 @@ impl DirectXBackendImpl {
         self.fence = None;
         self.device = None;
         self.dxgi_factory = None;
-        
+
         log::info!("DirectX 12 backend cleaned up");
     }
 

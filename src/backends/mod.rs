@@ -232,7 +232,10 @@ pub trait Swapchain: Send + Sync {
 /// let backend = create_backend(BackendType::Vulkan, true)?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn create_backend(backend_type: BackendType, enable_validation: bool) -> Result<Box<dyn GraphicsBackend>> {
+pub fn create_backend(
+    backend_type: BackendType,
+    enable_validation: bool,
+) -> Result<Box<dyn GraphicsBackend>> {
     match backend_type {
         BackendType::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(enable_validation)?)),
         BackendType::DirectX12 => Ok(Box::new(directx::DirectXBackend::new(enable_validation)?)),
@@ -279,25 +282,25 @@ mod tests {
     #[test]
     fn test_backend_creation() {
         // All backends should be creatable (even if stubs)
-        let vulkan = create_backend(BackendType::Vulkan);
+        let vulkan = create_backend(BackendType::Vulkan, false);
         assert!(vulkan.is_ok(), "Failed to create Vulkan backend");
 
-        let directx = create_backend(BackendType::DirectX12);
+        let directx = create_backend(BackendType::DirectX12, false);
         assert!(directx.is_ok(), "Failed to create DirectX backend");
 
-        let wgpu = create_backend(BackendType::Wgpu);
+        let wgpu = create_backend(BackendType::Wgpu, false);
         assert!(wgpu.is_ok(), "Failed to create wgpu backend");
     }
 
     #[test]
     fn test_backend_type_identification() {
-        let vulkan = create_backend(BackendType::Vulkan).unwrap();
+        let vulkan = create_backend(BackendType::Vulkan, false).unwrap();
         assert_eq!(vulkan.backend_type(), BackendType::Vulkan);
 
-        let directx = create_backend(BackendType::DirectX12).unwrap();
+        let directx = create_backend(BackendType::DirectX12, false).unwrap();
         assert_eq!(directx.backend_type(), BackendType::DirectX12);
 
-        let wgpu = create_backend(BackendType::Wgpu).unwrap();
+        let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
         assert_eq!(wgpu.backend_type(), BackendType::Wgpu);
     }
 }

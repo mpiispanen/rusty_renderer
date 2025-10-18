@@ -75,7 +75,7 @@ pub struct VulkanBackend {
 impl VulkanBackend {
     /// Create a new Vulkan backend
     pub fn new(enable_validation: bool) -> Result<Self> {
-        log::info!("Creating Vulkan backend (validation: {})", enable_validation);
+        log::info!("Creating Vulkan backend (validation: {enable_validation})");
 
         // Load Vulkan library
         let loader = unsafe { LibloadingLoader::new(LIBRARY)? };
@@ -833,9 +833,7 @@ impl VulkanBackend {
         self.images_in_flight = vec![None; swapchain_image_count];
 
         log::info!(
-            "Created synchronization objects: {} semaphore pairs (per swapchain image), {} fences (frames in flight)",
-            swapchain_image_count,
-            MAX_FRAMES_IN_FLIGHT
+            "Created synchronization objects: {swapchain_image_count} semaphore pairs (per swapchain image), {MAX_FRAMES_IN_FLIGHT} fences (frames in flight)"
         );
         Ok(())
     }
@@ -992,7 +990,8 @@ impl GraphicsBackend for VulkanBackend {
 
         // Acquire next image - we don't know which image yet, so we use current_frame semaphore temporarily
         // This is a limitation - ideally we'd use a fence here but that's more complex
-        let image_available = self.image_available_semaphores[self.current_frame % self.image_available_semaphores.len()];
+        let image_available = self.image_available_semaphores
+            [self.current_frame % self.image_available_semaphores.len()];
         let result = unsafe {
             device.acquire_next_image_khr(
                 self.swapchain_khr,
@@ -1049,7 +1048,8 @@ impl GraphicsBackend for VulkanBackend {
         let image_index = self.image_index as usize;
 
         // Use the image-specific semaphores for this swapchain image
-        let wait_semaphores = &[self.image_available_semaphores[self.current_frame % self.image_available_semaphores.len()]];
+        let wait_semaphores = &[self.image_available_semaphores
+            [self.current_frame % self.image_available_semaphores.len()]];
         let wait_stages = &[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT];
         let command_buffers = &[self.command_buffers[image_index]];
         let signal_semaphores = &[self.render_finished_semaphores[image_index]];
@@ -1438,33 +1438,33 @@ mod tests {
 
     #[test]
     fn test_vulkan_backend_creation() {
-        let backend = VulkanBackend::new();
+        let backend = VulkanBackend::new(false);
         assert!(backend.is_ok(), "Failed to create Vulkan backend");
     }
 
     #[test]
     fn test_vulkan_backend_type() {
-        let backend = VulkanBackend::new().unwrap();
+        let backend = VulkanBackend::new(false).unwrap();
         assert_eq!(backend.backend_type(), BackendType::Vulkan);
     }
 
     #[test]
     fn test_vulkan_device_access() {
-        let backend = VulkanBackend::new().unwrap();
+        let backend = VulkanBackend::new(false).unwrap();
         let device = backend.device();
         assert_eq!(device.name(), "Vulkan Stub Device");
     }
 
     #[test]
     fn test_vulkan_device_features() {
-        let backend = VulkanBackend::new().unwrap();
+        let backend = VulkanBackend::new(false).unwrap();
         let device = backend.device();
         assert!(!device.supports_feature("any_feature"));
     }
 
     #[test]
     fn test_vulkan_swapchain_access() {
-        let backend = VulkanBackend::new().unwrap();
+        let backend = VulkanBackend::new(false).unwrap();
         let swapchain = backend.swapchain();
         assert_eq!(swapchain.width(), 800);
         assert_eq!(swapchain.height(), 600);
@@ -1473,7 +1473,7 @@ mod tests {
 
     #[test]
     fn test_vulkan_swapchain_recreate() {
-        let mut backend = VulkanBackend::new().unwrap();
+        let mut backend = VulkanBackend::new(false).unwrap();
         let swapchain = backend.swapchain();
         assert_eq!(swapchain.width(), 800);
         assert_eq!(swapchain.height(), 600);
@@ -1524,27 +1524,27 @@ mod tests {
 
     #[test]
     fn test_vulkan_backend_frame_operations() {
-        let mut backend = VulkanBackend::new().unwrap();
+        let mut backend = VulkanBackend::new(false).unwrap();
         assert!(backend.begin_frame().is_ok());
         assert!(backend.end_frame().is_ok());
     }
 
     #[test]
     fn test_vulkan_backend_resize() {
-        let mut backend = VulkanBackend::new().unwrap();
+        let mut backend = VulkanBackend::new(false).unwrap();
         assert!(backend.resize(1024, 768).is_ok());
     }
 
     #[test]
     fn test_vulkan_backend_cleanup() {
-        let mut backend = VulkanBackend::new().unwrap();
+        let mut backend = VulkanBackend::new(false).unwrap();
         // Should not panic
         backend.cleanup();
     }
 
     #[test]
     fn test_vulkan_swapchain_operations() {
-        let mut backend = VulkanBackend::new().unwrap();
+        let mut backend = VulkanBackend::new(false).unwrap();
         assert!(backend.swapchain.acquire_next_image().is_ok());
         assert!(backend.swapchain.present().is_ok());
     }

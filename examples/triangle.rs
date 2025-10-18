@@ -45,7 +45,9 @@ impl Args {
                     println!("\nOptions:");
                     println!("  --backend, -b <backend>    Graphics backend to use");
                     #[cfg(target_os = "windows")]
-                    println!("                             Options: vulkan (default), directx, wgpu");
+                    println!(
+                        "                             Options: vulkan (default), directx, wgpu"
+                    );
                     #[cfg(not(target_os = "windows"))]
                     println!("                             Options: vulkan (default), wgpu");
                     println!("  --test-duration <seconds>  Run for specified duration then exit (for testing)");
@@ -82,7 +84,7 @@ fn main() -> anyhow::Result<()> {
 
     // Determine backend
     let backend = args.backend.unwrap_or(RenderBackend::Vulkan);
-    log::info!("Using backend: {:?}", backend);
+    log::info!("Using backend: {backend:?}");
 
     if let Some(duration) = args.test_duration {
         log::info!("Test mode: will run for {duration} seconds");
