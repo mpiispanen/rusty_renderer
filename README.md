@@ -91,6 +91,8 @@ Note: `directx` backend is only available on Windows.
 
 ## Testing
 
+### Unit and Integration Tests
+
 ```bash
 # Run all tests
 cargo test
@@ -101,6 +103,38 @@ cargo test test_name
 # Run with output
 cargo test -- --nocapture
 ```
+
+### Visual Regression Tests
+
+Visual tests compare rendering outputs across backends using perceptual metrics:
+
+```bash
+# Run all visual tests
+cargo test --test visual_tests -- --ignored --nocapture
+
+# Test specific backend comparison
+cargo test --test visual_tests test_vulkan_vs_wgpu -- --ignored --nocapture
+
+# FLIP perceptual comparison tests
+cargo test --test visual_tests flip -- --ignored --nocapture
+```
+
+#### FLIP Integration
+
+The project uses [NVIDIA FLIP](https://research.nvidia.com/publication/2020-07_FLIP) for perceptual image comparison:
+
+```bash
+# Install FLIP evaluator
+pip install flip-evaluator numpy pillow
+
+# Direct comparison using Python script
+python3 scripts/flip_compare.py reference.png test.png --error-map diff.png
+
+# Batch comparison
+./scripts/batch_flip_compare.sh reference_dir/ test_dir/ output_dir/
+```
+
+See [docs/FLIP_INTEGRATION.md](docs/FLIP_INTEGRATION.md) for detailed documentation.
 
 ## Development
 

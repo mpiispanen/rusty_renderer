@@ -27,6 +27,9 @@ env_logger = "0.11"
 # Image handling for screenshots
 image = "0.25"
 
+# JSON parsing for FLIP Python API
+serde_json = "1.0"
+
 # Vulkan bindings (M3)
 vulkanalia = { version = "0.31", features = ["libloading", "window"] }
 

@@ -4,9 +4,11 @@ This module provides comprehensive image comparison utilities for automated visu
 
 ## Features
 
+## Legacy Image Comparison
+
 ### Image Comparison Metrics
 
-The `ImageComparator` calculates multiple metrics to assess visual similarity:
+The `ImageComparator` provides traditional pixel-based metrics for quick comparisons:
 
 1. **Pixel-level Matching**
    - Counts exact pixel matches within configurable tolerance
@@ -115,19 +117,134 @@ Different rendering backends may produce slightly different outputs due to:
   - wgpu adds additional abstraction layers
   - May use different coordinate conventions
 
-## Perceptual Comparison (FLIP-inspired)
+## Perceptual Comparison (FLIP)
 
-Our perceptual comparison is inspired by [NVIDIA FLIP](https://research.nvidia.com/publication/2020-07_FLIP), 
-implementing key concepts:
+Our testing infrastructure now includes full integration with [NVIDIA FLIP](https://research.nvidia.com/publication/2020-07_FLIP), 
+the industry-standard perceptual image comparison metric.
 
-- **Luminance Sensitivity**: Human vision is more sensitive to brightness changes
-- **sRGB to Linear**: Proper color space conversion for accurate perception
-- **Spatial Weighting**: Window-based SSIM for structural comparison
+### FLIP Integration
 
-While not a full FLIP implementation (which requires C++), our approach provides:
-- Fast, pure-Rust implementation
-- Good correlation with perceptual quality
-- Suitable for automated testing
+FLIP (Feature-based Locally-Adaptive Pixel) is a perceptual image metric developed by NVIDIA that accounts for:
+- **Spatial frequency filtering** based on human contrast sensitivity
+- **Color perception** in LMS (cone response) color space
+- **Spatial pooling** to account for local adaptation
+
+We provide two methods for FLIP comparison:
+
+#### 1. Command-Line Tool (CLI)
+
+Uses the `flip` command-line tool from `flip-evaluator`:
+
+```rust
+let flip = FlipComparator::default();
+let result = flip.compare("reference.png", "test.png")?;
+```
+
+Pros:
+- Simple, no additional scripts needed
+- Works with existing CLI tools
+
+Cons:
+- Requires parsing text output
+- Less detailed error information
+
+#### 2. Python API (Recommended)
+
+Uses our Python wrapper script (`scripts/flip_compare.py`) for direct API access:
+
+```rust
+let flip = FlipComparator::with_python_api(None, 2);
+let result = flip.compare("reference.png", "test.png")?;
+```
+
+Pros:
+- JSON output for reliable parsing
+- More detailed error maps
+- Direct access to numpy arrays
+- Better error handling
+
+Cons:
+- Requires Python 3 and numpy
+
+### Installation
+
+```bash
+# Install FLIP evaluator
+pip install flip-evaluator numpy
+
+# Verify installation
+flip --help
+python3 scripts/flip_compare.py --help
+```
+
+### Using the Python Script
+
+The `scripts/flip_compare.py` script provides a clean interface to the FLIP Python API:
+
+```bash
+# Compare two images
+python3 scripts/flip_compare.py reference.png test.png
+
+# With custom PPD and error map
+python3 scripts/flip_compare.py reference.png test.png \
+    --ppd 67 \
+    --error-map diff.png \
+    --output results.json
+
+# Silent mode (only JSON output)
+python3 scripts/flip_compare.py reference.png test.png -v 0
+```
+
+Output example:
+```json
+{
+  "mean": 0.081237,
+  "median": 0.001462,
+  "q1": 0.001462,
+  "q3": 0.001462,
+  "min": 0.001462,
+  "max": 0.997351,
+  "ppd": 67.0,
+  "dynamic_range": "LDR",
+  "reference": "reference.png",
+  "test": "test.png",
+  "error_map": "error_map.png"
+}
+```
+
+### FLIP Thresholds
+
+Recommended thresholds for mean FLIP error:
+- **< 0.05**: Excellent match (imperceptible differences)
+- **< 0.10**: Good match (minor differences)
+- **< 0.15**: Acceptable match (noticeable but acceptable differences)
+- **≥ 0.15**: Significant differences (requires investigation)
+
+### Example Tests
+
+```rust
+#[test]
+fn test_with_flip() {
+    // Using CLI method
+    let flip = FlipComparator::default();
+    let result = flip.compare("ref.png", "test.png")?;
+    assert!(result.passes(0.10), "FLIP error: {:.6}", result.mean);
+}
+
+#[test]
+fn test_with_flip_python() {
+    // Using Python API method
+    let flip = FlipComparator::with_python_api(Some(67.0), 2);
+    let result = flip.compare("ref.png", "test.png")?;
+    
+    println!("Mean FLIP error: {:.6}", result.mean);
+    println!("Error map: {:?}", result.error_map_path);
+    
+    assert!(result.passes(0.15));
+}
+```
+
+## Legacy Image Comparison
 
 ## Interpreting Results
 
