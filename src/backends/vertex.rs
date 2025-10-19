@@ -6,7 +6,7 @@ use std::mem;
 
 /// Standard vertex format with position, normal, UV, and color
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {
     /// Position in 3D space (x, y, z)
     pub position: [f32; 3],
