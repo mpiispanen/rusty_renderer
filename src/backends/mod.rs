@@ -311,73 +311,8 @@ pub trait GraphicsBackend: Send + Sync {
         ))
     }
 
-    // Vertex/Index Buffer Rendering (M8.2)
-
-    /// Bind a vertex buffer for rendering
-    ///
-    /// Binds a vertex buffer to the specified binding slot. The buffer should contain
-    /// vertex data matching the format expected by the current pipeline.
-    ///
-    /// # Arguments
-    /// * `binding` - Binding slot (typically 0 for the first vertex buffer)
-    /// * `buffer` - The vertex buffer to bind
-    /// * `offset` - Offset in bytes into the buffer
-    ///
-    /// # Note
-    /// This method is typically called during render pass execution (e.g., in PassCallback::execute)
-    fn bind_vertex_buffer(&mut self, binding: u32, buffer: &dyn Buffer, offset: u64) -> Result<()>;
-
-    /// Bind an index buffer for indexed rendering
-    ///
-    /// Binds an index buffer for indexed draw calls. The buffer should contain
-    /// index data (u16 or u32 indices).
-    ///
-    /// # Arguments
-    /// * `buffer` - The index buffer to bind
-    /// * `offset` - Offset in bytes into the buffer
-    /// * `index_type` - The type of indices (U16 or U32)
-    fn bind_index_buffer(
-        &mut self,
-        buffer: &dyn Buffer,
-        offset: u64,
-        index_type: IndexType,
-    ) -> Result<()>;
-
-    /// Draw primitives using vertex data
-    ///
-    /// Draws non-indexed geometry using the currently bound vertex buffers.
-    ///
-    /// # Arguments
-    /// * `vertex_count` - Number of vertices to draw
-    /// * `instance_count` - Number of instances to draw
-    /// * `first_vertex` - Index of the first vertex
-    /// * `first_instance` - Index of the first instance
-    fn draw(
-        &mut self,
-        vertex_count: u32,
-        instance_count: u32,
-        first_vertex: u32,
-        first_instance: u32,
-    ) -> Result<()>;
-
-    /// Draw indexed primitives
-    ///
-    /// Draws indexed geometry using the currently bound vertex and index buffers.
-    ///
-    /// # Arguments
-    /// * `index_count` - Number of indices to draw
-    /// * `instance_count` - Number of instances to draw
-    /// * `first_index` - Index of the first index in the index buffer
-    /// * `vertex_offset` - Offset added to vertex indices
-    /// * `first_instance` - Index of the first instance
-    fn draw_indexed(
-        &mut self,
-        index_count: u32,
-        instance_count: u32,
-        first_index: u32,
-        vertex_offset: i32,
-        first_instance: u32,
-    ) -> Result<()>;
+    // Note: Draw commands (bind_vertex_buffer, draw, etc.) are NOT on GraphicsBackend
+    // They are only available through PassExecutionContext during render graph execution
 }
 
 /// Index buffer data type

@@ -718,45 +718,6 @@ impl GraphicsBackend for WgpuBackend {
         // TODO: Implement wgpu sampler creation
         anyhow::bail!("wgpu sampler creation not yet implemented")
     }
-
-    fn bind_vertex_buffer(
-        &mut self,
-        _binding: u32,
-        _buffer: &dyn super::Buffer,
-        _offset: u64,
-    ) -> Result<()> {
-        anyhow::bail!("bind_vertex_buffer not yet implemented for wgpu")
-    }
-
-    fn bind_index_buffer(
-        &mut self,
-        _buffer: &dyn super::Buffer,
-        _offset: u64,
-        _index_type: super::IndexType,
-    ) -> Result<()> {
-        anyhow::bail!("bind_index_buffer not yet implemented for wgpu")
-    }
-
-    fn draw(
-        &mut self,
-        _vertex_count: u32,
-        _instance_count: u32,
-        _first_vertex: u32,
-        _first_instance: u32,
-    ) -> Result<()> {
-        anyhow::bail!("draw not yet implemented for wgpu")
-    }
-
-    fn draw_indexed(
-        &mut self,
-        _index_count: u32,
-        _instance_count: u32,
-        _first_index: u32,
-        _vertex_offset: i32,
-        _first_instance: u32,
-    ) -> Result<()> {
-        anyhow::bail!("draw_indexed not yet implemented for wgpu")
-    }
 }
 
 /// Stub Device implementation
