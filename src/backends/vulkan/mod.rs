@@ -4,6 +4,7 @@
 //! Supports validation layers in debug mode and provides a complete
 //! Vulkan rendering pipeline.
 
+mod resources;
 mod shaders;
 
 use super::*;
@@ -1439,6 +1440,186 @@ impl VulkanBackend {
 
         flags
     }
+
+    /// Copy data between buffers
+    fn copy_buffer(
+        &mut self,
+        src: vk::Buffer,
+        dst: vk::Buffer,
+        dst_offset: u64,
+        size: u64,
+    ) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Create one-time command buffer
+        let command_buffer = self.begin_single_time_commands()?;
+
+        // Copy command
+        let copy_region = vk::BufferCopy::builder()
+            .src_offset(0)
+            .dst_offset(dst_offset)
+            .size(size);
+
+        unsafe {
+            device.cmd_copy_buffer(command_buffer, src, dst, &[*copy_region]);
+        }
+
+        self.end_single_time_commands(command_buffer)?;
+
+        Ok(())
+    }
+
+    /// Copy data from buffer to image
+    fn copy_buffer_to_image(
+        &mut self,
+        buffer: vk::Buffer,
+        image: vk::Image,
+        width: u32,
+        height: u32,
+        mip_level: u32,
+    ) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Create one-time command buffer
+        let command_buffer = self.begin_single_time_commands()?;
+
+        // Transition image to TRANSFER_DST_OPTIMAL
+        let barrier = vk::ImageMemoryBarrier::builder()
+            .old_layout(vk::ImageLayout::UNDEFINED)
+            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(image)
+            .subresource_range(
+                vk::ImageSubresourceRange::builder()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .base_mip_level(mip_level)
+                    .level_count(1)
+                    .base_array_layer(0)
+                    .layer_count(1)
+                    .build(),
+            )
+            .src_access_mask(vk::AccessFlags::empty())
+            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE);
+
+        unsafe {
+            device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TOP_OF_PIPE,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::DependencyFlags::empty(),
+                &[] as &[vk::MemoryBarrier],
+                &[] as &[vk::BufferMemoryBarrier],
+                &[*barrier],
+            );
+        }
+
+        // Copy buffer to image
+        let region = vk::BufferImageCopy::builder()
+            .buffer_offset(0)
+            .buffer_row_length(0)
+            .buffer_image_height(0)
+            .image_subresource(
+                vk::ImageSubresourceLayers::builder()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .mip_level(mip_level)
+                    .base_array_layer(0)
+                    .layer_count(1)
+                    .build(),
+            )
+            .image_offset(vk::Offset3D { x: 0, y: 0, z: 0 })
+            .image_extent(vk::Extent3D {
+                width,
+                height,
+                depth: 1,
+            });
+
+        unsafe {
+            device.cmd_copy_buffer_to_image(
+                command_buffer,
+                buffer,
+                image,
+                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                &[*region],
+            );
+        }
+
+        // Transition to SHADER_READ_ONLY_OPTIMAL
+        let barrier = vk::ImageMemoryBarrier::builder()
+            .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+            .new_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .image(image)
+            .subresource_range(
+                vk::ImageSubresourceRange::builder()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .base_mip_level(mip_level)
+                    .level_count(1)
+                    .base_array_layer(0)
+                    .layer_count(1)
+                    .build(),
+            )
+            .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+            .dst_access_mask(vk::AccessFlags::SHADER_READ);
+
+        unsafe {
+            device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::TRANSFER,
+                vk::PipelineStageFlags::FRAGMENT_SHADER,
+                vk::DependencyFlags::empty(),
+                &[] as &[vk::MemoryBarrier],
+                &[] as &[vk::BufferMemoryBarrier],
+                &[*barrier],
+            );
+        }
+
+        self.end_single_time_commands(command_buffer)?;
+
+        Ok(())
+    }
+
+    /// Begin a single-time command buffer for transfers
+    fn begin_single_time_commands(&self) -> Result<vk::CommandBuffer> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let alloc_info = vk::CommandBufferAllocateInfo::builder()
+            .command_pool(self.command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+
+        let command_buffer = unsafe { device.allocate_command_buffers(&alloc_info)?[0] };
+
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+        unsafe {
+            device.begin_command_buffer(command_buffer, &begin_info)?;
+        }
+
+        Ok(command_buffer)
+    }
+
+    /// End and submit a single-time command buffer
+    fn end_single_time_commands(&self, command_buffer: vk::CommandBuffer) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        unsafe {
+            device.end_command_buffer(command_buffer)?;
+        }
+
+        let command_buffers = &[command_buffer];
+        let submit_info = vk::SubmitInfo::builder().command_buffers(command_buffers);
+
+        unsafe {
+            device.queue_submit(self.graphics_queue, &[*submit_info], vk::Fence::null())?;
+            device.queue_wait_idle(self.graphics_queue)?;
+            device.free_command_buffers(self.command_pool, command_buffers);
+        }
+
+        Ok(())
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -2037,60 +2218,229 @@ impl GraphicsBackend for VulkanBackend {
     // Resource Management (M8.1)
 
     fn create_buffer(&mut self, desc: &super::BufferDescriptor) -> Result<Box<dyn super::Buffer>> {
-        log::debug!(
-            "Creating Vulkan buffer: {} bytes, usage: {:?}",
-            desc.size,
-            desc.usage
-        );
-        // TODO: Implement Vulkan buffer creation
-        anyhow::bail!("Vulkan buffer creation not yet implemented")
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for buffer creation")?;
+        let instance = self
+            .instance
+            .as_ref()
+            .context("Instance not initialized for buffer creation")?;
+
+        let buffer =
+            resources::VulkanBuffer::new(device.clone(), desc, self.physical_device, instance)?;
+
+        Ok(Box::new(buffer))
     }
 
     fn upload_to_buffer(
         &mut self,
-        _buffer: &dyn super::Buffer,
-        _data: &[u8],
-        _offset: u64,
+        buffer: &dyn super::Buffer,
+        data: &[u8],
+        offset: u64,
     ) -> Result<()> {
-        // TODO: Implement Vulkan buffer upload
-        anyhow::bail!("Vulkan buffer upload not yet implemented")
+        // Downcast to VulkanBuffer
+        let vk_buffer = buffer
+            .as_any()
+            .downcast_ref::<resources::VulkanBuffer>()
+            .context("Buffer is not a VulkanBuffer")?;
+
+        // Check size bounds
+        if offset + data.len() as u64 > buffer.size() {
+            anyhow::bail!(
+                "Upload out of bounds: offset {} + size {} > buffer size {}",
+                offset,
+                data.len(),
+                buffer.size()
+            );
+        }
+
+        match buffer.memory_location() {
+            super::MemoryLocation::CpuToGpu | super::MemoryLocation::GpuToCpu => {
+                // Direct mapping for CPU-visible buffers
+                let device = self
+                    .device
+                    .as_ref()
+                    .context("Device not initialized for buffer upload")?;
+
+                unsafe {
+                    // Map memory
+                    let ptr = device.map_memory(
+                        vk_buffer.memory,
+                        offset,
+                        data.len() as u64,
+                        vk::MemoryMapFlags::empty(),
+                    )?;
+
+                    // Copy data
+                    std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut u8, data.len());
+
+                    // Unmap memory
+                    device.unmap_memory(vk_buffer.memory);
+                }
+
+                log::trace!("Uploaded {} bytes to CPU-visible buffer", data.len());
+                Ok(())
+            }
+            super::MemoryLocation::GpuOnly => {
+                // Need staging buffer for GPU-only memory
+                let staging_desc = super::BufferDescriptor {
+                    size: data.len() as u64,
+                    usage: super::BufferUsage::staging(),
+                    memory_location: super::MemoryLocation::CpuToGpu,
+                    label: Some("Staging Buffer".to_string()),
+                };
+
+                let mut staging_buffer = self.create_buffer(&staging_desc)?;
+
+                // Upload to staging buffer
+                let staging_vk = staging_buffer
+                    .as_any_mut()
+                    .downcast_mut::<resources::VulkanBuffer>()
+                    .context("Failed to downcast staging buffer")?;
+
+                let device = self.device.as_ref().context("Device not initialized")?;
+
+                unsafe {
+                    let ptr = device.map_memory(
+                        staging_vk.memory,
+                        0,
+                        data.len() as u64,
+                        vk::MemoryMapFlags::empty(),
+                    )?;
+                    std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut u8, data.len());
+                    device.unmap_memory(staging_vk.memory);
+                }
+
+                // Copy from staging to GPU buffer
+                self.copy_buffer(
+                    staging_vk.vk_buffer(),
+                    vk_buffer.vk_buffer(),
+                    offset,
+                    data.len() as u64,
+                )?;
+
+                log::trace!(
+                    "Uploaded {} bytes to GPU-only buffer via staging",
+                    data.len()
+                );
+                Ok(())
+            }
+        }
     }
 
     fn create_texture(
         &mut self,
         desc: &super::TextureDescriptor,
     ) -> Result<Box<dyn super::Texture>> {
-        log::debug!(
-            "Creating Vulkan texture: {}x{}, format: {:?}",
-            desc.width,
-            desc.height,
-            desc.format
-        );
-        // TODO: Implement Vulkan texture creation
-        anyhow::bail!("Vulkan texture creation not yet implemented")
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for texture creation")?;
+        let instance = self
+            .instance
+            .as_ref()
+            .context("Instance not initialized for texture creation")?;
+
+        let texture =
+            resources::VulkanTexture::new(device.clone(), desc, self.physical_device, instance)?;
+
+        Ok(Box::new(texture))
     }
 
     fn upload_to_texture(
         &mut self,
-        _texture: &dyn super::Texture,
-        _data: &[u8],
-        _mip_level: u32,
+        texture: &dyn super::Texture,
+        data: &[u8],
+        mip_level: u32,
     ) -> Result<()> {
-        // TODO: Implement Vulkan texture upload
-        anyhow::bail!("Vulkan texture upload not yet implemented")
+        // Downcast to VulkanTexture
+        let vk_texture = texture
+            .as_any()
+            .downcast_ref::<resources::VulkanTexture>()
+            .context("Texture is not a VulkanTexture")?;
+
+        if mip_level >= texture.mip_levels() {
+            anyhow::bail!(
+                "Mip level {} out of range (max {})",
+                mip_level,
+                texture.mip_levels() - 1
+            );
+        }
+
+        // Calculate mip dimensions
+        let mip_width = texture.width() >> mip_level;
+        let mip_height = texture.height() >> mip_level;
+        let expected_size = (mip_width * mip_height * texture.format().bytes_per_pixel()) as usize;
+
+        if data.len() != expected_size {
+            anyhow::bail!(
+                "Data size mismatch: expected {} bytes for {}x{} texture, got {}",
+                expected_size,
+                mip_width,
+                mip_height,
+                data.len()
+            );
+        }
+
+        // Create staging buffer
+        let staging_desc = super::BufferDescriptor {
+            size: data.len() as u64,
+            usage: super::BufferUsage::staging(),
+            memory_location: super::MemoryLocation::CpuToGpu,
+            label: Some("Texture Staging Buffer".to_string()),
+        };
+
+        let mut staging_buffer = self.create_buffer(&staging_desc)?;
+
+        // Upload to staging buffer
+        let staging_vk = staging_buffer
+            .as_any_mut()
+            .downcast_mut::<resources::VulkanBuffer>()
+            .context("Failed to downcast staging buffer")?;
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        unsafe {
+            let ptr = device.map_memory(
+                staging_vk.memory,
+                0,
+                data.len() as u64,
+                vk::MemoryMapFlags::empty(),
+            )?;
+            std::ptr::copy_nonoverlapping(data.as_ptr(), ptr as *mut u8, data.len());
+            device.unmap_memory(staging_vk.memory);
+        }
+
+        // Copy from staging buffer to texture
+        self.copy_buffer_to_image(
+            staging_vk.vk_buffer(),
+            vk_texture.vk_image(),
+            mip_width,
+            mip_height,
+            mip_level,
+        )?;
+
+        log::trace!(
+            "Uploaded {} bytes to texture mip level {}",
+            data.len(),
+            mip_level
+        );
+        Ok(())
     }
 
     fn create_sampler(
         &mut self,
         desc: &super::SamplerDescriptor,
     ) -> Result<Box<dyn super::Sampler>> {
-        log::debug!(
-            "Creating Vulkan sampler: mag={:?}, min={:?}",
-            desc.mag_filter,
-            desc.min_filter
-        );
-        // TODO: Implement Vulkan sampler creation
-        anyhow::bail!("Vulkan sampler creation not yet implemented")
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for sampler creation")?;
+
+        let sampler = resources::VulkanSampler::new(device.clone(), desc)?;
+
+        Ok(Box::new(sampler))
     }
 }
 
