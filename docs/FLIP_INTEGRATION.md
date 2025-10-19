@@ -54,7 +54,7 @@ The `scripts/flip_compare.py` provides:
 2. **JSON Output**: Structured data easy to parse from Rust
 3. **Error Map Generation**: Saves perceptual difference maps with magma colormap
 4. **Flexible Parameters**: PPD, verbosity, custom output paths
-5. **Exit Codes**: 0 for pass (<0.15 mean error), 1 for fail, 2 for errors
+5. **Exit Codes**: 0 for pass (<0.10 mean error), 1 for fail, 2 for errors
 
 ### Rust Implementation
 
@@ -123,7 +123,7 @@ fn test_rendering_with_flip() {
     println!("Mean FLIP error: {:.6}", result.mean);
     
     // Assert within acceptable threshold
-    assert!(result.passes(0.15), 
+    assert!(result.passes(0.10), 
         "FLIP error too high: {:.6}", result.mean);
 }
 ```
@@ -156,16 +156,16 @@ cargo test --test visual_tests test_vulkan_vs_wgpu_flip -- --ignored --nocapture
 |-----------|----------------|----------|
 | < 0.05    | Excellent match | Same hardware, same backend |
 | < 0.10    | Good match | Different backends, expected variance |
-| < 0.15    | Acceptable | Cross-platform, different rasterization |
-| ≥ 0.15    | Significant differences | Investigate visual artifacts |
+| < 0.10    | Acceptable | Cross-platform, different rasterization |
+| ≥ 0.10    | Significant differences | Investigate visual artifacts |
 
-**CI Behavior:** CI job **fails automatically** if any comparison ≥ 0.15 mean error
+**CI Behavior:** CI job **fails automatically** if any comparison ≥ 0.10 mean error
 
 ### Understanding Results
 
 ```json
 {
-  "mean": 0.081237,      // Primary metric (target < 0.15)
+  "mean": 0.081237,      // Primary metric (target < 0.10)
   "median": 0.001462,    // Most pixels have low error
   "q1": 0.001462,        // 25% of pixels below this
   "q3": 0.001462,        // 75% of pixels below this
@@ -196,7 +196,7 @@ Different rendering backends produce slight variations due to:
 | Vulkan vs Vulkan | < 0.001 | Identical backend |
 | Vulkan vs DirectX | < 0.05 | Similar architecture |
 | Vulkan vs wgpu | < 0.10 | Abstraction layer differences |
-| wgpu vs DirectX | < 0.15 | Different underlying systems |
+| wgpu vs DirectX | < 0.10 | Different underlying systems |
 
 ## Troubleshooting
 
@@ -303,12 +303,12 @@ The actual CI workflow:
 
 ### When Visual Regression is Detected
 
-If any comparison exceeds the 0.15 threshold, CI will fail:
+If any comparison exceeds the 0.10 threshold, CI will fail:
 
 **Output:**
 ```
 ❌ Visual regression test FAILED: 1 comparison(s) exceeded threshold
-   Threshold: 0.15 mean FLIP error
+   Threshold: 0.10 mean FLIP error
    Review the HTML report for details
 ```
 

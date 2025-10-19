@@ -247,9 +247,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             <strong>FLIP Thresholds:</strong>
             <ul style="margin-left: 20px; margin-top: 5px;">
                 <li>&lt; 0.05: Excellent match (imperceptible differences)</li>
-                <li>&lt; 0.10: Good match (minor differences)</li>
-                <li>&lt; 0.15: Acceptable match (noticeable but acceptable)</li>
-                <li>≥ 0.15: Significant differences (investigation needed)</li>
+                <li>&lt; 0.10: Good match (minor differences, acceptable)</li>
+                <li>≥ 0.10: Significant differences (investigation needed)</li>
             </ul>
         </div>
         
@@ -336,10 +335,6 @@ def generate_comparison_html(comparison_name, ref_img, test_img, result):
         status = "pass"
         status_text = "GOOD"
         comparison_class = ""
-    elif mean_error < 0.15:
-        status = "warning"
-        status_text = "ACCEPTABLE"
-        comparison_class = "warning"
     else:
         status = "fail"
         status_text = "FAIL"
@@ -349,11 +344,9 @@ def generate_comparison_html(comparison_name, ref_img, test_img, result):
     if mean_error < 0.05:
         interpretation = "Images are visually identical or have imperceptible differences."
     elif mean_error < 0.10:
-        interpretation = "Images have minor differences that are barely noticeable."
-    elif mean_error < 0.15:
-        interpretation = "Images have noticeable but acceptable differences, likely due to rasterization or precision variations."
+        interpretation = "Images have minor differences that are barely noticeable. This is acceptable for cross-backend rendering."
     else:
-        interpretation = "Images have significant differences that require investigation."
+        interpretation = "Images have significant differences that require investigation. Check for rendering bugs or coordinate system issues."
     
     # Generate metrics HTML
     metrics_html = f"""
@@ -486,7 +479,7 @@ def main():
     
     # Generate summary
     total_comparisons = len(comparisons)
-    passed = sum(1 for c in comparisons if c["result"]["mean"] < 0.15)
+    passed = sum(1 for c in comparisons if c["result"]["mean"] < 0.10)  # Tightened to 0.10
     excellent = sum(1 for c in comparisons if c["result"]["mean"] < 0.05)
     
     summary_cards = f"""
@@ -495,7 +488,7 @@ def main():
             <div class="value">{total_comparisons}</div>
         </div>
         <div class="summary-card">
-            <h3>Passed (< 0.15)</h3>
+            <h3>Passed (&lt; 0.10)</h3>
             <div class="value">{passed}</div>
         </div>
         <div class="summary-card">
@@ -537,7 +530,7 @@ def main():
     
     if passed != total_comparisons:
         print(f"\n❌ Visual regression test FAILED: {total_comparisons - passed} comparison(s) exceeded threshold")
-        print(f"   Threshold: 0.15 mean FLIP error")
+        print(f"   Threshold: 0.10 mean FLIP error")
         print(f"   Review the HTML report for details")
     
     # Exit code based on results

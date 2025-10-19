@@ -32,9 +32,9 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
     
     // Hardcoded vertex colors
     float3 colors[3] = {
-        float3(1.0, 0.0, 0.0),  // Red
-        float3(0.0, 1.0, 0.0),  // Green
-        float3(0.0, 0.0, 1.0)   // Blue
+        float3(1.0, 0.0, 0.0),  // Red - bottom center (vertex 0)
+        float3(0.0, 1.0, 0.0),  // Green - top right (vertex 1)
+        float3(0.0, 0.0, 1.0)   // Blue - top left (vertex 2)
     };
     
     output.position = float4(positions[vertexID], 0.0, 1.0);
