@@ -5,10 +5,9 @@
 
 use crate::backends::{self, BackendType, GraphicsBackend};
 use crate::config::{Backend, Config};
+use crate::passes::TrianglePass;
 use crate::render_graph::{
-    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback, PassExecutionContext,
-    PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess, ResourceDescriptor,
-    SampleCount,
+    Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 use anyhow::{Context, Result};
 use winit::{
@@ -89,29 +88,8 @@ impl App {
         };
         let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
-        // Create triangle render pass
-        let mut triangle_pass =
-            RenderPass::new(graph.next_pass_id(), "triangle_pass", PassKind::Graphics);
-
-        // Output: write to color buffer
-        triangle_pass.add_output(ResourceAccess::new(
-            color_buffer,
-            AccessType::Write,
-            PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
-            Some(ImageLayout::ColorAttachment),
-        ));
-
-        // Triangle pass callback (currently just draws hardcoded triangle)
-        struct TriangleRenderCallback;
-        impl PassCallback for TriangleRenderCallback {
-            fn execute(&self, _context: &mut dyn PassExecutionContext) {
-                // Drawing is handled in backend's execute_graph for now
-                log::trace!("Triangle pass callback executed");
-            }
-        }
-
-        triangle_pass = triangle_pass.with_callback(Box::new(TriangleRenderCallback));
-        graph.add_pass(triangle_pass);
+        // Create triangle rendering pass
+        TrianglePass::new(&mut graph, color_buffer);
 
         self.render_graph = Some(graph);
         log::info!("Render graph built successfully");
