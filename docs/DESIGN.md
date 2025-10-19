@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.3.0  
-**Last Updated:** 2025-10-18  
-**Status:** Multi-Backend Complete - Planning Infrastructure & Testing Phase
+**Version:** 0.4.0  
+**Last Updated:** 2025-10-19  
+**Status:** Render Graph Foundation Complete - Planning Real Rendering Pipeline
 
 ## Project Vision
 
@@ -18,23 +18,36 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 
 ## Current State
 
-**Phase:** Foundation Complete  
-**Status:** Multi-backend triangle rendering operational
+**Phase:** Moving from Proof-of-Concept to Production-Ready  
+**Status:** Render graph architecture complete, planning real rendering pipeline
 
-### Completed
-- Repository setup with CI/CD pipeline
-- Project structure with proper module organization
-- Backend abstraction layer with trait definitions
-- Three working backends: Vulkan (primary), wgpu, DirectX 12
-- Command-line argument parsing for backend selection
-- Validation layer support across all backends
-- Triangle rendering on all backends
-- Cross-compilation setup for Windows targets
-- DirectX 12 testing via Proton on Linux
+### Completed (Foundation)
+- ✅ Repository setup with CI/CD pipeline
+- ✅ Project structure with proper module organization
+- ✅ Backend abstraction layer with trait definitions
+- ✅ Three working backends: Vulkan (primary), wgpu, DirectX 12
+- ✅ Command-line argument parsing for backend selection
+- ✅ Validation layer support across all backends
+- ✅ Render graph architecture with automatic dependency resolution
+- ✅ Render graph execution on all backends
+- ✅ Modular pass system (passes in separate files)
+- ✅ Cross-compilation setup for Windows targets
+- ✅ DirectX 12 testing via Proton on Linux
+- ✅ Headless rendering and screenshot capture
+- ✅ Visual testing infrastructure (FLIP integration)
+
+### Current Limitations (Placeholders)
+- ❌ **Triangle vertices hardcoded in shaders**
+- ❌ **No vertex/index buffer support**
+- ❌ **No texture loading or binding**
+- ❌ **No shader resource binding (descriptors/bind groups)**
+- ❌ **No model loading (glTF)**
+- ❌ **No material system**
+- ❌ **Placeholder render pass callbacks**
 
 ### In Progress
-- Milestone 5: Infrastructure improvements (offscreen rendering, visual testing)
-- Documentation organization and maintenance
+- **Milestone 8**: Real rendering pipeline (vertex buffers, textures, glTF)
+  - See `docs/M8_PLANNING.md` for detailed roadmap
 
 ### Coordinate System Handling
 All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
