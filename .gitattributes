@@ -1,0 +1,7 @@
+# Git LFS configuration for rusty_renderer
+# Reference images (baseline screenshots for visual regression testing)
+references/**/*.png filter=lfs diff=lfs merge=lfs -text
+references/**/*.exr filter=lfs diff=lfs merge=lfs -text
+# Test outputs that should be tracked with LFS
+test-output/**/*.png filter=lfs diff=lfs merge=lfs -text
+test-output/**/*.exr filter=lfs diff=lfs merge=lfs -text

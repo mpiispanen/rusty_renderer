@@ -98,7 +98,59 @@ The report includes:
 - FLIP error maps
 - Interpretation of results
 
-### batch_flip_compare.sh
+#### compare_against_baseline.py
+
+Compare test screenshots against baseline reference images.
+
+**Features:**
+- Compares current render output against known-good baselines
+- Generates HTML report with pass/fail status
+- Exits with failure if any comparison exceeds threshold
+- Shows reference, test, and error map side-by-side
+
+**Usage:**
+```bash
+# Compare test outputs against references
+python3 scripts/compare_against_baseline.py \
+  references/triangle/ \
+  test-output/ \
+  baseline-report.html
+
+# With custom threshold
+python3 scripts/compare_against_baseline.py \
+  references/triangle/ \
+  test-output/ \
+  baseline-report.html \
+  --threshold 0.10
+```
+
+**Exit Codes:**
+- `0`: All comparisons passed
+- `1`: One or more comparisons failed (exceeded threshold)
+- `2`: Error (missing files, etc.)
+
+**Output:**
+- HTML report with comparison results
+- Error maps showing where differences are
+- Pass/fail status for each backend
+- Summary statistics
+
+**Example:**
+```bash
+# After rendering new screenshots
+cargo run --release -- --backend vulkan --headless \
+  --screenshot test-output/vulkan-triangle.png
+
+# Compare against baseline
+python3 scripts/compare_against_baseline.py \
+  references/triangle/ \
+  test-output/ \
+  baseline-report.html
+
+# CI fails if mean FLIP error ≥ 0.10
+```
+
+## batch_flip_compare.sh
 
 Batch comparison script for comparing multiple images in directories.
 
