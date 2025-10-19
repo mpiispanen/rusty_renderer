@@ -640,8 +640,50 @@ impl VulkanBackend {
 
         let stages = &[vert_stage, frag_stage];
 
-        // Vertex input (none - hardcoded in shader)
-        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder();
+        // Vertex input state - configure to accept Vertex struct data (M8.2)
+        // Define vertex binding: one binding at index 0 with stride of Vertex::size()
+        let vertex_binding = vk::VertexInputBindingDescription::builder()
+            .binding(0)
+            .stride(crate::backends::Vertex::stride())
+            .input_rate(vk::VertexInputRate::VERTEX)
+            .build();
+
+        // Define vertex attributes matching our Vertex struct layout
+        let vertex_attributes = [
+            // Position: location 0, offset 0, format RGB32_SFLOAT
+            vk::VertexInputAttributeDescription::builder()
+                .binding(0)
+                .location(0)
+                .format(vk::Format::R32G32B32_SFLOAT)
+                .offset(0)
+                .build(),
+            // Normal: location 1, offset 12, format RGB32_SFLOAT
+            vk::VertexInputAttributeDescription::builder()
+                .binding(0)
+                .location(1)
+                .format(vk::Format::R32G32B32_SFLOAT)
+                .offset(12)
+                .build(),
+            // UV: location 2, offset 24, format RG32_SFLOAT
+            vk::VertexInputAttributeDescription::builder()
+                .binding(0)
+                .location(2)
+                .format(vk::Format::R32G32_SFLOAT)
+                .offset(24)
+                .build(),
+            // Color: location 3, offset 32, format RGBA32_SFLOAT
+            vk::VertexInputAttributeDescription::builder()
+                .binding(0)
+                .location(3)
+                .format(vk::Format::R32G32B32A32_SFLOAT)
+                .offset(32)
+                .build(),
+        ];
+
+        let vertex_bindings = &[vertex_binding];
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(vertex_bindings)
+            .vertex_attribute_descriptions(&vertex_attributes);
 
         // Input assembly
         let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
@@ -888,8 +930,10 @@ impl VulkanBackend {
                 self.pipeline,
             );
 
-            // Draw triangle (3 vertices, no vertex buffer - hardcoded in shader)
-            device.cmd_draw(command_buffer, 3, 1, 0, 0);
+            // NOTE: Draw call removed - now handled by render graph execution
+            // When using render graphs, execute_graph() handles command recording
+            // This function is only used for non-render-graph rendering
+            // TODO: Remove this function entirely once render graph is fully integrated
 
             device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer)?;
@@ -2671,9 +2715,13 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         buffer_ptr: *const std::ffi::c_void,
         offset: u64,
     ) -> Result<()> {
+        log::debug!("VulkanPassContext: Binding vertex buffer at binding {}, offset {}", binding, offset);
+        
         // Cast the void pointer to VulkanBuffer
         let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
         let vk_buffer = buffer_ref.handle();
+        
+        log::debug!("VulkanPassContext: Vulkan buffer handle: {:?}", vk_buffer);
 
         unsafe {
             self.device().cmd_bind_vertex_buffers(
@@ -2683,6 +2731,8 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
                 &[offset],
             );
         }
+        
+        log::debug!("VulkanPassContext: Vertex buffer bound successfully");
 
         Ok(())
     }
