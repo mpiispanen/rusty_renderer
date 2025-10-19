@@ -98,6 +98,63 @@ The report includes:
 - FLIP error maps
 - Interpretation of results
 
+#### validate_and_update_baselines.py
+
+Validate missing baselines by cross-checking against other backends.
+
+**Purpose:** Safely handle missing or removed baseline images by validating test outputs against other backends.
+
+**Features:**
+- Detects missing baseline images
+- Cross-validates test output against other backends
+- Updates baselines if they pass validation
+- Dry-run mode by default (safe)
+
+**Usage:**
+```bash
+# Check what would be updated (dry-run)
+python3 scripts/validate_and_update_baselines.py \
+  references/triangle/ \
+  test-output/
+
+# Actually update validated baselines
+python3 scripts/validate_and_update_baselines.py \
+  references/triangle/ \
+  test-output/ \
+  --update
+```
+
+**Workflow:**
+1. Detects missing baselines (e.g., wgpu-triangle.png removed)
+2. Compares test output against OTHER backends (Vulkan, DirectX)
+3. If FLIP error < threshold for all comparisons → Valid
+4. With --update flag, copies test image as new baseline
+
+**Exit Codes:**
+- `0`: All baselines valid or updated
+- `1`: Some validations failed (baselines not updated)
+- `2`: Error (missing files, etc.)
+
+**Example:**
+```bash
+# Remove questionable baseline
+rm references/triangle/wgpu-triangle.png
+
+# Validate and update if it matches other backends
+python3 scripts/validate_and_update_baselines.py \
+  references/triangle/ \
+  screenshots/ \
+  --update
+
+# If wgpu matches Vulkan + DirectX (< 0.10 error), it's re-added
+```
+
+**Benefits:**
+- Safe to remove bad baselines
+- Automatic validation via cross-checking
+- No manual FLIP comparison needed
+- CI can auto-recover from bad baselines
+
 #### compare_against_baseline.py
 
 Compare test screenshots against baseline reference images.

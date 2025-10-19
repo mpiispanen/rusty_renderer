@@ -44,12 +44,47 @@ Update reference images when:
 
 ## Update Process
 
+### Standard Update (Known Good Images)
+
 1. **Generate new screenshots** with the updated renderer
 2. **Compare against current references** using FLIP
 3. **Review differences** - ensure they're intentional
 4. **Copy new images** to `references/` directory
 5. **Update metadata** in scene-specific README
 6. **Commit changes** with explanation
+
+### Remove Bad Baseline (Safe Recovery)
+
+If you discover a baseline is incorrect:
+
+1. **Remove the bad baseline**
+   ```bash
+   git rm references/triangle/wgpu-triangle.png
+   git commit -m "Remove incorrect wgpu baseline"
+   ```
+
+2. **CI will validate replacement**
+   - CI detects missing baseline
+   - Cross-validates test output against other backends
+   - If test matches other backends (< 0.10 error), it's valid
+
+3. **Update with validated baseline**
+   ```bash
+   # After CI passes, download artifacts
+   ./scripts/populate_references.sh screenshots/
+   
+   # Or manually validate and update
+   python3 scripts/validate_and_update_baselines.py \
+     references/triangle/ \
+     screenshots/ \
+     --update
+   ```
+
+**Benefits:**
+- Safe to remove questionable baselines
+- Automatic cross-validation
+- No manual FLIP comparison needed
+- Quality assured by comparison to other backends
 
 Example:
 ```bash

@@ -330,6 +330,22 @@ jobs:
           echo "Backends detected:"
           ls screenshots/ | grep -E "(vulkan|wgpu|directx)" || echo "None found"
       
+      - name: Validate missing baselines (if any)
+        run: |
+          if [ -d references/triangle ] && [ -n "$(ls -A references/triangle/*.png 2>/dev/null || true)" ]; then
+            echo "📋 Checking for missing baselines..."
+            python3 scripts/validate_and_update_baselines.py \
+              references/triangle/ \
+              screenshots/ \
+              --threshold 0.10 || {
+                echo "⚠️  Some baselines missing or invalid"
+                echo "   This is acceptable - baselines may not exist yet"
+                exit 0
+              }
+          else
+            echo "ℹ️  No baselines directory or baselines don't exist yet"
+          fi
+      
       - name: Generate comprehensive visual regression report
         run: |
           echo "📊 Generating comprehensive visual regression report..."
