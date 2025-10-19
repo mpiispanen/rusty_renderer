@@ -23,7 +23,7 @@ fn test_vulkan_validation_enabled() {
 
     // Should not panic with validation enabled
     let result = backends::create_backend(backends::BackendType::Vulkan, config.debug);
-    
+
     match result {
         Ok(_) => {
             // Validation layers successfully enabled
@@ -33,7 +33,9 @@ fn test_vulkan_validation_enabled() {
             let err_msg = e.to_string();
             // Check if it's a validation layer availability issue
             if err_msg.contains("validation") || err_msg.contains("VK_LAYER") {
-                println!("⚠ Vulkan validation layers not available (expected in some CI environments)");
+                println!(
+                    "⚠ Vulkan validation layers not available (expected in some CI environments)"
+                );
                 println!("   Error: {}", err_msg);
             } else {
                 panic!("Unexpected error: {}", e);
@@ -88,7 +90,7 @@ fn test_wgpu_validation_enabled() {
         result.is_ok(),
         "wgpu backend with validation should initialize successfully"
     );
-    
+
     println!("✅ wgpu validation/debug mode enabled successfully");
 }
 
@@ -133,7 +135,7 @@ fn test_directx_validation_enabled() {
     };
 
     let result = backends::create_backend(backends::BackendType::DirectX12, config.debug);
-    
+
     match result {
         Ok(_) => {
             println!("✅ DirectX 12 debug layer enabled successfully");
@@ -208,5 +210,8 @@ fn test_validation_flag_consistency() {
     };
 
     assert!(config_debug.debug, "Debug config should have debug=true");
-    assert!(!config_no_debug.debug, "Non-debug config should have debug=false");
+    assert!(
+        !config_no_debug.debug,
+        "Non-debug config should have debug=false"
+    );
 }
