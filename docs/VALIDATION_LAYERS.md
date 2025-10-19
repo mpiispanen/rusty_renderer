@@ -118,6 +118,24 @@ For CI testing, validation layers can be selectively enabled:
 - run: cargo run -- --max-frames 100
 ```
 
+### Automated Validation Testing
+
+The project includes automated tests for validation layers in `tests/validation_tests.rs`:
+
+```bash
+# Run validation layer tests
+cargo test --test validation_tests
+
+# Run with output to see validation status
+cargo test --test validation_tests -- --nocapture
+```
+
+**Tests cover:**
+- ✅ Vulkan validation layer enabling/disabling
+- ✅ wgpu validation flag functionality
+- ✅ DirectX debug layer enabling/disabling (Windows)
+- ✅ Configuration flag consistency
+
 ## Troubleshooting
 
 ### Vulkan: "Validation layers requested but not available"
