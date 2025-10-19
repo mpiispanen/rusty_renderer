@@ -1020,6 +1020,160 @@ impl DirectXBackendImpl {
         &self.swapchain_wrapper
     }
 
+    /// Execute a compiled render graph
+    pub fn execute_graph(
+        &mut self,
+        graph: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
+        use crate::render_graph::*;
+
+        log::debug!(
+            "Executing render graph with {} passes, {} barriers",
+            graph.execution_order.len(),
+            graph.barriers.len()
+        );
+
+        unsafe {
+            let device = self.device.as_ref().context("Device not initialized")?;
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("Command list not initialized")?;
+            let root_signature = self
+                .root_signature
+                .as_ref()
+                .context("Root signature not initialized")?;
+            let pipeline_state = self
+                .pipeline_state
+                .as_ref()
+                .context("Pipeline state not initialized")?;
+
+            // Get render target
+            let render_target = if self.headless {
+                self.offscreen_render_target
+                    .as_ref()
+                    .context("Offscreen render target not initialized")?
+            } else {
+                &self.render_targets[self.frame_index as usize]
+            };
+
+            // Get RTV handle
+            let rtv_handle = self.get_render_target_view()?;
+
+            // Transition to render target state
+            if !self.headless {
+                let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
+                    pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                    Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                    StateBefore: D3D12_RESOURCE_STATE_PRESENT,
+                    StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                };
+
+                let barrier = D3D12_RESOURCE_BARRIER {
+                    Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                    Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                    Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                        Transition: std::mem::ManuallyDrop::new(transition_to_rt),
+                    },
+                };
+
+                command_list.ResourceBarrier(&[barrier]);
+            }
+
+            // Clear render target
+            let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
+            command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
+
+            // Set render target
+            command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, None);
+
+            // Set viewport and scissor
+            let viewport = D3D12_VIEWPORT {
+                TopLeftX: 0.0,
+                TopLeftY: 0.0,
+                Width: self.width as f32,
+                Height: self.height as f32,
+                MinDepth: 0.0,
+                MaxDepth: 1.0,
+            };
+            command_list.RSSetViewports(&[viewport]);
+
+            let scissor = RECT {
+                left: 0,
+                top: 0,
+                right: self.width as i32,
+                bottom: self.height as i32,
+            };
+            command_list.RSSetScissorRects(&[scissor]);
+
+            // Set pipeline state
+            command_list.SetGraphicsRootSignature(root_signature);
+            command_list.SetPipelineState(pipeline_state);
+            command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            // Execute passes in order
+            for pass_id in &graph.execution_order {
+                log::debug!("Executing pass: {pass_id:?}");
+
+                // Find and apply barriers before this pass
+                for barrier in &graph.barriers {
+                    if barrier.dst_pass == *pass_id {
+                        self.insert_dx12_barrier(command_list, barrier, render_target)?;
+                    }
+                }
+
+                // Execute pass callback
+                // For now, since triangle is hardcoded in shaders, just draw
+                command_list.DrawInstanced(3, 1, 0, 0);
+            }
+
+            // Transition back to present (windowed mode only)
+            if !self.headless {
+                let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
+                    pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
+                    Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                    StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    StateAfter: D3D12_RESOURCE_STATE_PRESENT,
+                };
+
+                let barrier = D3D12_RESOURCE_BARRIER {
+                    Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                    Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                    Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                        Transition: std::mem::ManuallyDrop::new(transition_to_present),
+                    },
+                };
+
+                command_list.ResourceBarrier(&[barrier]);
+            }
+
+            log::debug!("Render graph execution complete");
+            Ok(())
+        }
+    }
+
+    /// Insert DirectX 12 barriers from render graph barrier
+    fn insert_dx12_barrier(
+        &self,
+        command_list: &ID3D12GraphicsCommandList,
+        _barrier: &crate::render_graph::Barrier,
+        _resource: &ID3D12Resource,
+    ) -> Result<()> {
+        // DirectX 12 barrier translation
+        // For now, barriers are handled by the main graph execution
+        // In a full implementation, we would translate:
+        // - ImageBarrier -> D3D12_RESOURCE_TRANSITION_BARRIER
+        // - MemoryBarrier -> D3D12_RESOURCE_UAV_BARRIER
+        // - Access flags -> D3D12_RESOURCE_STATES
+
+        // Since we're doing simple render target transitions in execute_graph,
+        // we don't need additional barriers for the triangle demo
+        unsafe {
+            let _ = command_list;
+        }
+        Ok(())
+    }
+
     // Headless mode helper methods
 
     /// Create offscreen render target for headless mode

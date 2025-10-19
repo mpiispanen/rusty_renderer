@@ -172,6 +172,18 @@ impl GraphicsBackend for DirectXBackend {
             &self.swapchain
         }
     }
+
+    fn execute_graph(&mut self, _graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.execute_graph(_graph)
+        }
+
+        #[cfg(not(windows))]
+        {
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
 }
 
 // Stub implementations for non-Windows platforms
