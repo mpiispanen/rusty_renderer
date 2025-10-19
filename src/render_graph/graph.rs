@@ -349,7 +349,7 @@ impl Default for RenderGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render_graph::pass::{AccessType, PassKind, PipelineStage, ResourceAccess};
+    use crate::render_graph::pass::{PassKind, PipelineStage, ResourceAccess};
     use crate::render_graph::resource::{Extent3D, Format, ImageUsageFlags, SampleCount};
 
     #[test]

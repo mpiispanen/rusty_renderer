@@ -36,9 +36,9 @@ fn test_vulkan_validation_enabled() {
                 println!(
                     "⚠ Vulkan validation layers not available (expected in some CI environments)"
                 );
-                println!("   Error: {}", err_msg);
+                println!("   Error: {err_msg}");
             } else {
-                panic!("Unexpected error: {}", e);
+                panic!("Unexpected error: {e}");
             }
         }
     }
