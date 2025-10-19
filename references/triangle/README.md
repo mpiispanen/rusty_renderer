@@ -1,6 +1,7 @@
 # Triangle Scene Reference Images
 
 **Created:** 2025-10-19  
+**CI Run:** #18631957918  
 **Scene:** Basic RGB colored triangle  
 **Resolution:** 1280x720  
 **Purpose:** Baseline test for visual regression
@@ -18,23 +19,26 @@ This is the fundamental test case for ensuring consistent rendering across all b
 
 ### Vulkan (vulkan-triangle.png)
 - **Backend:** Vulkan 1.3
-- **Driver:** Mesa lavapipe (software renderer)
+- **Driver:** Mesa lavapipe 24.0.9 (software renderer)
 - **Platform:** Ubuntu 24.04 (GitHub Actions)
-- **Created:** 2025-10-19
+- **Created:** 2025-10-19 from CI run #18631957918
+- **Size:** 132 KB
 - **Notes:** Reference backend - all others are compared to this
 
 ### wgpu (wgpu-triangle.png)
 - **Backend:** wgpu 0.18
 - **Underlying API:** Vulkan
 - **Platform:** Ubuntu 24.04 (GitHub Actions)
-- **Created:** 2025-10-19
+- **Created:** 2025-10-19 from CI run #18631957918
+- **Size:** 138 KB
 - **Notes:** Minor differences due to shader pipeline
 
 ### DirectX 12 (directx-triangle.png)
 - **Backend:** DirectX 12
 - **Driver:** WARP (software renderer)
 - **Platform:** Windows Server 2022 (GitHub Actions)
-- **Created:** 2025-10-19
+- **Created:** 2025-10-19 from CI run #18631957918
+- **Size:** 132 KB
 - **Notes:** Y-axis flipped in shader to match Vulkan output
 
 ## Expected FLIP Errors
@@ -51,4 +55,8 @@ When comparing against these baselines:
 
 ## Update History
 
-- **2025-10-19:** Initial baseline images created from CI run
+- **2025-10-19:** Initial baseline images created from CI run #18631957918
+  - All coordinate system fixes applied
+  - DirectX Y-axis correction implemented
+  - Threshold tightened to 0.10
+  - All backends rendering correctly
