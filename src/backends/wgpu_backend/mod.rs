@@ -553,6 +553,108 @@ impl GraphicsBackend for WgpuBackend {
     fn swapchain(&self) -> &dyn Swapchain {
         &self.swapchain_wrapper
     }
+
+    fn execute_graph(&mut self, graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for graph execution")?;
+        let queue = self
+            .queue
+            .as_ref()
+            .context("Queue not initialized for graph execution")?;
+
+        log::debug!(
+            "Executing render graph with {} passes, {} barriers",
+            graph.execution_order.len(),
+            graph.barriers.len()
+        );
+
+        // Create command encoder
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Graph Encoder"),
+        });
+
+        // Get the render target (surface texture or offscreen)
+        let surface_texture = if !self.headless {
+            // Get surface texture
+            let surface = self.surface.as_ref().context("Surface not initialized")?;
+            Some(
+                surface
+                    .get_current_texture()
+                    .context("Failed to get current surface texture")?,
+            )
+        } else {
+            None
+        };
+
+        // Create a view from surface texture if windowed
+        let surface_view = surface_texture.as_ref().map(|texture| {
+            texture
+                .texture
+                .create_view(&wgpu::TextureViewDescriptor::default())
+        });
+
+        // Get the view to render to
+        let view = if let Some(ref view) = surface_view {
+            view
+        } else {
+            self.offscreen_view
+                .as_ref()
+                .context("Offscreen view not initialized")?
+        };
+
+        // Begin render pass
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Graph Pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.0,
+                            b: 0.0,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: None,
+                timestamp_writes: None,
+                occlusion_query_set: None,
+            });
+
+            // Bind pipeline
+            if let Some(pipeline) = &self.render_pipeline {
+                render_pass.set_pipeline(pipeline);
+            }
+
+            // Execute passes in order
+            for pass_id in &graph.execution_order {
+                log::debug!("Executing pass: {pass_id:?}");
+
+                // wgpu handles barriers automatically through resource state tracking
+                // We don't need to insert explicit barriers like Vulkan
+
+                // Execute pass callback
+                // For now, since triangle is hardcoded in shaders, just draw
+                render_pass.draw(0..3, 0..1);
+            }
+        }
+
+        // Submit commands
+        queue.submit(Some(encoder.finish()));
+
+        // Present if not headless
+        if let Some(texture) = surface_texture {
+            texture.present();
+        }
+
+        log::debug!("Render graph execution complete");
+        Ok(())
+    }
 }
 
 /// Stub Device implementation
