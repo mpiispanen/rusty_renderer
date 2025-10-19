@@ -5,6 +5,11 @@
 
 use crate::backends::{self, BackendType, GraphicsBackend};
 use crate::config::{Backend, Config};
+use crate::render_graph::{
+    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback, PassExecutionContext,
+    PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess, ResourceDescriptor,
+    SampleCount,
+};
 use anyhow::{Context, Result};
 use winit::{
     application::ApplicationHandler,
@@ -19,6 +24,8 @@ pub struct App {
     backend: Option<Box<dyn GraphicsBackend>>,
     config: Config,
     frame_count: u64,
+    render_graph: Option<RenderGraph>,
+    use_render_graph: bool, // Feature flag to enable/disable graph rendering
 }
 
 impl App {
@@ -65,7 +72,52 @@ impl App {
             backend: Some(backend),
             config,
             frame_count: 0,
+            render_graph: None,
+            use_render_graph: true, // Enable render graph by default
         })
+    }
+
+    /// Build the render graph for triangle rendering
+    fn build_render_graph(&mut self) -> Result<()> {
+        let (width, height) = self.config.window_size();
+        let mut graph = RenderGraph::new();
+
+        // Create color buffer resource (represents swapchain image)
+        let color_desc = ResourceDescriptor::Image {
+            format: Format::Bgra8Unorm, // Common swapchain format
+            extent: Extent3D::new_2d(width, height),
+            usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
+            samples: SampleCount::One,
+        };
+        let color_buffer = graph.create_resource("swapchain_image", color_desc);
+
+        // Create triangle render pass
+        let mut triangle_pass =
+            RenderPass::new(graph.next_pass_id(), "triangle_pass", PassKind::Graphics);
+
+        // Output: write to color buffer
+        triangle_pass.add_output(ResourceAccess::new(
+            color_buffer,
+            AccessType::Write,
+            PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
+            Some(ImageLayout::ColorAttachment),
+        ));
+
+        // Triangle pass callback (currently just draws hardcoded triangle)
+        struct TriangleRenderCallback;
+        impl PassCallback for TriangleRenderCallback {
+            fn execute(&self, _context: &mut dyn PassExecutionContext) {
+                // Drawing is handled in backend's execute_graph for now
+                log::trace!("Triangle pass callback executed");
+            }
+        }
+
+        triangle_pass = triangle_pass.with_callback(Box::new(TriangleRenderCallback));
+        graph.add_pass(triangle_pass);
+
+        self.render_graph = Some(graph);
+        log::info!("Render graph built successfully");
+        Ok(())
     }
 
     /// Run the application in headless mode (no window)
@@ -75,18 +127,39 @@ impl App {
         let max_frames = self.config.max_frames.unwrap_or(10);
         log::info!("Will render {max_frames} frames");
 
+        // Build render graph if enabled
+        if self.use_render_graph {
+            self.build_render_graph()?;
+        }
+
         // Determine screenshot mode
         let screenshot_interval = self.config.screenshot_interval;
         let capture_sequence = screenshot_interval > 0 && self.config.screenshot.is_some();
 
         if capture_sequence {
-            log::info!("Will capture screenshots every {screenshot_interval} frames",);
+            log::info!("Will capture screenshots every {screenshot_interval} frames");
         }
 
         while self.frame_count < max_frames {
             if let Some(backend) = &mut self.backend {
-                backend.begin_frame()?;
-                backend.end_frame()?;
+                // Use render graph if available, otherwise use direct rendering
+                if self.use_render_graph && self.render_graph.is_some() {
+                    // Compile graph (could be cached for multiple frames)
+                    let mut graph = self.render_graph.take().unwrap();
+                    let compiled = graph.compile()?;
+
+                    backend.begin_frame()?;
+                    backend.execute_graph(&compiled)?;
+                    backend.end_frame()?;
+
+                    // Put graph back
+                    self.render_graph = Some(graph);
+                } else {
+                    // Direct rendering (legacy path)
+                    backend.begin_frame()?;
+                    backend.end_frame()?;
+                }
+
                 self.frame_count += 1;
 
                 if self.frame_count.is_multiple_of(100) {
@@ -218,6 +291,15 @@ impl ApplicationHandler for App {
                         log::info!("Backend initialized successfully");
                     }
 
+                    // Build render graph if enabled
+                    if self.use_render_graph {
+                        if let Err(e) = self.build_render_graph() {
+                            log::error!("Failed to build render graph: {e}");
+                            event_loop.exit();
+                            return;
+                        }
+                    }
+
                     // Request initial redraw
                     window.request_redraw();
 
@@ -286,14 +368,49 @@ impl ApplicationHandler for App {
             WindowEvent::RedrawRequested => {
                 // Render a frame
                 if let Some(backend) = &mut self.backend {
-                    if let Err(e) = backend.begin_frame() {
-                        log::error!("Failed to begin frame: {e}");
-                        return;
-                    }
+                    // Use render graph if available
+                    if self.use_render_graph && self.render_graph.is_some() {
+                        // Compile graph (could be cached)
+                        let mut graph = self.render_graph.take().unwrap();
+                        let compiled = match graph.compile() {
+                            Ok(c) => c,
+                            Err(e) => {
+                                log::error!("Failed to compile render graph: {e}");
+                                self.render_graph = Some(graph);
+                                return;
+                            }
+                        };
 
-                    if let Err(e) = backend.end_frame() {
-                        log::error!("Failed to end frame: {e}");
-                        return;
+                        if let Err(e) = backend.begin_frame() {
+                            log::error!("Failed to begin frame: {e}");
+                            self.render_graph = Some(graph);
+                            return;
+                        }
+
+                        if let Err(e) = backend.execute_graph(&compiled) {
+                            log::error!("Failed to execute render graph: {e}");
+                            self.render_graph = Some(graph);
+                            return;
+                        }
+
+                        if let Err(e) = backend.end_frame() {
+                            log::error!("Failed to end frame: {e}");
+                            self.render_graph = Some(graph);
+                            return;
+                        }
+
+                        self.render_graph = Some(graph);
+                    } else {
+                        // Direct rendering (legacy path)
+                        if let Err(e) = backend.begin_frame() {
+                            log::error!("Failed to begin frame: {e}");
+                            return;
+                        }
+
+                        if let Err(e) = backend.end_frame() {
+                            log::error!("Failed to end frame: {e}");
+                            return;
+                        }
                     }
                 }
 
