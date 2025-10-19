@@ -260,6 +260,57 @@ pub trait GraphicsBackend: Send + Sync {
     /// A boxed Sampler trait object
     fn create_sampler(&mut self, desc: &SamplerDescriptor) -> Result<Box<dyn Sampler>>;
 
+    // Shader Resource Binding (M8.3)
+
+    /// Create a bind group layout
+    ///
+    /// Creates a layout describing a set of shader bindings. This layout
+    /// is used to create bind groups and must match the shader's expectations.
+    ///
+    /// # Arguments
+    /// * `layout` - The bind group layout descriptor
+    ///
+    /// # Returns
+    /// An opaque handle to the bind group layout
+    ///
+    /// # Note
+    /// The returned handle is backend-specific and should be passed to `create_bind_group`
+    fn create_bind_group_layout(&mut self, layout: &BindGroupLayout) -> Result<usize> {
+        // Default implementation for backends that don't support this yet
+        let _ = layout;
+        Err(anyhow::anyhow!(
+            "Bind group layouts not yet implemented for {} backend",
+            self.backend_type()
+        ))
+    }
+
+    /// Create a bind group
+    ///
+    /// Creates a bind group that binds actual resources to the slots described
+    /// by a bind group layout.
+    ///
+    /// # Arguments
+    /// * `layout_handle` - Handle returned from `create_bind_group_layout`
+    /// * `bind_group` - The bind group with bound resources
+    ///
+    /// # Returns
+    /// An opaque handle to the bind group
+    ///
+    /// # Note
+    /// The returned handle should be passed to render commands to bind resources
+    fn create_bind_group(
+        &mut self,
+        layout_handle: usize,
+        bind_group: &BindGroup,
+    ) -> Result<usize> {
+        // Default implementation for backends that don't support this yet
+        let _ = (layout_handle, bind_group);
+        Err(anyhow::anyhow!(
+            "Bind groups not yet implemented for {} backend",
+            self.backend_type()
+        ))
+    }
+
     // Vertex/Index Buffer Rendering (M8.2)
 
     /// Bind a vertex buffer for rendering

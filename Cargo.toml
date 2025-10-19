@@ -40,6 +40,7 @@ vulkanalia = { version = "0.31", features = ["libloading", "window"] }
 # wgpu for cross-platform rendering (M4)
 wgpu = "23.0"
 pollster = "0.3"  # For blocking on async operations
+glam = { version = "0.30.8", features = ["bytemuck"] }
 
 # DirectX 12 bindings (M4, Windows only)
 [target.'cfg(windows)'.dependencies]

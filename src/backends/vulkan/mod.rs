@@ -6,6 +6,7 @@
 
 mod resources;
 mod shaders;
+mod descriptor;
 
 use super::*;
 use anyhow::{Context, Result};
@@ -75,6 +76,11 @@ pub struct VulkanBackend {
     offscreen_image_memory: vk::DeviceMemory,
     offscreen_image_view: vk::ImageView,
 
+    // Shader resource binding (M8.3)
+    descriptor_pool_manager: Option<descriptor::DescriptorPoolManager>,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
+    descriptor_sets: Vec<vk::DescriptorSet>,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -124,6 +130,9 @@ impl VulkanBackend {
             offscreen_image: vk::Image::null(),
             offscreen_image_memory: vk::DeviceMemory::null(),
             offscreen_image_view: vk::ImageView::null(),
+            descriptor_pool_manager: None,
+            descriptor_set_layouts: vec![],
+            descriptor_sets: vec![],
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -362,10 +371,13 @@ impl VulkanBackend {
         log::info!("Graphics queue family: {}", indices.graphics);
         log::info!("Present queue family: {}", indices.present);
 
-        self.device = Some(device);
+        self.device = Some(device.clone());
         self.graphics_queue = graphics_queue;
         self.present_queue = present_queue;
         self.graphics_queue_family = indices.graphics; // Store for command pool creation
+
+        // Initialize descriptor pool manager
+        self.descriptor_pool_manager = Some(descriptor::DescriptorPoolManager::new(device));
 
         // Clean up temporary surface
         unsafe {
@@ -1098,10 +1110,13 @@ impl VulkanBackend {
         // Get queue handle
         let graphics_queue = unsafe { device.get_device_queue(graphics_family, 0) };
 
-        self.device = Some(device);
+        self.device = Some(device.clone());
         self.graphics_queue = graphics_queue;
         self.present_queue = graphics_queue; // Same as graphics in headless
         self.graphics_queue_family = graphics_family; // Store for command pool creation
+
+        // Initialize descriptor pool manager
+        self.descriptor_pool_manager = Some(descriptor::DescriptorPoolManager::new(device));
 
         log::info!("Logical device created (headless mode)");
         Ok(())
@@ -2145,6 +2160,21 @@ impl GraphicsBackend for VulkanBackend {
                 }
             }
 
+            // Clean up descriptor resources (M8.3)
+            if let Some(device) = &self.device {
+                // Destroy descriptor set layouts
+                for layout in &self.descriptor_set_layouts {
+                    device.destroy_descriptor_set_layout(*layout, None);
+                }
+                self.descriptor_set_layouts.clear();
+                self.descriptor_sets.clear();
+            }
+
+            // Destroy descriptor pool manager
+            if let Some(mut pool_manager) = self.descriptor_pool_manager.take() {
+                pool_manager.destroy();
+            }
+
             // Destroy logical device
             if let Some(device) = &self.device {
                 device.destroy_device(None);
@@ -2492,6 +2522,53 @@ impl GraphicsBackend for VulkanBackend {
         let sampler = resources::VulkanSampler::new(device.clone(), desc)?;
 
         Ok(Box::new(sampler))
+    }
+
+    // Shader Resource Binding (M8.3)
+
+    fn create_bind_group_layout(&mut self, layout: &BindGroupLayout) -> Result<usize> {
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for bind group layout creation")?;
+
+        let vk_layout = descriptor::create_descriptor_set_layout(device, layout)?;
+        
+        self.descriptor_set_layouts.push(vk_layout);
+        let handle = self.descriptor_set_layouts.len() - 1;
+        
+        log::debug!("Created descriptor set layout with handle {}", handle);
+        Ok(handle)
+    }
+
+    fn create_bind_group(&mut self, layout_handle: usize, bind_group: &BindGroup) -> Result<usize> {
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for bind group creation")?;
+
+        let pool_manager = self
+            .descriptor_pool_manager
+            .as_mut()
+            .context("Descriptor pool manager not initialized")?;
+
+        // Get the layout
+        let layout = self
+            .descriptor_set_layouts
+            .get(layout_handle)
+            .context("Invalid bind group layout handle")?;
+
+        // Allocate descriptor set
+        let descriptor_set = pool_manager.allocate(*layout)?;
+
+        // Update descriptor set with bound resources
+        descriptor::update_descriptor_set(device, descriptor_set, bind_group)?;
+
+        self.descriptor_sets.push(descriptor_set);
+        let handle = self.descriptor_sets.len() - 1;
+
+        log::debug!("Created descriptor set with handle {}", handle);
+        Ok(handle)
     }
 
     // Vertex/Index Buffer Rendering (M8.2)
