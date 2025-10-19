@@ -2715,13 +2715,13 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         buffer_ptr: *const std::ffi::c_void,
         offset: u64,
     ) -> Result<()> {
-        log::debug!("VulkanPassContext: Binding vertex buffer at binding {}, offset {}", binding, offset);
+        log::debug!("VulkanPassContext: Binding vertex buffer at binding {binding}, offset {offset}");
         
         // Cast the void pointer to VulkanBuffer
         let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
         let vk_buffer = buffer_ref.handle();
         
-        log::debug!("VulkanPassContext: Vulkan buffer handle: {:?}", vk_buffer);
+        log::debug!("VulkanPassContext: Vulkan buffer handle: {vk_buffer:?}");
 
         unsafe {
             self.device().cmd_bind_vertex_buffers(

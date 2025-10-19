@@ -28,13 +28,13 @@ impl PassCallback for VertexBufferTrianglePass {
 
         // Bind the vertex buffer
         if let Err(e) = context.bind_vertex_buffer(0, self.vertex_buffer_ptr, 0) {
-            log::error!("Failed to bind vertex buffer: {}", e);
+            log::error!("Failed to bind vertex buffer: {e}");
             return;
         }
 
         // Draw 3 vertices (triangle), 1 instance
         if let Err(e) = context.draw(3, 1, 0, 0) {
-            log::error!("Failed to draw triangle: {}", e);
+            log::error!("Failed to draw triangle: {e}");
             return;
         }
 
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
         })
         .unwrap_or(BackendType::Vulkan);
 
-    println!("Using backend: {}", backend_type);
+    println!("Using backend: {backend_type}");
 
     // Create backend
     let mut backend = create_backend(backend_type, true)?;
@@ -182,7 +182,7 @@ fn main() -> Result<()> {
         height,
         image::ColorType::Rgba8,
     )?;
-    println!("Saved to: {}", output_path);
+    println!("Saved to: {output_path}");
 
     // Cleanup
     backend.cleanup();

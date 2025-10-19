@@ -76,7 +76,7 @@ impl PassCallback for TrianglePassCallback {
         
         // Draw 3 vertices (triangle) with 1 instance
         if let Err(e) = context.draw(3, 1, 0, 0) {
-            log::error!("Failed to draw triangle: {}", e);
+            log::error!("Failed to draw triangle: {e}");
         }
         
         log::trace!("Triangle pass callback executed");

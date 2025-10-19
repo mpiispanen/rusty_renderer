@@ -121,6 +121,41 @@ fn main() -> anyhow::Result<()> {
                     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
                         self
                     }
+                    fn bind_vertex_buffer(
+                        &mut self,
+                        _binding: u32,
+                        _buffer_ptr: *const std::ffi::c_void,
+                        _offset: u64,
+                    ) -> anyhow::Result<()> {
+                        Ok(())
+                    }
+                    fn bind_index_buffer(
+                        &mut self,
+                        _buffer_ptr: *const std::ffi::c_void,
+                        _offset: u64,
+                        _index_type: rusty_renderer::render_graph::IndexType,
+                    ) -> anyhow::Result<()> {
+                        Ok(())
+                    }
+                    fn draw(
+                        &mut self,
+                        _vertex_count: u32,
+                        _instance_count: u32,
+                        _first_vertex: u32,
+                        _first_instance: u32,
+                    ) -> anyhow::Result<()> {
+                        Ok(())
+                    }
+                    fn draw_indexed(
+                        &mut self,
+                        _index_count: u32,
+                        _instance_count: u32,
+                        _first_index: u32,
+                        _vertex_offset: i32,
+                        _first_instance: u32,
+                    ) -> anyhow::Result<()> {
+                        Ok(())
+                    }
                 }
                 let mut ctx = DummyContext;
                 callback.execute(&mut ctx);
