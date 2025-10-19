@@ -4,4 +4,10 @@
 //! manages dependencies between render passes, resource lifetimes, and barrier
 //! insertion for optimal GPU performance.
 
-// Render graph implementation will be added in Milestone 5
+mod graph;
+mod pass;
+mod resource;
+
+pub use graph::RenderGraph;
+pub use pass::{PassCallback, PassKind, RenderPass};
+pub use resource::{Resource, ResourceDescriptor, ResourceKind, ResourceLifetime};

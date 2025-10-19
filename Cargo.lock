@@ -2147,6 +2147,7 @@ dependencies = [
  "log",
  "pollster",
  "serde_json",
+ "thiserror",
  "vulkanalia",
  "wgpu",
  "windows",
