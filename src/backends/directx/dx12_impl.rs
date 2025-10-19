@@ -23,10 +23,11 @@ VSOutput VSMain(uint vertexID : SV_VertexID) {
     VSOutput output;
     
     // Hardcoded triangle vertices (NDC coordinates)
+    // DirectX uses Y-down, so we flip Y coordinates from Vulkan's Y-up
     float2 positions[3] = {
-        float2(0.0, -0.5),   // Bottom center
-        float2(0.5, 0.5),    // Top right
-        float2(-0.5, 0.5)    // Top left
+        float2(0.0, 0.5),    // Bottom center (flipped from -0.5)
+        float2(0.5, -0.5),   // Top right (flipped from 0.5)
+        float2(-0.5, -0.5)   // Top left (flipped from 0.5)
     };
     
     // Hardcoded vertex colors
