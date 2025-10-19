@@ -1047,20 +1047,29 @@ impl DirectXBackendImpl {
                 .pipeline_state
                 .as_ref()
                 .context("Pipeline state not initialized")?;
+            let rtv_heap = self.rtv_heap.as_ref().context("RTV heap not initialized")?;
 
-            // Get render target
-            let render_target = if self.headless {
-                self.offscreen_render_target
+            // Get render target and RTV handle
+            let (render_target, rtv_handle) = if self.headless {
+                // Headless: use single offscreen target
+                let resource = self
+                    .offscreen_resource
                     .as_ref()
-                    .context("Offscreen render target not initialized")?
+                    .context("Offscreen resource not initialized")?;
+                let handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
+                (resource, handle)
             } else {
-                &self.render_targets[self.frame_index as usize]
+                // Windowed: use current frame's swapchain target
+                let resource = &self.render_targets[self.frame_index as usize];
+                let handle_base = rtv_heap.GetCPUDescriptorHandleForHeapStart();
+                let handle = D3D12_CPU_DESCRIPTOR_HANDLE {
+                    ptr: handle_base.ptr
+                        + (self.frame_index as usize * self.rtv_descriptor_size as usize),
+                };
+                (resource, handle)
             };
 
-            // Get RTV handle
-            let rtv_handle = self.get_render_target_view()?;
-
-            // Transition to render target state
+            // Transition to render target state (windowed only)
             if !self.headless {
                 let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
                     pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
@@ -1155,7 +1164,7 @@ impl DirectXBackendImpl {
     /// Insert DirectX 12 barriers from render graph barrier
     fn insert_dx12_barrier(
         &self,
-        command_list: &ID3D12GraphicsCommandList,
+        _command_list: &ID3D12GraphicsCommandList,
         _barrier: &crate::render_graph::Barrier,
         _resource: &ID3D12Resource,
     ) -> Result<()> {
@@ -1168,9 +1177,6 @@ impl DirectXBackendImpl {
 
         // Since we're doing simple render target transitions in execute_graph,
         // we don't need additional barriers for the triangle demo
-        unsafe {
-            let _ = command_list;
-        }
         Ok(())
     }
 
