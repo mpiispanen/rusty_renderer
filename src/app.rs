@@ -88,8 +88,9 @@ impl App {
         };
         let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
-        // Create triangle rendering pass
-        TrianglePass::new(&mut graph, color_buffer);
+        // Create triangle rendering pass with vertex buffer
+        let backend = self.backend.as_deref_mut().context("Backend not initialized")?;
+        TrianglePass::new(&mut graph, color_buffer, backend)?;
 
         self.render_graph = Some(graph);
         log::info!("Render graph built successfully");
