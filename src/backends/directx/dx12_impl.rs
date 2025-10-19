@@ -1180,6 +1180,68 @@ impl DirectXBackendImpl {
         Ok(())
     }
 
+    // Resource Management (M8.1)
+
+    pub fn create_buffer(
+        &mut self,
+        desc: &crate::backends::BufferDescriptor,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
+        log::debug!(
+            "Creating DirectX 12 buffer: {} bytes, usage: {:?}",
+            desc.size,
+            desc.usage
+        );
+        // TODO: Implement DirectX 12 buffer creation
+        anyhow::bail!("DirectX 12 buffer creation not yet implemented")
+    }
+
+    pub fn upload_to_buffer(
+        &mut self,
+        _buffer: &dyn crate::backends::Buffer,
+        _data: &[u8],
+        _offset: u64,
+    ) -> Result<()> {
+        // TODO: Implement DirectX 12 buffer upload
+        anyhow::bail!("DirectX 12 buffer upload not yet implemented")
+    }
+
+    pub fn create_texture(
+        &mut self,
+        desc: &crate::backends::TextureDescriptor,
+    ) -> Result<Box<dyn crate::backends::Texture>> {
+        log::debug!(
+            "Creating DirectX 12 texture: {}x{}, format: {:?}",
+            desc.width,
+            desc.height,
+            desc.format
+        );
+        // TODO: Implement DirectX 12 texture creation
+        anyhow::bail!("DirectX 12 texture creation not yet implemented")
+    }
+
+    pub fn upload_to_texture(
+        &mut self,
+        _texture: &dyn crate::backends::Texture,
+        _data: &[u8],
+        _mip_level: u32,
+    ) -> Result<()> {
+        // TODO: Implement DirectX 12 texture upload
+        anyhow::bail!("DirectX 12 texture upload not yet implemented")
+    }
+
+    pub fn create_sampler(
+        &mut self,
+        desc: &crate::backends::SamplerDescriptor,
+    ) -> Result<Box<dyn crate::backends::Sampler>> {
+        log::debug!(
+            "Creating DirectX 12 sampler: mag={:?}, min={:?}",
+            desc.mag_filter,
+            desc.min_filter
+        );
+        // TODO: Implement DirectX 12 sampler creation
+        anyhow::bail!("DirectX 12 sampler creation not yet implemented")
+    }
+
     // Headless mode helper methods
 
     /// Create offscreen render target for headless mode

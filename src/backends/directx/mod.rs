@@ -184,6 +184,89 @@ impl GraphicsBackend for DirectXBackend {
             anyhow::bail!("DirectX 12 backend is only available on Windows")
         }
     }
+
+    // Resource Management (M8.1)
+
+    fn create_buffer(&mut self, desc: &super::BufferDescriptor) -> Result<Box<dyn super::Buffer>> {
+        #[cfg(windows)]
+        {
+            self.inner.create_buffer(desc)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = desc;
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn upload_to_buffer(
+        &mut self,
+        buffer: &dyn super::Buffer,
+        data: &[u8],
+        offset: u64,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.upload_to_buffer(buffer, data, offset)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (buffer, data, offset);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn create_texture(
+        &mut self,
+        desc: &super::TextureDescriptor,
+    ) -> Result<Box<dyn super::Texture>> {
+        #[cfg(windows)]
+        {
+            self.inner.create_texture(desc)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = desc;
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn upload_to_texture(
+        &mut self,
+        texture: &dyn super::Texture,
+        data: &[u8],
+        mip_level: u32,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.upload_to_texture(texture, data, mip_level)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (texture, data, mip_level);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn create_sampler(
+        &mut self,
+        desc: &super::SamplerDescriptor,
+    ) -> Result<Box<dyn super::Sampler>> {
+        #[cfg(windows)]
+        {
+            self.inner.create_sampler(desc)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = desc;
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
 }
 
 // Stub implementations for non-Windows platforms

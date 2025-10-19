@@ -2033,6 +2033,65 @@ impl GraphicsBackend for VulkanBackend {
         log::debug!("Render graph execution complete");
         Ok(())
     }
+
+    // Resource Management (M8.1)
+
+    fn create_buffer(&mut self, desc: &super::BufferDescriptor) -> Result<Box<dyn super::Buffer>> {
+        log::debug!(
+            "Creating Vulkan buffer: {} bytes, usage: {:?}",
+            desc.size,
+            desc.usage
+        );
+        // TODO: Implement Vulkan buffer creation
+        anyhow::bail!("Vulkan buffer creation not yet implemented")
+    }
+
+    fn upload_to_buffer(
+        &mut self,
+        _buffer: &dyn super::Buffer,
+        _data: &[u8],
+        _offset: u64,
+    ) -> Result<()> {
+        // TODO: Implement Vulkan buffer upload
+        anyhow::bail!("Vulkan buffer upload not yet implemented")
+    }
+
+    fn create_texture(
+        &mut self,
+        desc: &super::TextureDescriptor,
+    ) -> Result<Box<dyn super::Texture>> {
+        log::debug!(
+            "Creating Vulkan texture: {}x{}, format: {:?}",
+            desc.width,
+            desc.height,
+            desc.format
+        );
+        // TODO: Implement Vulkan texture creation
+        anyhow::bail!("Vulkan texture creation not yet implemented")
+    }
+
+    fn upload_to_texture(
+        &mut self,
+        _texture: &dyn super::Texture,
+        _data: &[u8],
+        _mip_level: u32,
+    ) -> Result<()> {
+        // TODO: Implement Vulkan texture upload
+        anyhow::bail!("Vulkan texture upload not yet implemented")
+    }
+
+    fn create_sampler(
+        &mut self,
+        desc: &super::SamplerDescriptor,
+    ) -> Result<Box<dyn super::Sampler>> {
+        log::debug!(
+            "Creating Vulkan sampler: mag={:?}, min={:?}",
+            desc.mag_filter,
+            desc.min_filter
+        );
+        // TODO: Implement Vulkan sampler creation
+        anyhow::bail!("Vulkan sampler creation not yet implemented")
+    }
 }
 
 /// Debug callback for Vulkan validation layers

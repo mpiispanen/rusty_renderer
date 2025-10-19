@@ -655,6 +655,65 @@ impl GraphicsBackend for WgpuBackend {
         log::debug!("Render graph execution complete");
         Ok(())
     }
+
+    // Resource Management (M8.1)
+
+    fn create_buffer(&mut self, desc: &super::BufferDescriptor) -> Result<Box<dyn super::Buffer>> {
+        log::debug!(
+            "Creating wgpu buffer: {} bytes, usage: {:?}",
+            desc.size,
+            desc.usage
+        );
+        // TODO: Implement wgpu buffer creation
+        anyhow::bail!("wgpu buffer creation not yet implemented")
+    }
+
+    fn upload_to_buffer(
+        &mut self,
+        _buffer: &dyn super::Buffer,
+        _data: &[u8],
+        _offset: u64,
+    ) -> Result<()> {
+        // TODO: Implement wgpu buffer upload
+        anyhow::bail!("wgpu buffer upload not yet implemented")
+    }
+
+    fn create_texture(
+        &mut self,
+        desc: &super::TextureDescriptor,
+    ) -> Result<Box<dyn super::Texture>> {
+        log::debug!(
+            "Creating wgpu texture: {}x{}, format: {:?}",
+            desc.width,
+            desc.height,
+            desc.format
+        );
+        // TODO: Implement wgpu texture creation
+        anyhow::bail!("wgpu texture creation not yet implemented")
+    }
+
+    fn upload_to_texture(
+        &mut self,
+        _texture: &dyn super::Texture,
+        _data: &[u8],
+        _mip_level: u32,
+    ) -> Result<()> {
+        // TODO: Implement wgpu texture upload
+        anyhow::bail!("wgpu texture upload not yet implemented")
+    }
+
+    fn create_sampler(
+        &mut self,
+        desc: &super::SamplerDescriptor,
+    ) -> Result<Box<dyn super::Sampler>> {
+        log::debug!(
+            "Creating wgpu sampler: mag={:?}, min={:?}",
+            desc.mag_filter,
+            desc.min_filter
+        );
+        // TODO: Implement wgpu sampler creation
+        anyhow::bail!("wgpu sampler creation not yet implemented")
+    }
 }
 
 /// Stub Device implementation

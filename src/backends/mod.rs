@@ -40,6 +40,15 @@ use std::any::Any;
 // Backend capabilities and quirks
 pub mod capabilities;
 
+// GPU resource abstractions
+pub mod resources;
+
+// Re-export resource types for convenience
+pub use resources::{
+    AddressMode, Buffer, BufferDescriptor, BufferUsage, FilterMode, MemoryLocation, Sampler,
+    SamplerDescriptor, Texture, TextureDescriptor, TextureFormat, TextureUsage,
+};
+
 // Backend module declarations (implementations in M2+)
 pub mod directx;
 pub mod vulkan;
@@ -165,6 +174,71 @@ pub trait GraphicsBackend: Send + Sync {
 
     /// Get the swapchain interface
     fn swapchain(&self) -> &dyn Swapchain;
+
+    // Resource Management (M8.1)
+
+    /// Create a GPU buffer
+    ///
+    /// Creates a buffer with the specified descriptor. The buffer can be used
+    /// for vertices, indices, uniforms, or staging data transfers.
+    ///
+    /// # Arguments
+    /// * `desc` - Buffer descriptor with size, usage, and memory location
+    ///
+    /// # Returns
+    /// A boxed Buffer trait object
+    fn create_buffer(&mut self, desc: &BufferDescriptor) -> Result<Box<dyn Buffer>>;
+
+    /// Upload data to a buffer
+    ///
+    /// Uploads data from CPU memory to a GPU buffer. For GPU-only buffers,
+    /// this uses a staging buffer internally. For CPU-visible buffers,
+    /// this maps and copies directly.
+    ///
+    /// # Arguments
+    /// * `buffer` - The target buffer
+    /// * `data` - The data to upload
+    /// * `offset` - Offset in bytes into the buffer
+    fn upload_to_buffer(&mut self, buffer: &dyn Buffer, data: &[u8], offset: u64) -> Result<()>;
+
+    /// Create a 2D texture
+    ///
+    /// Creates a texture with the specified descriptor. The texture can be used
+    /// for sampling in shaders, as a render target, or for depth/stencil.
+    ///
+    /// # Arguments
+    /// * `desc` - Texture descriptor with dimensions, format, and usage
+    ///
+    /// # Returns
+    /// A boxed Texture trait object
+    fn create_texture(&mut self, desc: &TextureDescriptor) -> Result<Box<dyn Texture>>;
+
+    /// Upload data to a texture
+    ///
+    /// Uploads pixel data from CPU memory to a GPU texture. Uses a staging
+    /// buffer internally for the transfer.
+    ///
+    /// # Arguments
+    /// * `texture` - The target texture
+    /// * `data` - The pixel data (must match texture dimensions and format)
+    /// * `mip_level` - Which mip level to upload to (0 = base level)
+    fn upload_to_texture(
+        &mut self,
+        texture: &dyn Texture,
+        data: &[u8],
+        mip_level: u32,
+    ) -> Result<()>;
+
+    /// Create a sampler
+    ///
+    /// Creates a sampler object for texture sampling in shaders.
+    ///
+    /// # Arguments
+    /// * `desc` - Sampler descriptor with filter and address modes
+    ///
+    /// # Returns
+    /// A boxed Sampler trait object
+    fn create_sampler(&mut self, desc: &SamplerDescriptor) -> Result<Box<dyn Sampler>>;
 }
 
 /// Device creation and management trait
