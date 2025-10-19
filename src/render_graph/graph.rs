@@ -2,8 +2,9 @@
 //!
 //! This module implements the main render graph structure and compilation.
 
+use crate::render_graph::barrier::{Barrier, BarrierInserter};
 use crate::render_graph::pass::{PassId, RenderPass};
-use crate::render_graph::resource::{Resource, ResourceDescriptor, ResourceId};
+use crate::render_graph::resource::{Resource, ResourceDescriptor, ResourceId, ResourceKind};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -54,6 +55,8 @@ pub struct CompiledGraph {
     pub execution_order: Vec<PassId>,
     /// Resource producers (pass that writes to each resource)
     pub producers: HashMap<ResourceId, PassId>,
+    /// Barriers to insert between passes
+    pub barriers: Vec<Barrier>,
 }
 
 /// Main render graph structure
@@ -272,9 +275,13 @@ impl RenderGraph {
             }
         }
 
+        // Insert barriers between passes
+        let barriers = self.insert_barriers(&execution_order);
+
         Ok(CompiledGraph {
             execution_order,
             producers,
+            barriers,
         })
     }
 
@@ -338,6 +345,41 @@ impl RenderGraph {
             }
         }
     }
+
+    /// Insert barriers between passes based on resource access patterns
+    fn insert_barriers(&self, execution_order: &[PassId]) -> Vec<Barrier> {
+        let mut inserter = BarrierInserter::new();
+        let mut barriers = Vec::new();
+
+        // Build resource kind map
+        let resource_kinds: HashMap<ResourceId, ResourceKind> =
+            self.resources.iter().map(|r| (r.id, r.kind)).collect();
+
+        // Analyze transitions between consecutive passes
+        for window in execution_order.windows(2) {
+            let src_pass_id = window[0];
+            let dst_pass_id = window[1];
+
+            if let (Some(src_pass), Some(dst_pass)) =
+                (self.get_pass(src_pass_id), self.get_pass(dst_pass_id))
+            {
+                let barrier = inserter.analyze_transition(
+                    src_pass_id,
+                    dst_pass_id,
+                    &src_pass.outputs,
+                    &dst_pass.inputs,
+                    &resource_kinds,
+                );
+
+                if !barrier.is_empty() {
+                    barriers.push(barrier);
+                }
+            }
+        }
+
+        // Optimize barriers (merge, deduplicate, etc.)
+        BarrierInserter::optimize_barriers(barriers)
+    }
 }
 
 impl Default for RenderGraph {
@@ -349,7 +391,9 @@ impl Default for RenderGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render_graph::pass::{PassKind, PipelineStage, ResourceAccess};
+    use crate::render_graph::pass::{
+        AccessType, ImageLayout, PassKind, PipelineStage, ResourceAccess,
+    };
     use crate::render_graph::resource::{Extent3D, Format, ImageUsageFlags, SampleCount};
 
     #[test]
@@ -546,5 +590,56 @@ mod tests {
         let res2_resource = graph.get_resource(res2).unwrap();
         assert_eq!(res2_resource.lifetime.first_use, Some(1));
         assert_eq!(res2_resource.lifetime.last_use, Some(2));
+    }
+
+    #[test]
+    fn test_barrier_insertion() {
+        let mut graph = RenderGraph::new();
+
+        // Create resources
+        let desc = ResourceDescriptor::Image {
+            format: Format::Rgba8Unorm,
+            extent: Extent3D::new_2d(1280, 720),
+            usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
+            samples: SampleCount::One,
+        };
+        let res1 = graph.create_resource("res1", desc.clone());
+        let res2 = graph.create_resource("res2", desc);
+
+        // Pass A produces res1
+        let mut pass_a = RenderPass::new(graph.next_pass_id(), "pass_a", PassKind::Graphics);
+        pass_a.add_output(ResourceAccess::new(
+            res1,
+            AccessType::Write,
+            PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
+            Some(ImageLayout::ColorAttachment),
+        ));
+        graph.add_pass(pass_a);
+
+        // Pass B reads res1, produces res2
+        let mut pass_b = RenderPass::new(graph.next_pass_id(), "pass_b", PassKind::Graphics);
+        pass_b.add_input(ResourceAccess::new(
+            res1,
+            AccessType::Read,
+            PipelineStage::new(PipelineStage::FRAGMENT_SHADER),
+            Some(ImageLayout::ShaderReadOnly),
+        ));
+        pass_b.add_output(ResourceAccess::new(
+            res2,
+            AccessType::Write,
+            PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
+            Some(ImageLayout::ColorAttachment),
+        ));
+        graph.add_pass(pass_b);
+
+        // Compile
+        let compiled = graph.compile().unwrap();
+
+        // Should have one barrier for the layout transition
+        assert!(!compiled.barriers.is_empty());
+        let barrier = &compiled.barriers[0];
+        assert_eq!(barrier.src_pass, PassId(0));
+        assert_eq!(barrier.dst_pass, PassId(1));
+        assert!(!barrier.image_barriers.is_empty());
     }
 }
