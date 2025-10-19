@@ -271,6 +271,34 @@ impl GraphicsBackend for DirectXBackend {
             anyhow::bail!("DirectX 12 backend is only available on Windows")
         }
     }
+
+    // Shader Resource Binding (M8.3)
+
+    fn create_bind_group_layout(&mut self, layout: &BindGroupLayout) -> Result<usize> {
+        #[cfg(windows)]
+        {
+            self.inner.create_bind_group_layout(layout)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = layout;
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn create_bind_group(&mut self, layout_handle: usize, bind_group: &BindGroup) -> Result<usize> {
+        #[cfg(windows)]
+        {
+            self.inner.create_bind_group(layout_handle, bind_group)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (layout_handle, bind_group);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
 }
 
 // Stub implementations for non-Windows platforms

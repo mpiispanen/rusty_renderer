@@ -42,6 +42,10 @@ pub struct WgpuBackend {
     // Configuration
     enable_validation: bool,
 
+    // Shader resource binding (M8.3)
+    bind_group_layouts: Vec<wgpu::BindGroupLayout>,
+    bind_groups: Vec<wgpu::BindGroup>,
+
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
     swapchain_wrapper: WgpuSwapchain,
@@ -66,6 +70,8 @@ impl WgpuBackend {
             height: 600,
             headless: false,
             enable_validation,
+            bind_group_layouts: vec![],
+            bind_groups: vec![],
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
         })
@@ -718,6 +724,126 @@ impl GraphicsBackend for WgpuBackend {
         // TODO: Implement wgpu sampler creation
         anyhow::bail!("wgpu sampler creation not yet implemented")
     }
+
+    // Shader Resource Binding (M8.3)
+
+    fn create_bind_group_layout(&mut self, layout: &BindGroupLayout) -> Result<usize> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Convert our BindGroupLayout to wgpu::BindGroupLayout
+        let mut entries = Vec::new();
+
+        for binding in layout.bindings() {
+            let (binding_index, ty, visibility) = match binding {
+                ShaderBinding::UniformBuffer { binding, stage, .. } => {
+                    let vis = shader_stage_to_wgpu(*stage);
+                    let ty = wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    };
+                    (*binding, ty, vis)
+                }
+                ShaderBinding::StorageBuffer { binding, stage, readonly, .. } => {
+                    let vis = shader_stage_to_wgpu(*stage);
+                    let ty = wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: *readonly },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    };
+                    (*binding, ty, vis)
+                }
+                ShaderBinding::Texture { binding, stage, .. } => {
+                    let vis = shader_stage_to_wgpu(*stage);
+                    let ty = wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    };
+                    (*binding, ty, vis)
+                }
+                ShaderBinding::Sampler { binding, stage } => {
+                    let vis = shader_stage_to_wgpu(*stage);
+                    let ty = wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering);
+                    (*binding, ty, vis)
+                }
+            };
+
+            entries.push(wgpu::BindGroupLayoutEntry {
+                binding: binding_index,
+                visibility,
+                ty,
+                count: None,
+            });
+        }
+
+        let wgpu_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Bind Group Layout"),
+            entries: &entries,
+        });
+
+        self.bind_group_layouts.push(wgpu_layout);
+        let handle = self.bind_group_layouts.len() - 1;
+
+        log::debug!("Created wgpu bind group layout with handle {}", handle);
+        Ok(handle)
+    }
+
+    fn create_bind_group(&mut self, layout_handle: usize, bind_group: &BindGroup) -> Result<usize> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let layout = self
+            .bind_group_layouts
+            .get(layout_handle)
+            .context("Invalid bind group layout handle")?;
+
+        let mut entries = Vec::new();
+
+        for (_binding, resource) in bind_group.resources() {
+            match resource {
+                BoundResource::UniformBuffer(_buffer) | BoundResource::StorageBuffer(_buffer) => {
+                    // TODO: Get wgpu buffer from our Buffer trait
+                    log::warn!("wgpu buffer binding not yet fully implemented");
+                }
+                BoundResource::Texture(_texture) => {
+                    log::warn!("wgpu texture binding not yet implemented");
+                }
+                BoundResource::Sampler(_sampler) => {
+                    log::warn!("wgpu sampler binding not yet implemented");
+                }
+            }
+        }
+
+        // For now, create empty bind group
+        let wgpu_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Bind Group"),
+            layout,
+            entries: &entries,
+        });
+
+        self.bind_groups.push(wgpu_bind_group);
+        let handle = self.bind_groups.len() - 1;
+
+        log::debug!("Created wgpu bind group with handle {}", handle);
+        Ok(handle)
+    }
+}
+
+/// Convert ShaderStage to wgpu::ShaderStages
+fn shader_stage_to_wgpu(stage: ShaderStage) -> wgpu::ShaderStages {
+    let mut stages = wgpu::ShaderStages::empty();
+    
+    if stage.contains(ShaderStage::VERTEX) {
+        stages |= wgpu::ShaderStages::VERTEX;
+    }
+    if stage.contains(ShaderStage::FRAGMENT) {
+        stages |= wgpu::ShaderStages::FRAGMENT;
+    }
+    if stage.contains(ShaderStage::COMPUTE) {
+        stages |= wgpu::ShaderStages::COMPUTE;
+    }
+    
+    stages
 }
 
 /// Stub Device implementation
