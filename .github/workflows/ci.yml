@@ -335,34 +335,14 @@ jobs:
           echo "📊 Generating comprehensive visual regression report..."
           echo "   Comparing all available backends..."
           
+          # Generate report - will exit with code 1 if any comparison fails
           python3 scripts/generate_visual_report.py \
             screenshots/ \
             visual-regression-report.html \
-            --temp-dir flip_results || {
-              echo "⚠️  Report generation failed, but continuing..."
-              echo "This might happen if only one backend is available."
-              exit 0
-            }
+            --temp-dir flip_results
           
-          if [ -f visual-regression-report.html ]; then
-            echo ""
-            echo "✅ Visual regression report generated successfully!"
-            echo "   Report: visual-regression-report.html"
-            
-            # Display summary if JSON files exist
-            if [ -d flip_results ] && [ -n "$(ls -A flip_results/*.json 2>/dev/null)" ]; then
-              echo ""
-              echo "📊 Comparison Summary:"
-              for json in flip_results/*.json; do
-                if [ -f "$json" ]; then
-                  echo "  $(basename $json):"
-                  python3 -c "import json; data=json.load(open('$json')); print(f\"    Mean: {data['mean']:.6f}, Status: {'✅ PASS' if data['mean'] < 0.15 else '❌ FAIL'}\")"
-                fi
-              done
-            fi
-          else
-            echo "⚠️  No report generated (may need at least 2 backends)"
-          fi
+          # Script exits with code 0 if all pass, 1 if any fail
+          # CI will fail automatically if exit code is 1
       
       - name: Upload comprehensive visual regression report
         if: always()

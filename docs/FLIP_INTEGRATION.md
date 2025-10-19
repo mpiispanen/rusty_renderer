@@ -159,6 +159,8 @@ cargo test --test visual_tests test_vulkan_vs_wgpu_flip -- --ignored --nocapture
 | < 0.15    | Acceptable | Cross-platform, different rasterization |
 | ≥ 0.15    | Significant differences | Investigate visual artifacts |
 
+**CI Behavior:** CI job **fails automatically** if any comparison ≥ 0.15 mean error
+
 ### Understanding Results
 
 ```json
@@ -294,6 +296,30 @@ The actual CI workflow:
 - Go to GitHub Actions → Workflow Run
 - Download `visual-regression-report-all-backends` artifact
 - Open `visual-regression-report.html` in browser
+
+**Important:** Report is uploaded **even if CI fails**, so you can always investigate failures.
+
+## CI Failure Handling
+
+### When Visual Regression is Detected
+
+If any comparison exceeds the 0.15 threshold, CI will fail:
+
+**Output:**
+```
+❌ Visual regression test FAILED: 1 comparison(s) exceeded threshold
+   Threshold: 0.15 mean FLIP error
+   Review the HTML report for details
+```
+
+**Investigation Steps:**
+1. Download the report artifact (always available)
+2. Open HTML report and find failed comparisons (red badge)
+3. Review FLIP error map to see where differences are
+4. Determine if change was intentional or a bug
+5. Either fix the code or update reference images
+
+The report shows exactly which backends differ and by how much, making it easy to diagnose issues.
 
 ## Future Enhancements
 

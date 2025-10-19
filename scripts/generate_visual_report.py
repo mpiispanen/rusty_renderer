@@ -535,6 +535,11 @@ def main():
     print(f"   Total comparisons: {total_comparisons}")
     print(f"   Passed: {passed}/{total_comparisons}")
     
+    if passed != total_comparisons:
+        print(f"\n❌ Visual regression test FAILED: {total_comparisons - passed} comparison(s) exceeded threshold")
+        print(f"   Threshold: 0.15 mean FLIP error")
+        print(f"   Review the HTML report for details")
+    
     # Exit code based on results
     sys.exit(0 if passed == total_comparisons else 1)
 
