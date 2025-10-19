@@ -46,6 +46,9 @@ pub mod resources;
 // Vertex format definitions
 pub mod vertex;
 
+// Shader resource binding
+pub mod binding;
+
 // Re-export resource types for convenience
 pub use resources::{
     AddressMode, Buffer, BufferDescriptor, BufferUsage, FilterMode, MemoryLocation, Sampler,
@@ -54,6 +57,12 @@ pub use resources::{
 
 // Re-export vertex types for convenience
 pub use vertex::{Vertex, VertexAttribute, VertexBufferLayout, VertexFormat, VertexInputRate};
+
+// Re-export binding types for convenience
+pub use binding::{
+    BindGroup, BindGroupLayout, BindGroupLayoutBuilder, BoundResource, ShaderBinding, ShaderStage,
+    TextureDimension,
+};
 
 // Backend module declarations (implementations in M2+)
 pub mod directx;
