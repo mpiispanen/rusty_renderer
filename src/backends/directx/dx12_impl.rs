@@ -1242,6 +1242,45 @@ impl DirectXBackendImpl {
         anyhow::bail!("DirectX 12 sampler creation not yet implemented")
     }
 
+    pub fn bind_vertex_buffer(
+        &mut self,
+        _binding: u32,
+        _buffer: &dyn crate::backends::Buffer,
+        _offset: u64,
+    ) -> Result<()> {
+        anyhow::bail!("bind_vertex_buffer not yet implemented for DirectX 12")
+    }
+
+    pub fn bind_index_buffer(
+        &mut self,
+        _buffer: &dyn crate::backends::Buffer,
+        _offset: u64,
+        _index_type: crate::backends::IndexType,
+    ) -> Result<()> {
+        anyhow::bail!("bind_index_buffer not yet implemented for DirectX 12")
+    }
+
+    pub fn draw(
+        &mut self,
+        _vertex_count: u32,
+        _instance_count: u32,
+        _first_vertex: u32,
+        _first_instance: u32,
+    ) -> Result<()> {
+        anyhow::bail!("draw not yet implemented for DirectX 12")
+    }
+
+    pub fn draw_indexed(
+        &mut self,
+        _index_count: u32,
+        _instance_count: u32,
+        _first_index: u32,
+        _vertex_offset: i32,
+        _first_instance: u32,
+    ) -> Result<()> {
+        anyhow::bail!("draw_indexed not yet implemented for DirectX 12")
+    }
+
     // Headless mode helper methods
 
     /// Create offscreen render target for headless mode

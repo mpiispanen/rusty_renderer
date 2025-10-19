@@ -1,33 +1,30 @@
 // Triangle shader for DirectX 12 backend (HLSL)
-// Renders a simple colored triangle with hardcoded vertices
+// Renders a simple colored triangle using vertex buffers
+
+// Vertex input from vertex buffer
+struct VSInput {
+    float3 position : POSITION;
+    float3 normal : NORMAL;
+    float2 uv : TEXCOORD0;
+    float4 color : COLOR0;
+};
 
 struct VSOutput {
     float4 position : SV_POSITION;
     float3 color : COLOR0;
+    float2 uv : TEXCOORD0;
 };
 
 // Vertex Shader
-VSOutput VSMain(uint vertexID : SV_VertexID) {
+VSOutput VSMain(VSInput input) {
     VSOutput output;
     
-    // Hardcoded triangle vertices (NDC coordinates)
+    // For 2D triangle, we only use X and Y from position
     // DirectX 12 uses Y-axis pointing UP (like wgpu, opposite to Vulkan)
-    // Y coordinates are flipped to match Vulkan output
-    float2 positions[3] = {
-        float2(0.0, 0.5),    // Bottom center (flipped from -0.5)
-        float2(0.5, -0.5),   // Top right (flipped from 0.5)
-        float2(-0.5, -0.5)   // Top left (flipped from 0.5)
-    };
-    
-    // Hardcoded vertex colors (RGB) - must match Vulkan order
-    float3 colors[3] = {
-        float3(1.0, 0.0, 0.0),  // Red (bottom center)
-        float3(0.0, 1.0, 0.0),  // Green (top right)
-        float3(0.0, 0.0, 1.0)   // Blue (top left)
-    };
-    
-    output.position = float4(positions[vertexID], 0.0, 1.0);
-    output.color = colors[vertexID];
+    // Flip Y to match Vulkan convention
+    output.position = float4(input.position.x, -input.position.y, 0.0, 1.0);
+    output.color = input.color.rgb;
+    output.uv = input.uv;
     
     return output;
 }

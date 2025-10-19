@@ -2442,6 +2442,47 @@ impl GraphicsBackend for VulkanBackend {
 
         Ok(Box::new(sampler))
     }
+
+    // Vertex/Index Buffer Rendering (M8.2)
+
+    fn bind_vertex_buffer(
+        &mut self,
+        _binding: u32,
+        _buffer: &dyn super::Buffer,
+        _offset: u64,
+    ) -> Result<()> {
+        anyhow::bail!("bind_vertex_buffer not yet implemented for Vulkan - render graph execution handles this");
+    }
+
+    fn bind_index_buffer(
+        &mut self,
+        _buffer: &dyn super::Buffer,
+        _offset: u64,
+        _index_type: super::IndexType,
+    ) -> Result<()> {
+        anyhow::bail!("bind_index_buffer not yet implemented for Vulkan - render graph execution handles this");
+    }
+
+    fn draw(
+        &mut self,
+        _vertex_count: u32,
+        _instance_count: u32,
+        _first_vertex: u32,
+        _first_instance: u32,
+    ) -> Result<()> {
+        anyhow::bail!("draw not yet implemented for Vulkan - render graph execution handles this");
+    }
+
+    fn draw_indexed(
+        &mut self,
+        _index_count: u32,
+        _instance_count: u32,
+        _first_index: u32,
+        _vertex_offset: i32,
+        _first_instance: u32,
+    ) -> Result<()> {
+        anyhow::bail!("draw_indexed not yet implemented for Vulkan - render graph execution handles this");
+    }
 }
 
 /// Debug callback for Vulkan validation layers

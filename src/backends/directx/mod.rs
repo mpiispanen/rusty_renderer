@@ -267,6 +267,94 @@ impl GraphicsBackend for DirectXBackend {
             anyhow::bail!("DirectX 12 backend is only available on Windows")
         }
     }
+
+    fn bind_vertex_buffer(
+        &mut self,
+        binding: u32,
+        buffer: &dyn super::Buffer,
+        offset: u64,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.bind_vertex_buffer(binding, buffer, offset)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (binding, buffer, offset);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn bind_index_buffer(
+        &mut self,
+        buffer: &dyn super::Buffer,
+        offset: u64,
+        index_type: super::IndexType,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.bind_index_buffer(buffer, offset, index_type)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (buffer, offset, index_type);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn draw(
+        &mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner
+                .draw(vertex_count, instance_count, first_vertex, first_instance)
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (vertex_count, instance_count, first_vertex, first_instance);
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
+
+    fn draw_indexed(
+        &mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.draw_indexed(
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            )
+        }
+
+        #[cfg(not(windows))]
+        {
+            let _ = (
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            );
+            anyhow::bail!("DirectX 12 backend is only available on Windows")
+        }
+    }
 }
 
 // Stub implementations for non-Windows platforms

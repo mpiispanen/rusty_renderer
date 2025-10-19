@@ -461,7 +461,7 @@ fn test_texture_formats() {
             format,
             usage: TextureUsage::sampled(),
             mip_levels: 1,
-            label: Some(format!("Test {:?}", format)),
+            label: Some(format!("Test {format:?}")),
         };
 
         let texture = backend.create_texture(&desc).unwrap();
