@@ -5,12 +5,12 @@
 //! insertion for optimal GPU performance.
 
 mod barrier;
-mod graph;
+pub mod graph;
 mod pass;
 mod resource;
 
 pub use barrier::{Barrier, BarrierType, MemoryBarrier};
-pub use graph::RenderGraph;
+pub use graph::{CompiledGraph, RenderGraph};
 pub use pass::{
     AccessType, ImageLayout, PassCallback, PassExecutionContext, PassId, PassKind, PipelineStage,
     RenderPass, ResourceAccess,

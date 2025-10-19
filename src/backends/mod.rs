@@ -108,6 +108,38 @@ pub trait GraphicsBackend: Send + Sync {
     /// Submits recorded commands and presents the rendered image.
     fn end_frame(&mut self) -> Result<()>;
 
+    /// Execute a compiled render graph
+    ///
+    /// This executes all passes in the graph in the correct order with
+    /// automatic barrier insertion and synchronization.
+    ///
+    /// # Arguments
+    /// * `graph` - The compiled render graph to execute
+    ///
+    /// # Returns
+    /// Ok(()) if execution succeeded, Err otherwise
+    ///
+    /// # Example
+    /// ```no_run
+    /// use rusty_renderer::render_graph::RenderGraph;
+    /// # use rusty_renderer::backends::GraphicsBackend;
+    /// # fn example(backend: &mut dyn GraphicsBackend) -> anyhow::Result<()> {
+    /// let mut graph = RenderGraph::new();
+    /// // ... build graph ...
+    /// let compiled = graph.compile()?;
+    /// backend.execute_graph(&compiled)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn execute_graph(&mut self, _graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+        // Default implementation: not yet supported
+        // Backends should override this when they implement graph execution
+        Err(anyhow::anyhow!(
+            "Render graph execution not yet implemented for {} backend",
+            self.backend_type()
+        ))
+    }
+
     /// Capture the current frame to an image buffer
     ///
     /// This reads back the rendered image from the GPU and returns it as

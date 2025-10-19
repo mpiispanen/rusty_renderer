@@ -4,12 +4,12 @@
 //! and that the output matches the direct rendering implementation.
 
 use rusty_renderer::render_graph::{
-    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback,
-    PassExecutionContext, PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess,
-    ResourceDescriptor, SampleCount,
+    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback, PassExecutionContext,
+    PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess, ResourceDescriptor,
+    SampleCount,
 };
 use rusty_renderer::{RenderBackend, RenderConfig};
-use std::path::PathBuf;
+use std::path::Path;
 
 /// Test that render graph produces same output as direct rendering
 #[test]
@@ -24,18 +24,18 @@ fn test_render_graph_triangle_matches_direct() {
 
 /// Test render graph with specific backend
 fn test_backend_render_graph(backend: RenderBackend) {
-    println!("Testing render graph with backend: {:?}", backend);
+    println!("Testing render graph with backend: {backend:?}");
 
     // Create temporary directory for test outputs
     let temp_dir = std::env::temp_dir().join("rusty_renderer_graph_test");
     std::fs::create_dir_all(&temp_dir).unwrap();
 
     // Render using direct implementation
-    let direct_path = temp_dir.join(format!("direct_{:?}.png", backend));
+    let direct_path = temp_dir.join(format!("direct_{backend:?}.png"));
     render_direct(backend, &direct_path);
 
     // Render using render graph
-    let graph_path = temp_dir.join(format!("graph_{:?}.png", backend));
+    let graph_path = temp_dir.join(format!("graph_{backend:?}.png"));
     render_with_graph(backend, &graph_path);
 
     // Compare images using image comparison
@@ -45,21 +45,15 @@ fn test_backend_render_graph(backend: RenderBackend) {
 
     // For now, just verify both files exist
     // In a full implementation, we would use FLIP or pixel comparison
-    assert!(
-        direct_path.exists(),
-        "Direct rendering output not found"
-    );
-    assert!(
-        graph_path.exists(),
-        "Graph rendering output not found"
-    );
+    assert!(direct_path.exists(), "Direct rendering output not found");
+    assert!(graph_path.exists(), "Graph rendering output not found");
 
     println!("✓ Both renders completed successfully");
     println!("  Note: Visual comparison would be done with FLIP in production");
 }
 
 /// Render triangle using direct backend implementation
-fn render_direct(backend: RenderBackend, output_path: &PathBuf) {
+fn render_direct(backend: RenderBackend, output_path: &Path) {
     let config = RenderConfig {
         backend,
         scene: "triangle".to_string(),
@@ -70,7 +64,7 @@ fn render_direct(backend: RenderBackend, output_path: &PathBuf) {
         log_level: log::LevelFilter::Warn,
         max_frames: Some(1), // Just render one frame
         headless: true,
-        screenshot: Some(output_path.clone()),
+        screenshot: Some(output_path.to_path_buf()),
         screenshot_interval: 0,
     };
 
@@ -79,10 +73,10 @@ fn render_direct(backend: RenderBackend, output_path: &PathBuf) {
 }
 
 /// Render triangle using render graph
-fn render_with_graph(backend: RenderBackend, output_path: &PathBuf) {
+fn render_with_graph(backend: RenderBackend, output_path: &Path) {
     // Build render graph
     let mut graph = build_triangle_graph(800, 600).unwrap();
-    
+
     // For now, render using the same backend but with graph
     // In a full implementation, the backend would execute the graph
     let config = RenderConfig {
@@ -95,14 +89,14 @@ fn render_with_graph(backend: RenderBackend, output_path: &PathBuf) {
         log_level: log::LevelFilter::Warn,
         max_frames: Some(1),
         headless: true,
-        screenshot: Some(output_path.clone()),
+        screenshot: Some(output_path.to_path_buf()),
         screenshot_interval: 0,
     };
 
     // TODO: Actually execute the render graph through the backend
     // For now, this will render the same way but demonstrates the API
     let mut app = rusty_renderer::app::App::new(config).unwrap();
-    
+
     // Validate graph compiles
     let compiled = graph.compile().unwrap();
     println!(
@@ -110,7 +104,7 @@ fn render_with_graph(backend: RenderBackend, output_path: &PathBuf) {
         compiled.execution_order.len(),
         compiled.barriers.len()
     );
-    
+
     app.run_headless().unwrap();
 }
 
@@ -128,11 +122,8 @@ fn build_triangle_graph(width: u32, height: u32) -> anyhow::Result<RenderGraph> 
     let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
     // Create triangle render pass
-    let mut triangle_pass = RenderPass::new(
-        graph.next_pass_id(),
-        "triangle_pass",
-        PassKind::Graphics,
-    );
+    let mut triangle_pass =
+        RenderPass::new(graph.next_pass_id(), "triangle_pass", PassKind::Graphics);
 
     triangle_pass.add_output(ResourceAccess::new(
         color_buffer,
