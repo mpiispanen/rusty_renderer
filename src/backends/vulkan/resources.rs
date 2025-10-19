@@ -106,6 +106,11 @@ impl VulkanBuffer {
     pub fn vk_buffer(&self) -> vk::Buffer {
         self.buffer
     }
+
+    /// Alias for vk_buffer (for consistency with other handle() methods)
+    pub fn handle(&self) -> vk::Buffer {
+        self.buffer
+    }
 }
 
 impl crate::backends::Buffer for VulkanBuffer {

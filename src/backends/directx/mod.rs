@@ -173,10 +173,14 @@ impl GraphicsBackend for DirectXBackend {
         }
     }
 
-    fn execute_graph(&mut self, _graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+    fn execute_graph(
+        &mut self,
+        _graph: &crate::render_graph::graph::RenderGraph,
+        _compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
         #[cfg(windows)]
         {
-            self.inner.execute_graph(_graph)
+            self.inner.execute_graph(_graph, _compiled)
         }
 
         #[cfg(not(windows))]

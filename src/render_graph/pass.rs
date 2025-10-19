@@ -133,12 +133,83 @@ pub trait PassCallback: Send + Sync {
 }
 
 /// Execution context provided to pass callbacks
+///
+/// This trait provides access to rendering commands during pass execution.
+/// Backends implement this to expose their command recording capabilities.
 pub trait PassExecutionContext {
     /// Get the backend type as Any for downcasting
     fn as_any(&self) -> &dyn std::any::Any;
 
     /// Get the backend type as Any for mutable downcasting
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    /// Bind a vertex buffer for rendering (M8.2)
+    ///
+    /// # Arguments
+    /// * `binding` - Binding slot (typically 0 for the first vertex buffer)
+    /// * `buffer_id` - ID of the buffer resource (for resource tracking)
+    /// * `buffer_ptr` - Pointer to the buffer implementation
+    /// * `offset` - Offset in bytes into the buffer
+    fn bind_vertex_buffer(
+        &mut self,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Bind an index buffer for indexed rendering (M8.2)
+    ///
+    /// # Arguments
+    /// * `buffer_ptr` - Pointer to the buffer implementation
+    /// * `offset` - Offset in bytes into the buffer
+    /// * `index_type` - The type of indices (U16 or U32)
+    fn bind_index_buffer(
+        &mut self,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        index_type: IndexType,
+    ) -> anyhow::Result<()>;
+
+    /// Draw primitives using vertex data (M8.2)
+    ///
+    /// # Arguments
+    /// * `vertex_count` - Number of vertices to draw
+    /// * `instance_count` - Number of instances to draw
+    /// * `first_vertex` - Index of the first vertex
+    /// * `first_instance` - Index of the first instance
+    fn draw(
+        &mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> anyhow::Result<()>;
+
+    /// Draw indexed primitives (M8.2)
+    ///
+    /// # Arguments
+    /// * `index_count` - Number of indices to draw
+    /// * `instance_count` - Number of instances to draw
+    /// * `first_index` - Index of the first index in the index buffer
+    /// * `vertex_offset` - Offset added to vertex indices
+    /// * `first_instance` - Index of the first instance
+    fn draw_indexed(
+        &mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> anyhow::Result<()>;
+}
+
+/// Index buffer data type (re-exported for pass callbacks)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexType {
+    /// 16-bit unsigned integer indices
+    U16,
+    /// 32-bit unsigned integer indices
+    U32,
 }
 
 /// A render pass in the render graph

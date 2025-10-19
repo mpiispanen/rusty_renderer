@@ -121,7 +121,7 @@ impl App {
                 let compiled = graph.compile()?;
 
                 backend.begin_frame()?;
-                backend.execute_graph(&compiled)?;
+                backend.execute_graph(&graph, &compiled)?;
                 backend.end_frame()?;
 
                 // Put graph back
@@ -349,7 +349,7 @@ impl ApplicationHandler for App {
                         return;
                     }
 
-                    if let Err(e) = backend.execute_graph(&compiled) {
+                    if let Err(e) = backend.execute_graph(&graph, &compiled) {
                         log::error!("Failed to execute render graph: {e}");
                         self.render_graph = Some(graph);
                         return;

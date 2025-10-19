@@ -1023,14 +1023,15 @@ impl DirectXBackendImpl {
     /// Execute a compiled render graph
     pub fn execute_graph(
         &mut self,
-        graph: &crate::render_graph::graph::CompiledGraph,
+        _graph: &crate::render_graph::graph::RenderGraph,
+        compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
         use crate::render_graph::*;
 
         log::debug!(
             "Executing render graph with {} passes, {} barriers",
-            graph.execution_order.len(),
-            graph.barriers.len()
+            compiled.execution_order.len(),
+            compiled.barriers.len()
         );
 
         unsafe {

@@ -554,7 +554,11 @@ impl GraphicsBackend for WgpuBackend {
         &self.swapchain_wrapper
     }
 
-    fn execute_graph(&mut self, graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+    fn execute_graph(
+        &mut self,
+        _graph: &crate::render_graph::graph::RenderGraph,
+        compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
         let device = self
             .device
             .as_ref()
@@ -566,8 +570,8 @@ impl GraphicsBackend for WgpuBackend {
 
         log::debug!(
             "Executing render graph with {} passes, {} barriers",
-            graph.execution_order.len(),
-            graph.barriers.len()
+            compiled.execution_order.len(),
+            compiled.barriers.len()
         );
 
         // Create command encoder
@@ -632,7 +636,7 @@ impl GraphicsBackend for WgpuBackend {
             }
 
             // Execute passes in order
-            for pass_id in &graph.execution_order {
+            for pass_id in &compiled.execution_order {
                 log::debug!("Executing pass: {pass_id:?}");
 
                 // wgpu handles barriers automatically through resource state tracking

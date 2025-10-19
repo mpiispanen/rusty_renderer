@@ -49,7 +49,6 @@ struct Dependency {
 }
 
 /// Compiled render graph ready for execution
-#[derive(Debug)]
 pub struct CompiledGraph {
     /// Execution order of passes
     pub execution_order: Vec<PassId>,

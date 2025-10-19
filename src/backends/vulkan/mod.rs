@@ -2126,7 +2126,11 @@ impl GraphicsBackend for VulkanBackend {
         &self.swapchain
     }
 
-    fn execute_graph(&mut self, graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+    fn execute_graph(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
         let device = self
             .device
             .as_ref()
@@ -2134,8 +2138,8 @@ impl GraphicsBackend for VulkanBackend {
 
         log::debug!(
             "Executing render graph with {} passes, {} barriers",
-            graph.execution_order.len(),
-            graph.barriers.len()
+            compiled.execution_order.len(),
+            compiled.barriers.len()
         );
 
         // Get current command buffer
@@ -2185,23 +2189,26 @@ impl GraphicsBackend for VulkanBackend {
         }
 
         // Execute passes in order
-        for pass_id in &graph.execution_order {
+        for pass_id in &compiled.execution_order {
             log::debug!("Executing pass: {pass_id:?}");
 
             // Find barriers before this pass
-            for barrier in &graph.barriers {
+            for barrier in &compiled.barriers {
                 if barrier.dst_pass == *pass_id {
                     // Insert barriers
                     self.insert_barrier(command_buffer, barrier)?;
                 }
             }
 
-            // Execute pass callback
-            // For now, since the triangle is hardcoded in the shaders,
-            // we just draw it. In a full implementation, we would call
-            // the pass callback with proper context.
-            unsafe {
-                device.cmd_draw(command_buffer, 3, 1, 0, 0);
+            // Execute pass callback (M8.2)
+            if let Some(pass) = graph.get_pass(*pass_id) {
+                if let Some(callback) = &pass.callback {
+                    // Create execution context
+                    let mut context = VulkanPassContext::new(device, command_buffer);
+                    
+                    // Execute the pass
+                    callback.execute(&mut context);
+                }
             }
         }
 
@@ -2625,6 +2632,128 @@ impl Resource for VulkanResource {
 
     fn as_any(&self) -> &dyn Any {
         self
+    }
+}
+
+/// Vulkan pass execution context
+///
+/// Provides access to Vulkan command buffer recording during pass execution.
+struct VulkanPassContext {
+    device: *const VkDevice,
+    command_buffer: vk::CommandBuffer,
+}
+
+impl VulkanPassContext {
+    fn new(device: &VkDevice, command_buffer: vk::CommandBuffer) -> Self {
+        Self {
+            device: device as *const VkDevice,
+            command_buffer,
+        }
+    }
+    
+    fn device(&self) -> &VkDevice {
+        unsafe { &*self.device }
+    }
+}
+
+impl crate::render_graph::PassExecutionContext for VulkanPassContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn bind_vertex_buffer(
+        &mut self,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+    ) -> Result<()> {
+        // Cast the void pointer to VulkanBuffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
+        let vk_buffer = buffer_ref.handle();
+
+        unsafe {
+            self.device().cmd_bind_vertex_buffers(
+                self.command_buffer,
+                binding,
+                &[vk_buffer],
+                &[offset],
+            );
+        }
+
+        Ok(())
+    }
+
+    fn bind_index_buffer(
+        &mut self,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        index_type: crate::render_graph::IndexType,
+    ) -> Result<()> {
+        // Cast the void pointer to VulkanBuffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
+        let vk_buffer = buffer_ref.handle();
+
+        let vk_index_type = match index_type {
+            crate::render_graph::IndexType::U16 => vk::IndexType::UINT16,
+            crate::render_graph::IndexType::U32 => vk::IndexType::UINT32,
+        };
+
+        unsafe {
+            self.device().cmd_bind_index_buffer(
+                self.command_buffer,
+                vk_buffer,
+                offset,
+                vk_index_type,
+            );
+        }
+
+        Ok(())
+    }
+
+    fn draw(
+        &mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<()> {
+        unsafe {
+            self.device().cmd_draw(
+                self.command_buffer,
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            );
+        }
+
+        Ok(())
+    }
+
+    fn draw_indexed(
+        &mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<()> {
+        unsafe {
+            self.device().cmd_draw_indexed(
+                self.command_buffer,
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            );
+        }
+
+        Ok(())
     }
 }
 

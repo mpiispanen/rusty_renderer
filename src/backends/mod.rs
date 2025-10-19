@@ -129,7 +129,8 @@ pub trait GraphicsBackend: Send + Sync {
     /// automatic barrier insertion and synchronization.
     ///
     /// # Arguments
-    /// * `graph` - The compiled render graph to execute
+    /// * `graph` - The render graph containing pass definitions
+    /// * `compiled` - The compiled render graph with execution order
     ///
     /// # Returns
     /// Ok(()) if execution succeeded, Err otherwise
@@ -142,11 +143,15 @@ pub trait GraphicsBackend: Send + Sync {
     /// let mut graph = RenderGraph::new();
     /// // ... build graph ...
     /// let compiled = graph.compile()?;
-    /// backend.execute_graph(&compiled)?;
+    /// backend.execute_graph(&graph, &compiled)?;
     /// # Ok(())
     /// # }
     /// ```
-    fn execute_graph(&mut self, _graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+    fn execute_graph(
+        &mut self,
+        _graph: &crate::render_graph::graph::RenderGraph,
+        _compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
         // Default implementation: not yet supported
         // Backends should override this when they implement graph execution
         Err(anyhow::anyhow!(
