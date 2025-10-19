@@ -68,6 +68,13 @@ pub struct DirectXBackendImpl {
     pipeline_state: Option<ID3D12PipelineState>,
     root_signature: Option<ID3D12RootSignature>,
 
+    // Shader resource binding (M8.3)
+    cbv_srv_uav_heap: Option<ID3D12DescriptorHeap>, // Descriptor heap for CBV/SRV/UAV
+    cbv_srv_uav_descriptor_size: u32,
+    descriptor_heap_offset: u32, // Current offset in descriptor heap
+    root_signatures: Vec<ID3D12RootSignature>, // Root signatures for bind group layouts
+    descriptor_tables: Vec<u32>, // Descriptor table offsets for bind groups
+
     // Synchronization
     fence: Option<ID3D12Fence>,
     fence_value: u64,
@@ -118,6 +125,11 @@ impl DirectXBackendImpl {
             rtv_descriptor_size: 0,
             pipeline_state: None,
             root_signature: None,
+            cbv_srv_uav_heap: None,
+            cbv_srv_uav_descriptor_size: 0,
+            descriptor_heap_offset: 0,
+            root_signatures: Vec::new(),
+            descriptor_tables: Vec::new(),
             fence: None,
             fence_value: 0,
             fence_event: HANDLE::default(),
@@ -1241,6 +1253,151 @@ impl DirectXBackendImpl {
         );
         // TODO: Implement DirectX 12 sampler creation
         anyhow::bail!("DirectX 12 sampler creation not yet implemented")
+    }
+
+    // Shader Resource Binding (M8.3)
+
+    pub fn create_bind_group_layout(
+        &mut self,
+        layout: &crate::backends::BindGroupLayout,
+    ) -> Result<usize> {
+        use crate::backends::{ShaderBinding, ShaderStage};
+        use windows::Win32::Graphics::Direct3D12::*;
+
+        log::debug!("Creating DirectX 12 root signature for bind group layout");
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Build root parameters for each binding
+        let mut root_params: Vec<D3D12_ROOT_PARAMETER> = Vec::new();
+
+        for binding in layout.bindings() {
+            match binding {
+                ShaderBinding::UniformBuffer { binding: bind_idx, .. } => {
+                    // Constant Buffer View (CBV)
+                    let mut param = D3D12_ROOT_PARAMETER::default();
+                    param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    unsafe {
+                        param.Anonymous.Descriptor = D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: *bind_idx,
+                            RegisterSpace: 0,
+                        };
+                    }
+                    root_params.push(param);
+                }
+                ShaderBinding::StorageBuffer { binding: bind_idx, readonly, .. } => {
+                    // Unordered Access View (UAV) or Shader Resource View (SRV)
+                    let mut param = D3D12_ROOT_PARAMETER::default();
+                    if *readonly {
+                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_SRV;
+                    } else {
+                        param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_UAV;
+                    }
+                    param.ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
+                    unsafe {
+                        param.Anonymous.Descriptor = D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: *bind_idx,
+                            RegisterSpace: 0,
+                        };
+                    }
+                    root_params.push(param);
+                }
+                ShaderBinding::Texture { .. } | ShaderBinding::Sampler { .. } => {
+                    // TODO: Implement descriptor table for textures/samplers
+                    log::warn!("DirectX 12 texture/sampler binding via descriptor tables not yet fully implemented");
+                }
+            }
+        }
+
+        // Create root signature
+        let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
+            NumParameters: root_params.len() as u32,
+            pParameters: if root_params.is_empty() {
+                std::ptr::null()
+            } else {
+                root_params.as_ptr()
+            },
+            NumStaticSamplers: 0,
+            pStaticSamplers: std::ptr::null(),
+            Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+        };
+
+        let mut blob: Option<ID3DBlob> = None;
+        let mut error_blob: Option<ID3DBlob> = None;
+
+        unsafe {
+            D3D12SerializeRootSignature(
+                &root_sig_desc,
+                D3D_ROOT_SIGNATURE_VERSION_1,
+                &mut blob,
+                Some(&mut error_blob),
+            )
+            .context("Failed to serialize root signature")?;
+
+            let blob = blob.context("Root signature blob is null")?;
+
+            let root_signature: ID3D12RootSignature = device.CreateRootSignature(
+                0,
+                std::slice::from_raw_parts(
+                    blob.GetBufferPointer() as *const u8,
+                    blob.GetBufferSize(),
+                ),
+            )?;
+
+            self.root_signatures.push(root_signature);
+            let handle = self.root_signatures.len() - 1;
+
+            log::debug!("Created DirectX 12 root signature with handle {}", handle);
+            Ok(handle)
+        }
+    }
+
+    pub fn create_bind_group(
+        &mut self,
+        layout_handle: usize,
+        bind_group: &crate::backends::BindGroup,
+    ) -> Result<usize> {
+        use crate::backends::BoundResource;
+
+        log::debug!("Creating DirectX 12 bind group (descriptor table)");
+
+        // Verify layout exists
+        let _layout = self
+            .root_signatures
+            .get(layout_handle)
+            .context("Invalid bind group layout handle")?;
+
+        // For DirectX 12, bind groups are descriptor tables
+        // We allocate space in the descriptor heap
+        let current_offset = self.descriptor_heap_offset;
+
+        // Count how many descriptors we need
+        let mut descriptor_count = 0;
+        for (_binding, resource) in bind_group.resources() {
+            match resource {
+                BoundResource::UniformBuffer(_)
+                | BoundResource::StorageBuffer(_)
+                | BoundResource::Texture(_)
+                | BoundResource::Sampler(_) => {
+                    descriptor_count += 1;
+                }
+            }
+        }
+
+        // Reserve space in descriptor heap
+        // TODO: Actually create descriptors in the heap
+        self.descriptor_heap_offset += descriptor_count;
+
+        self.descriptor_tables.push(current_offset);
+        let handle = self.descriptor_tables.len() - 1;
+
+        log::debug!(
+            "Created DirectX 12 bind group with handle {} (descriptor offset: {})",
+            handle,
+            current_offset
+        );
+        Ok(handle)
     }
 
     pub fn bind_vertex_buffer(
