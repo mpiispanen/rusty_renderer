@@ -9,7 +9,7 @@ pub mod graph;
 mod pass;
 mod resource;
 
-pub use barrier::{Barrier, BarrierType, MemoryBarrier};
+pub use barrier::{Barrier, BarrierType, ImageBarrier, MemoryAccess, MemoryBarrier};
 pub use graph::{CompiledGraph, RenderGraph};
 pub use pass::{
     AccessType, ImageLayout, PassCallback, PassExecutionContext, PassId, PassKind, PipelineStage,

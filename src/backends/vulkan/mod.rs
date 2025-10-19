@@ -1260,6 +1260,185 @@ impl VulkanBackend {
 
         anyhow::bail!("Failed to find suitable memory type")
     }
+
+    /// Insert a barrier between passes
+    fn insert_barrier(
+        &self,
+        command_buffer: vk::CommandBuffer,
+        barrier: &crate::render_graph::Barrier,
+    ) -> Result<()> {
+        use crate::render_graph::PipelineStage;
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Translate image barriers
+        let image_barriers: Vec<vk::ImageMemoryBarrier> = barrier
+            .image_barriers
+            .iter()
+            .map(|img_barrier| {
+                // Translate layouts
+                let old_layout = Self::translate_image_layout(img_barrier.old_layout);
+                let new_layout = Self::translate_image_layout(img_barrier.new_layout);
+
+                // Translate access masks
+                let src_access = Self::translate_access_mask(&img_barrier.src_access);
+                let dst_access = Self::translate_access_mask(&img_barrier.dst_access);
+
+                // For now, use swapchain images - in full impl, look up actual image
+                let image = if self.headless {
+                    self.offscreen_image
+                } else {
+                    self.swapchain_images[self.image_index as usize]
+                };
+
+                vk::ImageMemoryBarrier::builder()
+                    .old_layout(old_layout)
+                    .new_layout(new_layout)
+                    .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                    .image(image)
+                    .subresource_range(vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    })
+                    .src_access_mask(src_access)
+                    .dst_access_mask(dst_access)
+                    .build()
+            })
+            .collect();
+
+        // Translate pipeline stages
+        let src_stage = Self::translate_pipeline_stage(
+            &barrier
+                .image_barriers
+                .first()
+                .map(|b| b.src_stage)
+                .unwrap_or_else(|| PipelineStage::new(PipelineStage::TOP_OF_PIPE)),
+        );
+        let dst_stage = Self::translate_pipeline_stage(
+            &barrier
+                .image_barriers
+                .first()
+                .map(|b| b.dst_stage)
+                .unwrap_or_else(|| PipelineStage::new(PipelineStage::BOTTOM_OF_PIPE)),
+        );
+
+        // Insert pipeline barrier
+        unsafe {
+            device.cmd_pipeline_barrier(
+                command_buffer,
+                src_stage,
+                dst_stage,
+                vk::DependencyFlags::empty(),
+                &[] as &[vk::MemoryBarrier],
+                &[] as &[vk::BufferMemoryBarrier],
+                &image_barriers,
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Translate render graph image layout to Vulkan
+    fn translate_image_layout(layout: crate::render_graph::ImageLayout) -> vk::ImageLayout {
+        use crate::render_graph::ImageLayout;
+        match layout {
+            ImageLayout::Undefined => vk::ImageLayout::UNDEFINED,
+            ImageLayout::General => vk::ImageLayout::GENERAL,
+            ImageLayout::ColorAttachment => vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            ImageLayout::DepthStencilAttachment => {
+                vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+            }
+            ImageLayout::ShaderReadOnly => vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+            ImageLayout::TransferSrc => vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+            ImageLayout::TransferDst => vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+            ImageLayout::Present => vk::ImageLayout::PRESENT_SRC_KHR,
+        }
+    }
+
+    /// Translate render graph access mask to Vulkan
+    fn translate_access_mask(access: &crate::render_graph::MemoryAccess) -> vk::AccessFlags {
+        use crate::render_graph::MemoryAccess;
+
+        let mut flags = vk::AccessFlags::empty();
+
+        if access.contains(MemoryAccess::READ) {
+            flags |= vk::AccessFlags::MEMORY_READ;
+        }
+        if access.contains(MemoryAccess::WRITE) {
+            flags |= vk::AccessFlags::MEMORY_WRITE;
+        }
+        if access.contains(MemoryAccess::COLOR_ATTACHMENT_READ) {
+            flags |= vk::AccessFlags::COLOR_ATTACHMENT_READ;
+        }
+        if access.contains(MemoryAccess::COLOR_ATTACHMENT_WRITE) {
+            flags |= vk::AccessFlags::COLOR_ATTACHMENT_WRITE;
+        }
+        if access.contains(MemoryAccess::DEPTH_STENCIL_READ) {
+            flags |= vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_READ;
+        }
+        if access.contains(MemoryAccess::DEPTH_STENCIL_WRITE) {
+            flags |= vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE;
+        }
+        if access.contains(MemoryAccess::TRANSFER_READ) {
+            flags |= vk::AccessFlags::TRANSFER_READ;
+        }
+        if access.contains(MemoryAccess::TRANSFER_WRITE) {
+            flags |= vk::AccessFlags::TRANSFER_WRITE;
+        }
+        if access.contains(MemoryAccess::SHADER_READ) {
+            flags |= vk::AccessFlags::SHADER_READ;
+        }
+        if access.contains(MemoryAccess::SHADER_WRITE) {
+            flags |= vk::AccessFlags::SHADER_WRITE;
+        }
+
+        flags
+    }
+
+    /// Translate render graph pipeline stage to Vulkan
+    fn translate_pipeline_stage(
+        stage: &crate::render_graph::PipelineStage,
+    ) -> vk::PipelineStageFlags {
+        use crate::render_graph::PipelineStage;
+
+        let mut flags = vk::PipelineStageFlags::empty();
+
+        if stage.contains(PipelineStage::TOP_OF_PIPE) {
+            flags |= vk::PipelineStageFlags::TOP_OF_PIPE;
+        }
+        if stage.contains(PipelineStage::VERTEX_INPUT) {
+            flags |= vk::PipelineStageFlags::VERTEX_INPUT;
+        }
+        if stage.contains(PipelineStage::VERTEX_SHADER) {
+            flags |= vk::PipelineStageFlags::VERTEX_SHADER;
+        }
+        if stage.contains(PipelineStage::FRAGMENT_SHADER) {
+            flags |= vk::PipelineStageFlags::FRAGMENT_SHADER;
+        }
+        if stage.contains(PipelineStage::COLOR_ATTACHMENT_OUTPUT) {
+            flags |= vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT;
+        }
+        if stage.contains(PipelineStage::COMPUTE_SHADER) {
+            flags |= vk::PipelineStageFlags::COMPUTE_SHADER;
+        }
+        if stage.contains(PipelineStage::TRANSFER) {
+            flags |= vk::PipelineStageFlags::TRANSFER;
+        }
+        if stage.contains(PipelineStage::BOTTOM_OF_PIPE) {
+            flags |= vk::PipelineStageFlags::BOTTOM_OF_PIPE;
+        }
+
+        // Default to all graphics if no flags set
+        if flags.is_empty() {
+            flags = vk::PipelineStageFlags::ALL_GRAPHICS;
+        }
+
+        flags
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -1764,6 +1943,95 @@ impl GraphicsBackend for VulkanBackend {
 
     fn swapchain(&self) -> &dyn Swapchain {
         &self.swapchain
+    }
+
+    fn execute_graph(&mut self, graph: &crate::render_graph::graph::CompiledGraph) -> Result<()> {
+        let device = self
+            .device
+            .as_ref()
+            .context("Device not initialized for graph execution")?;
+
+        log::debug!(
+            "Executing render graph with {} passes, {} barriers",
+            graph.execution_order.len(),
+            graph.barriers.len()
+        );
+
+        // Get current command buffer
+        let image_index = if self.headless {
+            0
+        } else {
+            self.image_index as usize
+        };
+        let command_buffer = self.command_buffers[image_index];
+
+        // Begin command buffer if not already begun
+        let begin_info = vk::CommandBufferBeginInfo::builder();
+        unsafe {
+            device.begin_command_buffer(command_buffer, &begin_info)?;
+        }
+
+        // Clear values for render pass
+        let clear_values = &[vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 1.0],
+            },
+        }];
+
+        // Begin render pass
+        let render_pass_info = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.render_pass)
+            .framebuffer(self.framebuffers[image_index])
+            .render_area(vk::Rect2D {
+                offset: vk::Offset2D { x: 0, y: 0 },
+                extent: self.swapchain_extent,
+            })
+            .clear_values(clear_values);
+
+        unsafe {
+            device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_info,
+                vk::SubpassContents::INLINE,
+            );
+
+            // Bind pipeline
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline,
+            );
+        }
+
+        // Execute passes in order
+        for pass_id in &graph.execution_order {
+            log::debug!("Executing pass: {pass_id:?}");
+
+            // Find barriers before this pass
+            for barrier in &graph.barriers {
+                if barrier.dst_pass == *pass_id {
+                    // Insert barriers
+                    self.insert_barrier(command_buffer, barrier)?;
+                }
+            }
+
+            // Execute pass callback
+            // For now, since the triangle is hardcoded in the shaders,
+            // we just draw it. In a full implementation, we would call
+            // the pass callback with proper context.
+            unsafe {
+                device.cmd_draw(command_buffer, 3, 1, 0, 0);
+            }
+        }
+
+        // End render pass and command buffer
+        unsafe {
+            device.cmd_end_render_pass(command_buffer);
+            device.end_command_buffer(command_buffer)?;
+        }
+
+        log::debug!("Render graph execution complete");
+        Ok(())
     }
 }
 
