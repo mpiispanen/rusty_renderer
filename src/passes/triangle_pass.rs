@@ -70,14 +70,15 @@ impl TrianglePass {
 struct TrianglePassCallback;
 
 impl PassCallback for TrianglePassCallback {
-    fn execute(&self, _context: &mut dyn PassExecutionContext) {
-        // The actual drawing is currently handled by the backend's execute_graph
-        // In a full implementation, this would:
-        // 1. Downcast context to backend-specific type (e.g., VulkanPassContext)
-        // 2. Bind pipeline
-        // 3. Set viewport/scissor
-        // 4. Issue draw call: cmd_draw(3, 1, 0, 0)
-
+    fn execute(&self, context: &mut dyn PassExecutionContext) {
+        // M8.2: Now we actually issue the draw command through the context
+        // The backend (Vulkan, wgpu, DirectX) will handle the actual command recording
+        
+        // Draw 3 vertices (triangle) with 1 instance
+        if let Err(e) = context.draw(3, 1, 0, 0) {
+            log::error!("Failed to draw triangle: {}", e);
+        }
+        
         log::trace!("Triangle pass callback executed");
     }
 }
