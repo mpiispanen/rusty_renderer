@@ -242,21 +242,58 @@ Both methods are fast enough for automated testing. Python API method is recomme
 Example GitHub Actions workflow:
 
 ```yaml
+# Linux: Test Vulkan and wgpu
 - name: Install FLIP
   run: |
     pip install flip-evaluator numpy pillow
-    
-- name: Run Visual Tests
+
+- name: Test Vulkan rendering
   run: |
-    cargo test --test visual_tests -- --ignored --nocapture
-    
-- name: Upload Error Maps
-  if: failure()
-  uses: actions/upload-artifact@v3
+    ./target/release/rusty_renderer \
+      --backend vulkan --headless \
+      --screenshot screenshots/vulkan-triangle.png --max-frames 1
+
+- name: Test wgpu rendering
+  run: |
+    ./target/release/rusty_renderer \
+      --backend wgpu --headless \
+      --screenshot screenshots/wgpu-triangle.png --max-frames 1
+
+# Windows: Test DirectX
+- name: Test DirectX rendering
+  run: |
+    ./target/release/rusty_renderer.exe \
+      --backend directx --headless \
+      --screenshot screenshots/directx-triangle.png --max-frames 1
+
+# Generate comprehensive report comparing all backends
+- name: Generate visual regression report
+  run: |
+    python3 scripts/generate_visual_report.py \
+      screenshots/ \
+      visual-regression-report.html
+
+- name: Upload Report
+  uses: actions/upload-artifact@v4
   with:
-    name: flip-error-maps
-    path: target/visual_tests/*error*.png
+    name: visual-regression-report
+    path: |
+      visual-regression-report.html
+      screenshots/
+      flip_results/
 ```
+
+The actual CI workflow:
+1. **Linux job** renders with Vulkan and wgpu
+2. **Windows job** renders with DirectX 12
+3. **Report job** downloads all screenshots and generates comprehensive HTML report
+4. Report compares all backend pairs (Vulkan-wgpu, Vulkan-DirectX, wgpu-DirectX)
+5. Uploads combined report as CI artifact
+
+**Accessing Reports:**
+- Go to GitHub Actions → Workflow Run
+- Download `visual-regression-report-all-backends` artifact
+- Open `visual-regression-report.html` in browser
 
 ## Future Enhancements
 

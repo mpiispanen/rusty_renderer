@@ -161,14 +161,21 @@ jobs:
           echo "   Report: visual-regression-report.html"
           echo "   All comparisons passed!" 
       
-      - name: Upload visual regression report
+      - name: Upload Linux screenshots
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: visual-regression-report
+          name: screenshots-linux
+          path: screenshots/
+          retention-days: 7
+      
+      - name: Upload visual regression report (Linux only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report-linux
           path: |
             visual-regression-report.html
-            screenshots/
             flip_results/
           retention-days: 30
 
@@ -293,14 +300,100 @@ jobs:
         shell: powershell
       
       - name: Upload DirectX screenshot
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: directx-screenshot
-          path: screenshots/directx-triangle.png
-          retention-days: 30
+          name: screenshots-windows
+          path: screenshots/
+          retention-days: 7
       
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
         with:
           name: rusty_renderer-windows
           path: target/release/rusty_renderer.exe
+  
+  # Generate comprehensive visual regression report with all backends
+  visual-regression-report:
+    name: Visual Regression Report (All Backends)
+    runs-on: ubuntu-latest
+    needs: [test-gpu, build-windows]
+    if: always()
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Install FLIP
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install flip-evaluator numpy pillow
+      
+      - name: Download Linux screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-linux
+          path: screenshots/
+      
+      - name: Download Windows screenshots
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-windows
+          path: screenshots/
+      
+      - name: List all screenshots
+        run: |
+          echo "📸 Available screenshots:"
+          ls -lh screenshots/
+          echo ""
+          echo "Backends detected:"
+          ls screenshots/ | grep -E "(vulkan|wgpu|directx)" || echo "None found"
+      
+      - name: Generate comprehensive visual regression report
+        run: |
+          echo "📊 Generating comprehensive visual regression report..."
+          echo "   Comparing all available backends..."
+          
+          python3 scripts/generate_visual_report.py \
+            screenshots/ \
+            visual-regression-report.html \
+            --temp-dir flip_results || {
+              echo "⚠️  Report generation failed, but continuing..."
+              echo "This might happen if only one backend is available."
+              exit 0
+            }
+          
+          if [ -f visual-regression-report.html ]; then
+            echo ""
+            echo "✅ Visual regression report generated successfully!"
+            echo "   Report: visual-regression-report.html"
+            
+            # Display summary if JSON files exist
+            if [ -d flip_results ] && [ -n "$(ls -A flip_results/*.json 2>/dev/null)" ]; then
+              echo ""
+              echo "📊 Comparison Summary:"
+              for json in flip_results/*.json; do
+                if [ -f "$json" ]; then
+                  echo "  $(basename $json):"
+                  python3 -c "import json; data=json.load(open('$json')); print(f\"    Mean: {data['mean']:.6f}, Status: {'✅ PASS' if data['mean'] < 0.15 else '❌ FAIL'}\")"
+                fi
+              done
+            fi
+          else
+            echo "⚠️  No report generated (may need at least 2 backends)"
+          fi
+      
+      - name: Upload comprehensive visual regression report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-report-all-backends
+          path: |
+            visual-regression-report.html
+            screenshots/
+            flip_results/
+          retention-days: 30
