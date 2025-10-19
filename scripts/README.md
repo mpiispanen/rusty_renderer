@@ -53,6 +53,51 @@ python3 scripts/flip_compare.py reference.png test.png -v 0
 
 See `src/testing/README.md` for integration with Rust tests.
 
+### generate_visual_report.py
+
+Comprehensive HTML report generator for visual regression testing.
+
+**Features:**
+- Compares all backend pairs automatically
+- Generates embedded HTML report with images
+- FLIP error maps included
+- Color-coded metrics and status badges
+- Self-contained (all images embedded as base64)
+
+**Usage:**
+```bash
+# Generate report from screenshot directory
+python3 scripts/generate_visual_report.py screenshots/ report.html
+
+# With custom temp directory
+python3 scripts/generate_visual_report.py screenshots/ report.html --temp-dir flip_temp
+```
+
+**Output:**
+- Single HTML file with all images embedded
+- Color-coded comparison results
+- FLIP metrics for each pair
+- Visual error maps
+- Threshold interpretation
+
+**Example:**
+```bash
+# After running visual tests
+cargo test --test visual_tests -- --ignored
+
+# Generate comprehensive report
+python3 scripts/generate_visual_report.py \
+    target/visual_tests/ \
+    visual-regression-report.html
+```
+
+The report includes:
+- Summary cards (total comparisons, pass rate, backends)
+- Detailed metrics for each comparison
+- Side-by-side screenshots
+- FLIP error maps
+- Interpretation of results
+
 ### batch_flip_compare.sh
 
 Batch comparison script for comparing multiple images in directories.
