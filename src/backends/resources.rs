@@ -228,7 +228,7 @@ impl TextureUsage {
 
 /// Texture descriptor for creation
 #[derive(Debug, Clone)]
-pub struct TextureDescriptor {
+pub struct TextureDescriptor<'a> {
     /// Width in pixels
     pub width: u32,
     /// Height in pixels
@@ -239,6 +239,8 @@ pub struct TextureDescriptor {
     pub usage: TextureUsage,
     /// Number of mip levels (1 = no mipmaps)
     pub mip_levels: u32,
+    /// Optional initial data to upload (RGBA8 format, must match dimensions)
+    pub initial_data: Option<&'a [u8]>,
     /// Debug label
     pub label: Option<String>,
 }

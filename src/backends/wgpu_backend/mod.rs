@@ -741,37 +741,153 @@ impl GraphicsBackend for WgpuBackend {
         &mut self,
         desc: &super::TextureDescriptor,
     ) -> Result<Box<dyn super::Texture>> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let wgpu_format = texture_format_to_wgpu(desc.format);
+
+        // Convert usage flags
+        let mut wgpu_usage = wgpu::TextureUsages::empty();
+        if desc.usage.sampled {
+            wgpu_usage |= wgpu::TextureUsages::TEXTURE_BINDING;
+        }
+        if desc.usage.render_target {
+            wgpu_usage |= wgpu::TextureUsages::RENDER_ATTACHMENT;
+        }
+        if desc.usage.transfer_dst {
+            wgpu_usage |= wgpu::TextureUsages::COPY_DST;
+        }
+        if desc.usage.transfer_src {
+            wgpu_usage |= wgpu::TextureUsages::COPY_SRC;
+        }
+
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: desc.label.as_deref(),
+            size: wgpu::Extent3d {
+                width: desc.width,
+                height: desc.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: desc.mip_levels,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu_format,
+            usage: wgpu_usage,
+            view_formats: &[],
+        });
+
+        // If initial data is provided, upload it
+        if let Some(data) = desc.initial_data {
+            let queue = self.queue.as_ref().context("Queue not initialized")?;
+            let bytes_per_row = desc.width * desc.format.bytes_per_pixel();
+
+            queue.write_texture(
+                wgpu::ImageCopyTexture {
+                    texture: &texture,
+                    mip_level: 0,
+                    origin: wgpu::Origin3d::ZERO,
+                    aspect: wgpu::TextureAspect::All,
+                },
+                data,
+                wgpu::ImageDataLayout {
+                    offset: 0,
+                    bytes_per_row: Some(bytes_per_row),
+                    rows_per_image: Some(desc.height),
+                },
+                wgpu::Extent3d {
+                    width: desc.width,
+                    height: desc.height,
+                    depth_or_array_layers: 1,
+                },
+            );
+        }
+
         log::debug!(
-            "Creating wgpu texture: {}x{}, format: {:?}",
+            "Created wgpu texture: {}x{}, format: {:?}, mip_levels: {}",
             desc.width,
             desc.height,
-            desc.format
+            desc.format,
+            desc.mip_levels
         );
-        // TODO: Implement wgpu texture creation
-        anyhow::bail!("wgpu texture creation not yet implemented")
+
+        Ok(Box::new(WgpuTexture {
+            texture,
+            width: desc.width,
+            height: desc.height,
+            format: desc.format,
+            usage: desc.usage,
+            mip_levels: desc.mip_levels,
+        }))
     }
 
     fn upload_to_texture(
         &mut self,
-        _texture: &dyn super::Texture,
-        _data: &[u8],
-        _mip_level: u32,
+        texture: &dyn super::Texture,
+        data: &[u8],
+        mip_level: u32,
     ) -> Result<()> {
-        // TODO: Implement wgpu texture upload
-        anyhow::bail!("wgpu texture upload not yet implemented")
+        let queue = self.queue.as_ref().context("Queue not initialized")?;
+
+        // Downcast to WgpuTexture
+        let wgpu_texture = texture
+            .as_any()
+            .downcast_ref::<WgpuTexture>()
+            .context("Expected WgpuTexture")?;
+
+        let bytes_per_row = wgpu_texture.width * wgpu_texture.format.bytes_per_pixel();
+
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &wgpu_texture.texture,
+                mip_level,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            data,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(bytes_per_row),
+                rows_per_image: Some(wgpu_texture.height),
+            },
+            wgpu::Extent3d {
+                width: wgpu_texture.width,
+                height: wgpu_texture.height,
+                depth_or_array_layers: 1,
+            },
+        );
+
+        log::debug!("Uploaded data to wgpu texture at mip level {mip_level}");
+
+        Ok(())
     }
 
     fn create_sampler(
         &mut self,
         desc: &super::SamplerDescriptor,
     ) -> Result<Box<dyn super::Sampler>> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: desc.label.as_deref(),
+            address_mode_u: address_mode_to_wgpu(desc.address_mode_u),
+            address_mode_v: address_mode_to_wgpu(desc.address_mode_v),
+            address_mode_w: address_mode_to_wgpu(desc.address_mode_w),
+            mag_filter: filter_mode_to_wgpu(desc.mag_filter),
+            min_filter: filter_mode_to_wgpu(desc.min_filter),
+            mipmap_filter: filter_mode_to_wgpu(desc.mipmap_filter),
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 32.0,
+            compare: None,
+            anisotropy_clamp: 1,
+            border_color: None,
+        });
+
         log::debug!(
-            "Creating wgpu sampler: mag={:?}, min={:?}",
+            "Created wgpu sampler: mag={:?}, min={:?}",
             desc.mag_filter,
             desc.min_filter
         );
-        // TODO: Implement wgpu sampler creation
-        anyhow::bail!("wgpu sampler creation not yet implemented")
+
+        Ok(Box::new(WgpuSampler { sampler }))
     }
 
     // Shader Resource Binding (M8.3)
@@ -900,6 +1016,35 @@ fn shader_stage_to_wgpu(stage: ShaderStage) -> wgpu::ShaderStages {
     }
 
     stages
+}
+
+/// Convert TextureFormat to wgpu::TextureFormat
+fn texture_format_to_wgpu(format: super::TextureFormat) -> wgpu::TextureFormat {
+    match format {
+        super::TextureFormat::Rgba8Srgb => wgpu::TextureFormat::Rgba8UnormSrgb,
+        super::TextureFormat::Rgba8Unorm => wgpu::TextureFormat::Rgba8Unorm,
+        super::TextureFormat::Bgra8Srgb => wgpu::TextureFormat::Bgra8UnormSrgb,
+        super::TextureFormat::Bgra8Unorm => wgpu::TextureFormat::Bgra8Unorm,
+        super::TextureFormat::Depth32Float => wgpu::TextureFormat::Depth32Float,
+        super::TextureFormat::Depth24PlusStencil8 => wgpu::TextureFormat::Depth24PlusStencil8,
+    }
+}
+
+/// Convert FilterMode to wgpu::FilterMode
+fn filter_mode_to_wgpu(filter: super::FilterMode) -> wgpu::FilterMode {
+    match filter {
+        super::FilterMode::Nearest => wgpu::FilterMode::Nearest,
+        super::FilterMode::Linear => wgpu::FilterMode::Linear,
+    }
+}
+
+/// Convert AddressMode to wgpu::AddressMode
+fn address_mode_to_wgpu(mode: super::AddressMode) -> wgpu::AddressMode {
+    match mode {
+        super::AddressMode::ClampToEdge => wgpu::AddressMode::ClampToEdge,
+        super::AddressMode::Repeat => wgpu::AddressMode::Repeat,
+        super::AddressMode::MirrorRepeat => wgpu::AddressMode::MirrorRepeat,
+    }
 }
 
 /// Stub Device implementation
@@ -1087,6 +1232,62 @@ impl super::Buffer for WgpuBuffer {
         // No-op for now
     }
 
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+// WgpuTexture implementation
+struct WgpuTexture {
+    texture: wgpu::Texture,
+    width: u32,
+    height: u32,
+    format: super::TextureFormat,
+    usage: super::TextureUsage,
+    mip_levels: u32,
+}
+
+impl super::Texture for WgpuTexture {
+    fn width(&self) -> u32 {
+        self.width
+    }
+
+    fn height(&self) -> u32 {
+        self.height
+    }
+
+    fn format(&self) -> super::TextureFormat {
+        self.format
+    }
+
+    fn usage(&self) -> super::TextureUsage {
+        self.usage
+    }
+
+    fn mip_levels(&self) -> u32 {
+        self.mip_levels
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+// WgpuSampler implementation
+#[allow(dead_code)] // Field will be used when binding samplers in Phase 4
+struct WgpuSampler {
+    sampler: wgpu::Sampler,
+}
+
+impl super::Sampler for WgpuSampler {
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }

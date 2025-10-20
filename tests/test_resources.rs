@@ -66,6 +66,7 @@ fn test_texture_creation_vulkan() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture".to_string()),
     };
 
@@ -90,6 +91,7 @@ fn test_texture_upload_vulkan() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture Upload".to_string()),
     };
 
@@ -200,6 +202,7 @@ fn test_texture_creation_wgpu() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture".to_string()),
     };
 
@@ -224,6 +227,7 @@ fn test_texture_upload_wgpu() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture Upload".to_string()),
     };
 
@@ -334,6 +338,7 @@ fn test_texture_creation_directx() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture".to_string()),
     };
 
@@ -358,6 +363,7 @@ fn test_texture_upload_directx() {
         format: TextureFormat::Rgba8Srgb,
         usage: TextureUsage::sampled(),
         mip_levels: 1,
+        initial_data: None,
         label: Some("Test Texture Upload".to_string()),
     };
 
@@ -473,6 +479,7 @@ fn test_texture_formats() {
             format,
             usage: TextureUsage::sampled(),
             mip_levels: 1,
+            initial_data: None,
             label: Some(format!("Test {format:?}")),
         };
 
