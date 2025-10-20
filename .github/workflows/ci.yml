@@ -242,13 +242,39 @@ jobs:
       - name: Build examples
         run: cargo build --release --examples
       
-      - name: Test DirectX 12 with WARP (TODO - needs M9.5 update)
-        continue-on-error: true
+      - name: Test DirectX 12 with WARP (headless)
         run: |
-          echo "⚠️  DirectX backend needs M9.5 updates (PassExecutionContext)"
-          echo "   This test will be enabled once DirectX has M9 parity"
-          echo "   For now, just verify the example builds"
+          Write-Host "Testing DirectX 12 backend with render_graph_triangle example"
+          mkdir screenshots
+          $env:RUST_LOG = "info"
+          ./target/release/examples/render_graph_triangle.exe --headless directx
+          Move-Item render_graph_triangle.png screenshots/directx-triangle.png
         shell: powershell
+      
+      - name: Verify DirectX screenshot
+        run: |
+          if (Test-Path screenshots/directx-triangle.png) {
+            $fileSize = (Get-Item screenshots/directx-triangle.png).Length
+            Write-Host "DirectX screenshot size: $fileSize bytes"
+            if ($fileSize -gt 0) {
+              Write-Host "✅ DirectX screenshot created successfully"
+            } else {
+              Write-Host "❌ DirectX screenshot is empty"
+              exit 1
+            }
+          } else {
+            Write-Host "❌ DirectX screenshot not found"
+            exit 1
+          }
+        shell: powershell
+      
+      - name: Upload DirectX screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-windows
+          path: screenshots/
+          retention-days: 7
       
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
