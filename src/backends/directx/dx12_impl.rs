@@ -1204,18 +1204,109 @@ impl DirectXBackendImpl {
             desc.size,
             desc.usage
         );
-        // TODO: Implement DirectX 12 buffer creation
-        anyhow::bail!("DirectX 12 buffer creation not yet implemented")
+        
+        use windows::Win32::Graphics::Direct3D12::*;
+        
+        let device = self.device.as_ref().context("Device not initialized")?;
+        
+        // Map heap properties based on memory location
+        let heap_props = match desc.memory_location {
+            crate::backends::MemoryLocation::GpuOnly => D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_DEFAULT,
+                ..Default::default()
+            },
+            crate::backends::MemoryLocation::CpuToGpu => D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_UPLOAD,
+                ..Default::default()
+            },
+            crate::backends::MemoryLocation::GpuToCpu => D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_READBACK,
+                ..Default::default()
+            },
+        };
+        
+        // Map buffer usage to resource state
+        let initial_state = if desc.usage.vertex {
+            D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+        } else if desc.usage.index {
+            D3D12_RESOURCE_STATE_INDEX_BUFFER
+        } else if desc.usage.uniform {
+            D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+        } else {
+            D3D12_RESOURCE_STATE_COMMON
+        };
+        
+        let buffer_desc = D3D12_RESOURCE_DESC {
+            Dimension: D3D12_RESOURCE_DIMENSION_BUFFER,
+            Alignment: 0,
+            Width: desc.size,
+            Height: 1,
+            DepthOrArraySize: 1,
+            MipLevels: 1,
+            Format: windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_UNKNOWN,
+            SampleDesc: windows::Win32::Graphics::Dxgi::Common::DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            },
+            Layout: D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+            Flags: D3D12_RESOURCE_FLAG_NONE,
+        };
+        
+        let mut resource: Option<ID3D12Resource> = None;
+        unsafe {
+            device.CreateCommittedResource(
+                &heap_props,
+                D3D12_HEAP_FLAG_NONE,
+                &buffer_desc,
+                initial_state,
+                None,
+                &mut resource,
+            )?;
+        }
+        
+        let resource = resource.context("Failed to create D3D12 buffer resource")?;
+        
+        Ok(Box::new(DirectXBuffer {
+            resource,
+            size: desc.size,
+            usage: desc.usage,
+            memory_location: desc.memory_location,
+        }))
     }
 
     pub fn upload_to_buffer(
         &mut self,
-        _buffer: &dyn crate::backends::Buffer,
-        _data: &[u8],
-        _offset: u64,
+        buffer: &dyn crate::backends::Buffer,
+        data: &[u8],
+        offset: u64,
     ) -> Result<()> {
-        // TODO: Implement DirectX 12 buffer upload
-        anyhow::bail!("DirectX 12 buffer upload not yet implemented")
+        let dx_buffer = buffer
+            .as_any()
+            .downcast_ref::<DirectXBuffer>()
+            .context("Buffer is not a DirectXBuffer")?;
+        
+        // Check bounds
+        if offset + data.len() as u64 > buffer.size() {
+            anyhow::bail!(
+                "Upload out of bounds: offset {} + size {} > buffer size {}",
+                offset,
+                data.len(),
+                buffer.size()
+            );
+        }
+        
+        // Map and copy data
+        unsafe {
+            let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+            dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
+            
+            let dst = (mapped_ptr as *mut u8).add(offset as usize);
+            std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+            
+            dx_buffer.resource.Unmap(0, None);
+        }
+        
+        Ok(())
     }
 
     pub fn create_texture(
@@ -1586,5 +1677,43 @@ impl Swapchain for DirectXSwapchain {
         self.width = width;
         self.height = height;
         Ok(())
+    }
+}
+
+// DirectXBuffer implementation
+struct DirectXBuffer {
+    resource: windows::Win32::Graphics::Direct3D12::ID3D12Resource,
+    size: u64,
+    usage: crate::backends::BufferUsage,
+    memory_location: crate::backends::MemoryLocation,
+}
+
+impl crate::backends::Buffer for DirectXBuffer {
+    fn size(&self) -> u64 {
+        self.size
+    }
+
+    fn usage(&self) -> crate::backends::BufferUsage {
+        self.usage
+    }
+
+    fn memory_location(&self) -> crate::backends::MemoryLocation {
+        self.memory_location
+    }
+
+    fn map(&mut self) -> Result<&mut [u8]> {
+        anyhow::bail!("DirectX buffer mapping not yet implemented")
+    }
+
+    fn unmap(&mut self) {
+        // No-op for now
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

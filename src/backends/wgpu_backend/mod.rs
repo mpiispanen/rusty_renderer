@@ -705,18 +705,67 @@ impl GraphicsBackend for WgpuBackend {
             desc.size,
             desc.usage
         );
-        // TODO: Implement wgpu buffer creation
-        anyhow::bail!("wgpu buffer creation not yet implemented")
+        
+        let device = self.device.as_ref().context("Device not initialized")?;
+        
+        // Convert usage flags
+        let mut wgpu_usage = wgpu::BufferUsages::empty();
+        if desc.usage.vertex {
+            wgpu_usage |= wgpu::BufferUsages::VERTEX;
+        }
+        if desc.usage.index {
+            wgpu_usage |= wgpu::BufferUsages::INDEX;
+        }
+        if desc.usage.uniform {
+            wgpu_usage |= wgpu::BufferUsages::UNIFORM;
+        }
+        if desc.usage.transfer_src {
+            wgpu_usage |= wgpu::BufferUsages::COPY_SRC;
+        }
+        if desc.usage.transfer_dst {
+            wgpu_usage |= wgpu::BufferUsages::COPY_DST;
+        }
+        
+        let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: desc.label.as_deref(),
+            size: desc.size,
+            usage: wgpu_usage,
+            mapped_at_creation: false,
+        });
+        
+        Ok(Box::new(WgpuBuffer {
+            buffer,
+            size: desc.size,
+            usage: desc.usage,
+            memory_location: desc.memory_location,
+        }))
     }
 
     fn upload_to_buffer(
         &mut self,
-        _buffer: &dyn super::Buffer,
-        _data: &[u8],
-        _offset: u64,
+        buffer: &dyn super::Buffer,
+        data: &[u8],
+        offset: u64,
     ) -> Result<()> {
-        // TODO: Implement wgpu buffer upload
-        anyhow::bail!("wgpu buffer upload not yet implemented")
+        let queue = self.queue.as_ref().context("Queue not initialized")?;
+        
+        let wgpu_buffer = buffer
+            .as_any()
+            .downcast_ref::<WgpuBuffer>()
+            .context("Buffer is not a WgpuBuffer")?;
+        
+        // Check bounds
+        if offset + data.len() as u64 > buffer.size() {
+            anyhow::bail!(
+                "Upload out of bounds: offset {} + size {} > buffer size {}",
+                offset,
+                data.len(),
+                buffer.size()
+            );
+        }
+        
+        queue.write_buffer(&wgpu_buffer.buffer, offset, data);
+        Ok(())
     }
 
     fn create_texture(
@@ -1037,6 +1086,44 @@ impl Swapchain for WgpuSwapchain {
         self.width = width;
         self.height = height;
         Ok(())
+    }
+}
+
+// WgpuBuffer implementation
+struct WgpuBuffer {
+    buffer: wgpu::Buffer,
+    size: u64,
+    usage: super::BufferUsage,
+    memory_location: super::MemoryLocation,
+}
+
+impl super::Buffer for WgpuBuffer {
+    fn size(&self) -> u64 {
+        self.size
+    }
+
+    fn usage(&self) -> super::BufferUsage {
+        self.usage
+    }
+
+    fn memory_location(&self) -> super::MemoryLocation {
+        self.memory_location
+    }
+
+    fn map(&mut self) -> Result<&mut [u8]> {
+        anyhow::bail!("wgpu buffer mapping not yet implemented")
+    }
+
+    fn unmap(&mut self) {
+        // No-op for now
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 
