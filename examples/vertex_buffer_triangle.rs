@@ -3,6 +3,15 @@
 //! This example demonstrates rendering a triangle using actual vertex buffers
 //! and proper render pass classes. This is the M9 milestone update showing
 //! clean architecture without raw pointer workarounds.
+//!
+//! By default, runs in headless mode (offscreen rendering) which is useful for
+//! CI/testing. For interactive windowed rendering, use the main application
+//! framework (see examples in the app module).
+//!
+//! Usage:
+//!   cargo run --example vertex_buffer_triangle [backend]
+//!   cargo run --example vertex_buffer_triangle vulkan
+//!   cargo run --example vertex_buffer_triangle wgpu
 
 use anyhow::Result;
 use rusty_renderer::backends::{
@@ -38,19 +47,29 @@ fn main() -> Result<()> {
             "vulkan" => Some(BackendType::Vulkan),
             "wgpu" => Some(BackendType::Wgpu),
             "directx" | "dx12" => Some(BackendType::DirectX12),
+            "--help" | "-h" => {
+                println!("Usage: vertex_buffer_triangle [BACKEND]");
+                println!("\nBackends:");
+                println!("  vulkan    Use Vulkan backend (default)");
+                println!("  wgpu      Use wgpu backend");
+                println!("  directx   Use DirectX 12 backend (Windows only)");
+                println!("\nNote: Runs in headless mode (offscreen rendering).");
+                println!("For interactive windowed rendering, use the main application.");
+                std::process::exit(0);
+            }
             _ => None,
         })
         .unwrap_or(BackendType::Vulkan);
 
     println!("Using backend: {backend_type}");
+    println!("Mode: Headless (offscreen rendering)\n");
 
     // Create backend
     let mut backend = create_backend(backend_type, true)?;
-    println!("Backend created");
 
     // Initialize in headless mode for screenshot capture
     backend.initialize_headless(800, 600)?;
-    println!("Backend initialized (headless 800x600)");
+    println!("Backend initialized (800x600)");
 
     // Create triangle vertices
     let vertices = create_triangle_vertices();
@@ -141,6 +160,8 @@ fn main() -> Result<()> {
     backend.cleanup();
     println!("\n=== Success! ===");
     println!("Triangle rendered using vertex buffers instead of hardcoded shader data.");
+    println!("Note: This example runs in headless mode (offscreen).");
+    println!("For interactive windowed rendering, use the main application.");
 
     Ok(())
 }

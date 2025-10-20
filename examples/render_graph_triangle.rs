@@ -3,6 +3,15 @@
 //! This example demonstrates the minimal render graph usage with a single
 //! triangle pass using vertex buffers. This is the cleanest example showing
 //! the M9 render graph architecture.
+//!
+//! By default, runs in headless mode (offscreen rendering) which is useful for
+//! CI/testing. For interactive windowed rendering, use the main application
+//! framework (see examples in the app module).
+//!
+//! Usage:
+//!   cargo run --example render_graph_triangle [backend]
+//!   cargo run --example render_graph_triangle vulkan
+//!   cargo run --example render_graph_triangle wgpu
 
 use anyhow::Result;
 use rusty_renderer::backends::{
@@ -35,16 +44,27 @@ fn main() -> Result<()> {
             "vulkan" => Some(BackendType::Vulkan),
             "wgpu" => Some(BackendType::Wgpu),
             "directx" | "dx12" => Some(BackendType::DirectX12),
+            "--help" | "-h" => {
+                println!("Usage: render_graph_triangle [BACKEND]");
+                println!("\nBackends:");
+                println!("  vulkan    Use Vulkan backend (default)");
+                println!("  wgpu      Use wgpu backend");
+                println!("  directx   Use DirectX 12 backend (Windows only)");
+                println!("\nNote: Runs in headless mode (offscreen rendering).");
+                println!("For interactive windowed rendering, use the main application.");
+                std::process::exit(0);
+            }
             _ => None,
         })
         .unwrap_or(BackendType::Vulkan);
 
     println!("Backend: {backend_type}");
+    println!("Mode: Headless (offscreen rendering)\n");
 
     // Create backend
     let mut backend = create_backend(backend_type, false)?;
     backend.initialize_headless(800, 600)?;
-    println!("Initialized headless backend (800x600)");
+    println!("Initialized backend (800x600)");
 
     // Create triangle vertices
     let vertices = create_triangle();
@@ -93,11 +113,11 @@ fn main() -> Result<()> {
     backend.end_frame()?;
     println!("✓ Rendered successfully");
 
-    // Capture output
+    // Capture output and save
+    println!("\nCapturing frame...");
     let (width, height, pixels) = backend.capture_frame()?;
     println!("Captured frame: {width}x{height}");
 
-    // Save
     let output_path = "render_graph_triangle.png";
     image::save_buffer(
         output_path,
@@ -110,6 +130,8 @@ fn main() -> Result<()> {
 
     backend.cleanup();
     println!("\n=== Success! ===");
+    println!("Note: This example runs in headless mode (offscreen).");
+    println!("For interactive windowed rendering, use the main application.");
 
     Ok(())
 }
