@@ -1035,7 +1035,7 @@ impl DirectXBackendImpl {
     /// Execute a compiled render graph
     pub fn execute_graph(
         &mut self,
-        _graph: &crate::render_graph::graph::RenderGraph,
+        graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
         use crate::render_graph::*;
@@ -1261,7 +1261,7 @@ impl DirectXBackendImpl {
         &mut self,
         layout: &crate::backends::BindGroupLayout,
     ) -> Result<usize> {
-        use crate::backends::{ShaderBinding, ShaderStage};
+        use crate::backends::ShaderBinding;
         use windows::Win32::Graphics::Direct3D12::*;
 
         log::debug!("Creating DirectX 12 root signature for bind group layout");
@@ -1273,7 +1273,9 @@ impl DirectXBackendImpl {
 
         for binding in layout.bindings() {
             match binding {
-                ShaderBinding::UniformBuffer { binding: bind_idx, .. } => {
+                ShaderBinding::UniformBuffer {
+                    binding: bind_idx, ..
+                } => {
                     // Constant Buffer View (CBV)
                     let mut param = D3D12_ROOT_PARAMETER::default();
                     param.ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
@@ -1286,7 +1288,11 @@ impl DirectXBackendImpl {
                     }
                     root_params.push(param);
                 }
-                ShaderBinding::StorageBuffer { binding: bind_idx, readonly, .. } => {
+                ShaderBinding::StorageBuffer {
+                    binding: bind_idx,
+                    readonly,
+                    ..
+                } => {
                     // Unordered Access View (UAV) or Shader Resource View (SRV)
                     let mut param = D3D12_ROOT_PARAMETER::default();
                     if *readonly {

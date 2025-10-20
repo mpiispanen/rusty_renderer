@@ -159,7 +159,10 @@ fn main() -> Result<()> {
 
     // Compile graph
     let compiled = graph.compile()?;
-    println!("Render graph compiled: {} passes", compiled.execution_order.len());
+    println!(
+        "Render graph compiled: {} passes",
+        compiled.execution_order.len()
+    );
 
     // Render frame
     println!("\nRendering frame...");
@@ -171,17 +174,16 @@ fn main() -> Result<()> {
     // Capture the rendered image
     println!("\nCapturing frame...");
     let (width, height, pixels) = backend.capture_frame()?;
-    println!("Frame captured: {}x{} ({} bytes)", width, height, pixels.len());
+    println!(
+        "Frame captured: {}x{} ({} bytes)",
+        width,
+        height,
+        pixels.len()
+    );
 
     // Save to file
     let output_path = "vertex_buffer_triangle.png";
-    image::save_buffer(
-        output_path,
-        &pixels,
-        width,
-        height,
-        image::ColorType::Rgba8,
-    )?;
+    image::save_buffer(output_path, &pixels, width, height, image::ColorType::Rgba8)?;
     println!("Saved to: {output_path}");
 
     // Cleanup

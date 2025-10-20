@@ -298,11 +298,7 @@ pub trait GraphicsBackend: Send + Sync {
     ///
     /// # Note
     /// The returned handle should be passed to render commands to bind resources
-    fn create_bind_group(
-        &mut self,
-        layout_handle: usize,
-        bind_group: &BindGroup,
-    ) -> Result<usize> {
+    fn create_bind_group(&mut self, layout_handle: usize, bind_group: &BindGroup) -> Result<usize> {
         // Default implementation for backends that don't support this yet
         let _ = (layout_handle, bind_group);
         Err(anyhow::anyhow!(

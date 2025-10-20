@@ -4,9 +4,9 @@
 //! Supports validation layers in debug mode and provides a complete
 //! Vulkan rendering pipeline.
 
+mod descriptor;
 mod resources;
 mod shaders;
-mod descriptor;
 
 use super::*;
 use anyhow::{Context, Result};
@@ -2279,7 +2279,7 @@ impl GraphicsBackend for VulkanBackend {
                 if let Some(callback) = &pass.callback {
                     // Create execution context
                     let mut context = VulkanPassContext::new(device, command_buffer);
-                    
+
                     // Execute the pass
                     callback.execute(&mut context);
                 }
@@ -2533,10 +2533,10 @@ impl GraphicsBackend for VulkanBackend {
             .context("Device not initialized for bind group layout creation")?;
 
         let vk_layout = descriptor::create_descriptor_set_layout(device, layout)?;
-        
+
         self.descriptor_set_layouts.push(vk_layout);
         let handle = self.descriptor_set_layouts.len() - 1;
-        
+
         log::debug!("Created descriptor set layout with handle {handle}");
         Ok(handle)
     }
@@ -2733,7 +2733,7 @@ impl VulkanPassContext {
             command_buffer,
         }
     }
-    
+
     fn device(&self) -> &VkDevice {
         unsafe { &*self.device }
     }
@@ -2754,12 +2754,14 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         buffer_ptr: *const std::ffi::c_void,
         offset: u64,
     ) -> Result<()> {
-        log::debug!("VulkanPassContext: Binding vertex buffer at binding {binding}, offset {offset}");
-        
+        log::debug!(
+            "VulkanPassContext: Binding vertex buffer at binding {binding}, offset {offset}"
+        );
+
         // Cast the void pointer to VulkanBuffer
         let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
         let vk_buffer = buffer_ref.handle();
-        
+
         log::debug!("VulkanPassContext: Vulkan buffer handle: {vk_buffer:?}");
 
         unsafe {
@@ -2770,7 +2772,7 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
                 &[offset],
             );
         }
-        
+
         log::debug!("VulkanPassContext: Vertex buffer bound successfully");
 
         Ok(())

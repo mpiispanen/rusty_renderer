@@ -100,13 +100,44 @@ impl WgpuBackend {
         });
 
         // Create render pipeline
+        let vertex_buffer_layout = wgpu::VertexBufferLayout {
+            array_stride: crate::backends::Vertex::stride() as u64,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                // Position (location = 0)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 0,
+                    shader_location: 0,
+                },
+                // Normal (location = 1)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x3,
+                    offset: 12,
+                    shader_location: 1,
+                },
+                // UV (location = 2)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x2,
+                    offset: 24,
+                    shader_location: 2,
+                },
+                // Color (location = 3)
+                wgpu::VertexAttribute {
+                    format: wgpu::VertexFormat::Float32x4,
+                    offset: 32,
+                    shader_location: 3,
+                },
+            ],
+        };
+
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Triangle Pipeline"),
             layout: None, // Auto layout
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[], // No vertex buffers needed (hardcoded in shader)
+                buffers: &[vertex_buffer_layout],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -744,10 +775,17 @@ impl GraphicsBackend for WgpuBackend {
                     };
                     (*binding, ty, vis)
                 }
-                ShaderBinding::StorageBuffer { binding, stage, readonly, .. } => {
+                ShaderBinding::StorageBuffer {
+                    binding,
+                    stage,
+                    readonly,
+                    ..
+                } => {
                     let vis = shader_stage_to_wgpu(*stage);
                     let ty = wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: *readonly },
+                        ty: wgpu::BufferBindingType::Storage {
+                            read_only: *readonly,
+                        },
                         has_dynamic_offset: false,
                         min_binding_size: None,
                     };
@@ -832,7 +870,7 @@ impl GraphicsBackend for WgpuBackend {
 /// Convert ShaderStage to wgpu::ShaderStages
 fn shader_stage_to_wgpu(stage: ShaderStage) -> wgpu::ShaderStages {
     let mut stages = wgpu::ShaderStages::empty();
-    
+
     if stage.contains(ShaderStage::VERTEX) {
         stages |= wgpu::ShaderStages::VERTEX;
     }
@@ -842,7 +880,7 @@ fn shader_stage_to_wgpu(stage: ShaderStage) -> wgpu::ShaderStages {
     if stage.contains(ShaderStage::COMPUTE) {
         stages |= wgpu::ShaderStages::COMPUTE;
     }
-    
+
     stages
 }
 

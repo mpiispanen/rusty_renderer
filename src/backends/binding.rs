@@ -224,7 +224,12 @@ impl BindGroupLayoutBuilder {
     }
 
     /// Add a texture binding
-    pub fn texture(mut self, binding: u32, dimension: TextureDimension, stage: ShaderStage) -> Self {
+    pub fn texture(
+        mut self,
+        binding: u32,
+        dimension: TextureDimension,
+        stage: ShaderStage,
+    ) -> Self {
         self.bindings.push(ShaderBinding::Texture {
             binding,
             dimension,
@@ -235,7 +240,8 @@ impl BindGroupLayoutBuilder {
 
     /// Add a sampler binding
     pub fn sampler(mut self, binding: u32, stage: ShaderStage) -> Self {
-        self.bindings.push(ShaderBinding::Sampler { binding, stage });
+        self.bindings
+            .push(ShaderBinding::Sampler { binding, stage });
         self
     }
 
@@ -270,7 +276,11 @@ mod tests {
     fn test_bind_group_layout_creation() {
         let layout = BindGroupLayoutBuilder::new()
             .uniform_buffer(0, 64, ShaderStage::new(ShaderStage::VERTEX))
-            .texture(1, TextureDimension::D2, ShaderStage::new(ShaderStage::FRAGMENT))
+            .texture(
+                1,
+                TextureDimension::D2,
+                ShaderStage::new(ShaderStage::FRAGMENT),
+            )
             .sampler(2, ShaderStage::new(ShaderStage::FRAGMENT))
             .build();
 

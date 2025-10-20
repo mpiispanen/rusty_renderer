@@ -49,9 +49,9 @@ impl TrianglePass {
 
         // Create triangle vertices
         let vertices = [
-            Vertex::new_2d([0.0, -0.5], [1.0, 0.0, 0.0]),  // Bottom - Red
-            Vertex::new_2d([0.5, 0.5], [0.0, 1.0, 0.0]),   // Top Right - Green
-            Vertex::new_2d([-0.5, 0.5], [0.0, 0.0, 1.0]),  // Top Left - Blue
+            Vertex::new_2d([0.0, -0.5], [1.0, 0.0, 0.0]), // Bottom - Red
+            Vertex::new_2d([0.5, 0.5], [0.0, 1.0, 0.0]),  // Top Right - Green
+            Vertex::new_2d([-0.5, 0.5], [0.0, 0.0, 1.0]), // Top Left - Blue
         ];
 
         // Create vertex buffer
@@ -74,12 +74,11 @@ impl TrianglePass {
 
         backend.upload_to_buffer(vertex_buffer.as_ref(), &vertex_data, 0)?;
 
-        log::debug!(
-            "Created triangle vertex buffer: {vertex_buffer_size} bytes"
-        );
+        log::debug!("Created triangle vertex buffer: {vertex_buffer_size} bytes");
 
         // Convert to raw pointer for callback
-        let vertex_buffer_ptr = vertex_buffer.as_ref() as *const dyn Buffer as *const std::ffi::c_void;
+        let vertex_buffer_ptr =
+            vertex_buffer.as_ref() as *const dyn Buffer as *const std::ffi::c_void;
 
         let mut pass = RenderPass::new(pass_id, "triangle_pass", PassKind::Graphics);
 
@@ -137,9 +136,6 @@ impl PassCallback for TrianglePassCallback {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::render_graph::{Extent3D, Format, ImageUsageFlags, ResourceDescriptor, SampleCount};
-
     // Note: Tests disabled because TrianglePass now requires a backend to create vertex buffers
     // These should be integration tests with a real backend
 

@@ -3,7 +3,9 @@
 //! This module handles descriptor sets, descriptor pools, and descriptor set layouts
 //! for binding shader resources (uniform buffers, textures, samplers).
 
-use crate::backends::binding::{BindGroup, BindGroupLayout, BoundResource, ShaderBinding, ShaderStage};
+use crate::backends::binding::{
+    BindGroup, BindGroupLayout, BoundResource, ShaderBinding, ShaderStage,
+};
 use anyhow::{Context, Result};
 use vulkanalia::prelude::v1_0::*;
 
@@ -63,10 +65,7 @@ impl DescriptorPoolManager {
     }
 
     /// Allocate a descriptor set from the pool
-    pub fn allocate(
-        &mut self,
-        layout: vk::DescriptorSetLayout,
-    ) -> Result<vk::DescriptorSet> {
+    pub fn allocate(&mut self, layout: vk::DescriptorSetLayout) -> Result<vk::DescriptorSet> {
         // Ensure we have at least one pool
         if self.pools.is_empty() {
             let pool = self.create_pool()?;
@@ -114,7 +113,7 @@ impl DescriptorPoolManager {
 /// Convert ShaderStage to Vulkan shader stage flags
 fn shader_stage_to_vk(stage: ShaderStage) -> vk::ShaderStageFlags {
     let mut flags = vk::ShaderStageFlags::empty();
-    
+
     if stage.contains(ShaderStage::VERTEX) {
         flags |= vk::ShaderStageFlags::VERTEX;
     }
@@ -124,7 +123,7 @@ fn shader_stage_to_vk(stage: ShaderStage) -> vk::ShaderStageFlags {
     if stage.contains(ShaderStage::COMPUTE) {
         flags |= vk::ShaderStageFlags::COMPUTE;
     }
-    
+
     flags
 }
 
@@ -156,8 +155,7 @@ pub fn create_descriptor_set_layout(
         bindings.push(vk_binding);
     }
 
-    let layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
-        .bindings(&bindings);
+    let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
     unsafe {
         device

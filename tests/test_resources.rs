@@ -102,15 +102,17 @@ fn test_texture_upload_vulkan() {
         for x in 0..64 {
             let idx = (y * 64 + x) * 4;
             let is_red = ((x / 8) + (y / 8)) % 2 == 0;
-            data[idx] = if is_red { 255 } else { 0 };     // R
-            data[idx + 1] = 0;                             // G
-            data[idx + 2] = 0;                             // B
-            data[idx + 3] = 255;                           // A
+            data[idx] = if is_red { 255 } else { 0 }; // R
+            data[idx + 1] = 0; // G
+            data[idx + 2] = 0; // B
+            data[idx + 3] = 255; // A
         }
     }
 
     // Upload texture data
-    backend.upload_to_texture(texture.as_ref(), &data, 0).unwrap();
+    backend
+        .upload_to_texture(texture.as_ref(), &data, 0)
+        .unwrap();
 
     backend.cleanup();
 }
@@ -234,15 +236,17 @@ fn test_texture_upload_wgpu() {
         for x in 0..64 {
             let idx = (y * 64 + x) * 4;
             let is_red = ((x / 8) + (y / 8)) % 2 == 0;
-            data[idx] = if is_red { 255 } else { 0 };     // R
-            data[idx + 1] = 0;                             // G
-            data[idx + 2] = 0;                             // B
-            data[idx + 3] = 255;                           // A
+            data[idx] = if is_red { 255 } else { 0 }; // R
+            data[idx + 1] = 0; // G
+            data[idx + 2] = 0; // B
+            data[idx + 3] = 255; // A
         }
     }
 
     // Upload texture data
-    backend.upload_to_texture(texture.as_ref(), &data, 0).unwrap();
+    backend
+        .upload_to_texture(texture.as_ref(), &data, 0)
+        .unwrap();
 
     backend.cleanup();
 }
@@ -366,15 +370,17 @@ fn test_texture_upload_directx() {
         for x in 0..64 {
             let idx = (y * 64 + x) * 4;
             let is_red = ((x / 8) + (y / 8)) % 2 == 0;
-            data[idx] = if is_red { 255 } else { 0 };     // R
-            data[idx + 1] = 0;                             // G
-            data[idx + 2] = 0;                             // B
-            data[idx + 3] = 255;                           // A
+            data[idx] = if is_red { 255 } else { 0 }; // R
+            data[idx + 1] = 0; // G
+            data[idx + 2] = 0; // B
+            data[idx + 3] = 255; // A
         }
     }
 
     // Upload texture data
-    backend.upload_to_texture(texture.as_ref(), &data, 0).unwrap();
+    backend
+        .upload_to_texture(texture.as_ref(), &data, 0)
+        .unwrap();
 
     backend.cleanup();
 }
@@ -412,26 +418,32 @@ fn test_multiple_buffer_types() {
     backend.initialize_headless(800, 600).unwrap();
 
     // Test different buffer types
-    let vertex = backend.create_buffer(&BufferDescriptor {
-        size: 1024,
-        usage: BufferUsage::vertex(),
-        memory_location: MemoryLocation::GpuOnly,
-        label: Some("Vertex".to_string()),
-    }).unwrap();
+    let vertex = backend
+        .create_buffer(&BufferDescriptor {
+            size: 1024,
+            usage: BufferUsage::vertex(),
+            memory_location: MemoryLocation::GpuOnly,
+            label: Some("Vertex".to_string()),
+        })
+        .unwrap();
 
-    let index = backend.create_buffer(&BufferDescriptor {
-        size: 512,
-        usage: BufferUsage::index(),
-        memory_location: MemoryLocation::GpuOnly,
-        label: Some("Index".to_string()),
-    }).unwrap();
+    let index = backend
+        .create_buffer(&BufferDescriptor {
+            size: 512,
+            usage: BufferUsage::index(),
+            memory_location: MemoryLocation::GpuOnly,
+            label: Some("Index".to_string()),
+        })
+        .unwrap();
 
-    let uniform = backend.create_buffer(&BufferDescriptor {
-        size: 256,
-        usage: BufferUsage::uniform(),
-        memory_location: MemoryLocation::CpuToGpu,
-        label: Some("Uniform".to_string()),
-    }).unwrap();
+    let uniform = backend
+        .create_buffer(&BufferDescriptor {
+            size: 256,
+            usage: BufferUsage::uniform(),
+            memory_location: MemoryLocation::CpuToGpu,
+            label: Some("Uniform".to_string()),
+        })
+        .unwrap();
 
     assert_eq!(vertex.size(), 1024);
     assert_eq!(index.size(), 512);
