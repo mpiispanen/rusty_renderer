@@ -1134,11 +1134,11 @@ impl DirectXBackendImpl {
             command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             // Execute passes in order
-            for pass_id in &graph.execution_order {
+            for pass_id in &compiled.execution_order {
                 log::debug!("Executing pass: {pass_id:?}");
 
                 // Find and apply barriers before this pass
-                for barrier in &graph.barriers {
+                for barrier in &compiled.barriers {
                     if barrier.dst_pass == *pass_id {
                         self.insert_dx12_barrier(command_list, barrier, render_target)?;
                     }
