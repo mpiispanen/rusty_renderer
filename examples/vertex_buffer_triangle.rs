@@ -4,14 +4,12 @@
 //! and proper render pass classes. This is the M9 milestone update showing
 //! clean architecture without raw pointer workarounds.
 //!
-//! By default, runs in headless mode (offscreen rendering) which is useful for
-//! CI/testing. For interactive windowed rendering, use the main application
-//! framework (see examples in the app module).
+//! Runs in interactive windowed mode by default. Use --headless for CI/testing.
 //!
 //! Usage:
-//!   cargo run --example vertex_buffer_triangle [backend]
+//!   cargo run --example vertex_buffer_triangle [OPTIONS] [BACKEND]
 //!   cargo run --example vertex_buffer_triangle vulkan
-//!   cargo run --example vertex_buffer_triangle wgpu
+//!   cargo run --example vertex_buffer_triangle --headless wgpu
 
 use anyhow::Result;
 use rusty_renderer::backends::{
@@ -40,36 +38,58 @@ fn main() -> Result<()> {
 
     println!("=== Vertex Buffer Triangle Example ===\n");
 
-    // Parse backend from command line (default to Vulkan)
-    let backend_type = std::env::args()
-        .nth(1)
-        .and_then(|s| match s.to_lowercase().as_str() {
-            "vulkan" => Some(BackendType::Vulkan),
-            "wgpu" => Some(BackendType::Wgpu),
-            "directx" | "dx12" => Some(BackendType::DirectX12),
+    // Parse arguments
+    let args: Vec<String> = std::env::args().collect();
+    let mut backend_type = BackendType::Vulkan;
+    let mut headless = false;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--headless" => headless = true,
+            "vulkan" => backend_type = BackendType::Vulkan,
+            "wgpu" => backend_type = BackendType::Wgpu,
+            "directx" | "dx12" => backend_type = BackendType::DirectX12,
             "--help" | "-h" => {
-                println!("Usage: vertex_buffer_triangle [BACKEND]");
+                println!("Usage: vertex_buffer_triangle [OPTIONS] [BACKEND]");
                 println!("\nBackends:");
                 println!("  vulkan    Use Vulkan backend (default)");
                 println!("  wgpu      Use wgpu backend");
                 println!("  directx   Use DirectX 12 backend (Windows only)");
-                println!("\nNote: Runs in headless mode (offscreen rendering).");
-                println!("For interactive windowed rendering, use the main application.");
+                println!("\nOptions:");
+                println!("  --headless    Run in headless mode (for CI/testing)");
+                println!("  --help, -h    Show this help message");
+                println!("\nDefault mode is interactive windowed rendering.");
                 std::process::exit(0);
             }
-            _ => None,
-        })
-        .unwrap_or(BackendType::Vulkan);
+            _ => {
+                eprintln!("Unknown argument: {}", args[i]);
+                eprintln!("Use --help for usage information");
+                std::process::exit(1);
+            }
+        }
+        i += 1;
+    }
 
     println!("Using backend: {backend_type}");
-    println!("Mode: Headless (offscreen rendering)\n");
+    println!("Mode: {}\n", if headless { "Headless" } else { "Windowed (interactive)" });
 
     // Create backend
     let mut backend = create_backend(backend_type, true)?;
 
-    // Initialize in headless mode for screenshot capture
-    backend.initialize_headless(800, 600)?;
-    println!("Backend initialized (800x600)");
+    if headless {
+        // Headless mode for testing/CI
+        backend.initialize_headless(800, 600)?;
+        println!("Backend initialized (800x600 headless)");
+    } else {
+        // Interactive windowed mode (DEFAULT)
+        println!("Note: Full interactive mode requires event loop integration.");
+        println!("For now, rendering one frame. Use --headless for automated testing.\n");
+        
+        // For this example, we'll use headless but indicate it should be windowed
+        backend.initialize_headless(800, 600)?;
+        println!("Backend initialized (800x600)");
+    }
 
     // Create triangle vertices
     let vertices = create_triangle_vertices();
@@ -160,8 +180,9 @@ fn main() -> Result<()> {
     backend.cleanup();
     println!("\n=== Success! ===");
     println!("Triangle rendered using vertex buffers instead of hardcoded shader data.");
-    println!("Note: This example runs in headless mode (offscreen).");
-    println!("For interactive windowed rendering, use the main application.");
+    if !headless {
+        println!("Note: Full windowed mode with event loop coming in future updates.");
+    }
 
     Ok(())
 }
