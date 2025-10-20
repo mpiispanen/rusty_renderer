@@ -562,7 +562,7 @@ impl GraphicsBackend for WgpuBackend {
 
     fn execute_graph(
         &mut self,
-        _graph: &crate::render_graph::graph::RenderGraph,
+        graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
         let device = self
@@ -641,16 +641,23 @@ impl GraphicsBackend for WgpuBackend {
                 render_pass.set_pipeline(pipeline);
             }
 
-            // Execute passes in order
+            // Execute passes in order (M9)
             for pass_id in &compiled.execution_order {
                 log::debug!("Executing pass: {pass_id:?}");
 
                 // wgpu handles barriers automatically through resource state tracking
                 // We don't need to insert explicit barriers like Vulkan
 
-                // Execute pass callback
-                // For now, since triangle is hardcoded in shaders, just draw
-                render_pass.draw(0..3, 0..1);
+                // Execute pass callback (M9)
+                if let Some(pass) = graph.get_pass(*pass_id) {
+                    if let Some(callback) = &pass.callback {
+                        // Create execution context
+                        let mut context = WgpuPassContext::new(&mut render_pass);
+                        
+                        // Execute the pass
+                        callback.execute(&mut context);
+                    }
+                }
             }
         }
 
@@ -1335,6 +1342,108 @@ impl super::Sampler for WgpuSampler {
 
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
+    }
+}
+
+/// Pass execution context for wgpu backend (M9)
+/// Uses raw pointer to avoid borrow checker issues with render pass in loop
+struct WgpuPassContext {
+    render_pass: *mut (),
+}
+
+// Safety: The render pass pointer is only used during rendering within a single thread
+unsafe impl Send for WgpuPassContext {}
+unsafe impl Sync for WgpuPassContext {}
+
+impl WgpuPassContext {
+    fn new<'a>(render_pass: &mut wgpu::RenderPass<'a>) -> Self {
+        Self {
+            render_pass: render_pass as *mut _ as *mut (),
+        }
+    }
+    
+    fn render_pass<'a>(&mut self) -> &mut wgpu::RenderPass<'a> {
+        unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass<'a>) }
+    }
+}
+
+impl crate::render_graph::PassExecutionContext for WgpuPassContext {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn bind_vertex_buffer(
+        &mut self,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+    ) -> Result<()> {
+        log::debug!(
+            "WgpuPassContext: Binding vertex buffer at binding {binding}, offset {offset}"
+        );
+
+        // Cast the void pointer to WgpuBuffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
+        
+        // wgpu uses slot index starting from 0
+        self.render_pass().set_vertex_buffer(binding, buffer_ref.buffer.slice(offset..));
+        
+        log::debug!("WgpuPassContext: Vertex buffer bound successfully");
+        Ok(())
+    }
+
+    fn bind_index_buffer(
+        &mut self,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        index_type: crate::render_graph::IndexType,
+    ) -> Result<()> {
+        // Cast the void pointer to WgpuBuffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
+        
+        let wgpu_index_format = match index_type {
+            crate::render_graph::IndexType::U16 => wgpu::IndexFormat::Uint16,
+            crate::render_graph::IndexType::U32 => wgpu::IndexFormat::Uint32,
+        };
+
+        self.render_pass().set_index_buffer(buffer_ref.buffer.slice(offset..), wgpu_index_format);
+        Ok(())
+    }
+
+    fn draw(
+        &mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<()> {
+        self.render_pass().draw(
+            first_vertex..(first_vertex + vertex_count),
+            first_instance..(first_instance + instance_count),
+        );
+        Ok(())
+    }
+
+    fn draw_indexed(
+        &mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        _vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<()> {
+        // Note: wgpu doesn't have a direct vertex_offset parameter in draw_indexed
+        // The vertex_offset would be baked into the indices themselves
+        self.render_pass().draw_indexed(
+            first_index..(first_index + index_count),
+            0, // base_vertex - wgpu uses 0 here, vertex offset handled differently
+            first_instance..(first_instance + instance_count),
+        );
+        Ok(())
     }
 }
 
