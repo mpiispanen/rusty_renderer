@@ -10,6 +10,7 @@ pub mod config;
 pub mod passes;
 pub mod profiling;
 pub mod render_graph;
+pub mod resources;
 pub mod scene;
 pub mod shaders;
 pub mod testing;
