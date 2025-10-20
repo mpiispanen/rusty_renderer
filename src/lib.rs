@@ -8,6 +8,7 @@ pub mod app;
 pub mod backends;
 pub mod config;
 pub mod passes;
+pub mod pipelines;
 pub mod profiling;
 pub mod render_graph;
 pub mod resources;
