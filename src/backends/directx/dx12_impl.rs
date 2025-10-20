@@ -4,8 +4,8 @@
 //! It's only compiled on Windows platforms.
 
 use super::*;
-use anyhow::{Context, Result};
 use crate::render_graph::PassExecutionContext;
+use anyhow::{Context, Result};
 use windows::{
     core::*, Win32::Foundation::*, Win32::Graphics::Direct3D::Fxc::*, Win32::Graphics::Direct3D::*,
     Win32::Graphics::Direct3D12::*, Win32::Graphics::Dxgi::Common::*, Win32::Graphics::Dxgi::*,
@@ -1033,140 +1033,6 @@ impl DirectXBackendImpl {
         &self.swapchain_wrapper
     }
 
-    /// DirectX Pass execution context (M9)
-    /// 
-    /// Provides PassExecutionContext implementation for DirectX backend.
-    /// Uses raw pointer to avoid borrow checker issues (same pattern as Vulkan/wgpu).
-    struct DirectXPassContext {
-        command_list: *mut (),
-    }
-
-    impl PassExecutionContext for DirectXPassContext {
-        fn bind_vertex_buffer(
-            &mut self,
-            binding: u32,
-            buffer_ptr: *const std::ffi::c_void,
-            offset: u64,
-        ) -> Result<()> {
-            unsafe {
-                let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
-                
-                // Downcast to DirectX buffer
-                let buffer = &*(buffer_ptr as *const DirectXBuffer);
-                let dx_buffer = &buffer.resource;
-                
-                // For now, use fixed stride for Vertex struct (48 bytes: 3 floats pos + 3 floats color + padding)
-                // TODO: Pass stride through BufferDescriptor or separate parameter
-                let stride = 48u32; // sizeof(Vertex) with padding
-                
-                // Create vertex buffer view
-                let vbv = D3D12_VERTEX_BUFFER_VIEW {
-                    BufferLocation: dx_buffer.GetGPUVirtualAddress() + offset,
-                    SizeInBytes: (buffer.size - offset) as u32,
-                    StrideInBytes: stride,
-                };
-                
-                command_list.IASetVertexBuffers(binding, Some(&[vbv]));
-                
-                log::trace!("Bound vertex buffer at binding {} (stride: {})", binding, stride);
-                Ok(())
-            }
-        }
-
-        fn bind_index_buffer(
-            &mut self,
-            buffer_ptr: *const std::ffi::c_void,
-            offset: u64,
-            index_type: crate::render_graph::IndexType,
-        ) -> Result<()> {
-            unsafe {
-                let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
-                
-                // Downcast to DirectX buffer
-                let buffer = &*(buffer_ptr as *const DirectXBuffer);
-                let dx_buffer = &buffer.resource;
-                
-                // Convert index type
-                let format = match index_type {
-                    crate::render_graph::IndexType::U16 => DXGI_FORMAT_R16_UINT,
-                    crate::render_graph::IndexType::U32 => DXGI_FORMAT_R32_UINT,
-                };
-                
-                // Create index buffer view
-                let ibv = D3D12_INDEX_BUFFER_VIEW {
-                    BufferLocation: dx_buffer.GetGPUVirtualAddress() + offset,
-                    SizeInBytes: (buffer.size - offset) as u32,
-                    Format: format,
-                };
-                
-                command_list.IASetIndexBuffer(Some(&ibv));
-                
-                log::trace!("Bound index buffer");
-                Ok(())
-            }
-        }
-
-        fn draw(
-            &mut self,
-            vertex_count: u32,
-            instance_count: u32,
-            first_vertex: u32,
-            first_instance: u32,
-        ) -> Result<()> {
-            unsafe {
-                let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
-                command_list.DrawInstanced(
-                    vertex_count,
-                    instance_count,
-                    first_vertex,
-                    first_instance,
-                );
-                
-                log::trace!(
-                    "Draw: {} vertices, {} instances",
-                    vertex_count,
-                    instance_count
-                );
-                Ok(())
-            }
-        }
-
-        fn draw_indexed(
-            &mut self,
-            index_count: u32,
-            instance_count: u32,
-            first_index: u32,
-            vertex_offset: i32,
-            first_instance: u32,
-        ) -> Result<()> {
-            unsafe {
-                let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
-                command_list.DrawIndexedInstanced(
-                    index_count,
-                    instance_count,
-                    first_index,
-                    vertex_offset,
-                    first_instance,
-                );
-                
-                log::trace!(
-                    "DrawIndexed: {} indices, {} instances",
-                    index_count,
-                    instance_count
-                );
-                Ok(())
-            }
-        }
-
-        fn as_any(&self) -> &dyn std::any::Any {
-            self
-        }
-
-        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
-            self
-        }
-    }
-
     /// Execute a compiled render graph
     pub fn execute_graph(
         &mut self,
@@ -1280,15 +1146,16 @@ impl DirectXBackendImpl {
                 }
 
                 // Execute pass callback through context (M9)
-                let pass = graph.get_pass(*pass_id)
+                let pass = graph
+                    .get_pass(*pass_id)
                     .context("Pass not found in graph")?;
-                
+
                 if let Some(callback) = &pass.callback {
                     // Create pass context with command list pointer
                     let mut context = DirectXPassContext {
                         command_list: command_list as *const _ as *mut (),
                     };
-                    
+
                     // Execute the pass callback
                     callback.execute(&mut context)?;
                 } else {
@@ -2151,5 +2018,138 @@ mod dx12_helpers {
             TextureFormat::Depth32Float => DXGI_FORMAT_D32_FLOAT,
             TextureFormat::Depth24PlusStencil8 => DXGI_FORMAT_D24_UNORM_S8_UINT,
         }
+    }
+}
+
+/// DirectX Pass execution context (M9)
+///
+/// Provides PassExecutionContext implementation for DirectX backend.
+/// Uses raw pointer to avoid borrow checker issues (same pattern as Vulkan/wgpu).
+struct DirectXPassContext {
+    command_list: *mut (),
+}
+
+impl PassExecutionContext for DirectXPassContext {
+    fn bind_vertex_buffer(
+        &mut self,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+    ) -> Result<()> {
+        unsafe {
+            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+
+            // Downcast to DirectX buffer
+            let buffer = &*(buffer_ptr as *const DirectXBuffer);
+            let dx_buffer = &buffer.resource;
+
+            // For now, use fixed stride for Vertex struct (48 bytes: 3 floats pos + 3 floats color + padding)
+            // TODO: Pass stride through BufferDescriptor or separate parameter
+            let stride = 48u32; // sizeof(Vertex) with padding
+
+            // Create vertex buffer view
+            let vbv = D3D12_VERTEX_BUFFER_VIEW {
+                BufferLocation: dx_buffer.GetGPUVirtualAddress() + offset,
+                SizeInBytes: (buffer.size - offset) as u32,
+                StrideInBytes: stride,
+            };
+
+            command_list.IASetVertexBuffers(binding, Some(&[vbv]));
+
+            log::trace!(
+                "Bound vertex buffer at binding {} (stride: {})",
+                binding,
+                stride
+            );
+            Ok(())
+        }
+    }
+
+    fn bind_index_buffer(
+        &mut self,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        index_type: crate::render_graph::IndexType,
+    ) -> Result<()> {
+        unsafe {
+            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+
+            // Downcast to DirectX buffer
+            let buffer = &*(buffer_ptr as *const DirectXBuffer);
+            let dx_buffer = &buffer.resource;
+
+            // Convert index type
+            let format = match index_type {
+                crate::render_graph::IndexType::U16 => DXGI_FORMAT_R16_UINT,
+                crate::render_graph::IndexType::U32 => DXGI_FORMAT_R32_UINT,
+            };
+
+            // Create index buffer view
+            let ibv = D3D12_INDEX_BUFFER_VIEW {
+                BufferLocation: dx_buffer.GetGPUVirtualAddress() + offset,
+                SizeInBytes: (buffer.size - offset) as u32,
+                Format: format,
+            };
+
+            command_list.IASetIndexBuffer(Some(&ibv));
+
+            log::trace!("Bound index buffer");
+            Ok(())
+        }
+    }
+
+    fn draw(
+        &mut self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) -> Result<()> {
+        unsafe {
+            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            command_list.DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
+
+            log::trace!(
+                "Draw: {} vertices, {} instances",
+                vertex_count,
+                instance_count
+            );
+            Ok(())
+        }
+    }
+
+    fn draw_indexed(
+        &mut self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) -> Result<()> {
+        unsafe {
+            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            command_list.DrawIndexedInstanced(
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            );
+
+            log::trace!(
+                "DrawIndexed: {} indices, {} instances",
+                index_count,
+                instance_count
+            );
+            Ok(())
+        }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

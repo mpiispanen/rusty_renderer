@@ -39,13 +39,17 @@ impl RenderPipeline for SimplePipeline {
         Ok(())
     }
 
-    fn build_graph(&mut self, scene: &Scene, _backend: &mut dyn crate::backends::GraphicsBackend) -> Result<RenderGraph> {
+    fn build_graph(
+        &mut self,
+        scene: &Scene,
+        _backend: &mut dyn crate::backends::GraphicsBackend,
+    ) -> Result<RenderGraph> {
         log::debug!("Building render graph for scene: {}", scene.metadata.name);
-        
+
         // For M10 Phase 0, we're just setting up the structure
         // The actual render graph construction will be done when we integrate
         // with the unified application in the next phase
-        
+
         let graph = RenderGraph::new();
 
         log::info!(
@@ -53,22 +57,20 @@ impl RenderPipeline for SimplePipeline {
             scene.metadata.name,
             scene.objects.len()
         );
-        
+
         // Log what we would render
         for obj in &scene.objects {
             match obj {
-                SceneObject::Mesh { name, geometry, .. } => {
-                    match geometry {
-                        GeometryData::Inline { vertices, .. } => {
-                            log::info!("  - Mesh '{}': {} vertices", name, vertices.len());
-                        }
-                        GeometryData::File { path } => {
-                            log::info!("  - Mesh '{}': external file {}", name, path);
-                        }
+                SceneObject::Mesh { name, geometry, .. } => match geometry {
+                    GeometryData::Inline { vertices, .. } => {
+                        log::info!("  - Mesh '{}': {} vertices", name, vertices.len());
                     }
-                }
+                    GeometryData::File { path } => {
+                        log::info!("  - Mesh '{name}': external file {path}");
+                    }
+                },
                 SceneObject::GltfModel { name, path, .. } => {
-                    log::info!("  - glTF Model '{}': {}", name, path);
+                    log::info!("  - glTF Model '{name}': {path}");
                 }
             }
         }

@@ -653,7 +653,7 @@ impl GraphicsBackend for WgpuBackend {
                     if let Some(callback) = &pass.callback {
                         // Create execution context
                         let mut context = WgpuPassContext::new(&mut render_pass);
-                        
+
                         // Execute the pass
                         callback.execute(&mut context);
                     }
@@ -1361,7 +1361,7 @@ impl WgpuPassContext {
             render_pass: render_pass as *mut _ as *mut (),
         }
     }
-    
+
     fn render_pass<'a>(&mut self) -> &mut wgpu::RenderPass<'a> {
         unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass<'a>) }
     }
@@ -1382,16 +1382,15 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         buffer_ptr: *const std::ffi::c_void,
         offset: u64,
     ) -> Result<()> {
-        log::debug!(
-            "WgpuPassContext: Binding vertex buffer at binding {binding}, offset {offset}"
-        );
+        log::debug!("WgpuPassContext: Binding vertex buffer at binding {binding}, offset {offset}");
 
         // Cast the void pointer to WgpuBuffer
         let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
-        
+
         // wgpu uses slot index starting from 0
-        self.render_pass().set_vertex_buffer(binding, buffer_ref.buffer.slice(offset..));
-        
+        self.render_pass()
+            .set_vertex_buffer(binding, buffer_ref.buffer.slice(offset..));
+
         log::debug!("WgpuPassContext: Vertex buffer bound successfully");
         Ok(())
     }
@@ -1404,13 +1403,14 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
     ) -> Result<()> {
         // Cast the void pointer to WgpuBuffer
         let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
-        
+
         let wgpu_index_format = match index_type {
             crate::render_graph::IndexType::U16 => wgpu::IndexFormat::Uint16,
             crate::render_graph::IndexType::U32 => wgpu::IndexFormat::Uint32,
         };
 
-        self.render_pass().set_index_buffer(buffer_ref.buffer.slice(offset..), wgpu_index_format);
+        self.render_pass()
+            .set_index_buffer(buffer_ref.buffer.slice(offset..), wgpu_index_format);
         Ok(())
     }
 

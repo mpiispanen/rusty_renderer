@@ -23,9 +23,9 @@ use rusty_renderer::render_graph::{
 /// Create simple triangle vertices (red, green, blue)
 fn create_triangle() -> Vec<Vertex> {
     vec![
-        Vertex::new_2d([0.0, -0.5], [1.0, 0.0, 0.0]),  // Bottom: Red
-        Vertex::new_2d([0.5, 0.5], [0.0, 1.0, 0.0]),   // Top-right: Green
-        Vertex::new_2d([-0.5, 0.5], [0.0, 0.0, 1.0]),  // Top-left: Blue
+        Vertex::new_2d([0.0, -0.5], [1.0, 0.0, 0.0]), // Bottom: Red
+        Vertex::new_2d([0.5, 0.5], [0.0, 1.0, 0.0]),  // Top-right: Green
+        Vertex::new_2d([-0.5, 0.5], [0.0, 0.0, 1.0]), // Top-left: Blue
     ]
 }
 
@@ -69,7 +69,14 @@ fn main() -> Result<()> {
     }
 
     println!("Backend: {backend_type}");
-    println!("Mode: {}\n", if headless { "Headless" } else { "Windowed (interactive)" });
+    println!(
+        "Mode: {}\n",
+        if headless {
+            "Headless"
+        } else {
+            "Windowed (interactive)"
+        }
+    );
 
     // Create backend
     let mut backend = create_backend(backend_type, false)?;
@@ -82,7 +89,7 @@ fn main() -> Result<()> {
         // Interactive windowed mode (DEFAULT)
         println!("Note: Full interactive mode requires event loop integration.");
         println!("For now, rendering one frame. Use --headless for automated testing.\n");
-        
+
         // For this example, we'll use headless but indicate it should be windowed
         backend.initialize_headless(800, 600)?;
         println!("Initialized backend (800x600)");
@@ -141,13 +148,7 @@ fn main() -> Result<()> {
     println!("Captured frame: {width}x{height}");
 
     let output_path = "render_graph_triangle.png";
-    image::save_buffer(
-        output_path,
-        &pixels,
-        width,
-        height,
-        image::ColorType::Rgba8,
-    )?;
+    image::save_buffer(output_path, &pixels, width, height, image::ColorType::Rgba8)?;
     println!("Saved to: {output_path}");
 
     backend.cleanup();

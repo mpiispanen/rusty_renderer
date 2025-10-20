@@ -16,9 +16,7 @@ use rusty_renderer::backends::{
     create_backend, BackendType, BufferDescriptor, BufferUsage, MemoryLocation, Vertex,
 };
 use rusty_renderer::passes::VertexBufferTrianglePass;
-use rusty_renderer::render_graph::{
-    Extent3D, Format, ImageUsageFlags, RenderGraph, SampleCount,
-};
+use rusty_renderer::render_graph::{Extent3D, Format, ImageUsageFlags, RenderGraph, SampleCount};
 
 /// Create triangle vertices using the Vertex struct
 fn create_triangle_vertices() -> Vec<Vertex> {
@@ -72,7 +70,14 @@ fn main() -> Result<()> {
     }
 
     println!("Using backend: {backend_type}");
-    println!("Mode: {}\n", if headless { "Headless" } else { "Windowed (interactive)" });
+    println!(
+        "Mode: {}\n",
+        if headless {
+            "Headless"
+        } else {
+            "Windowed (interactive)"
+        }
+    );
 
     // Create backend
     let mut backend = create_backend(backend_type, true)?;
@@ -85,7 +90,7 @@ fn main() -> Result<()> {
         // Interactive windowed mode (DEFAULT)
         println!("Note: Full interactive mode requires event loop integration.");
         println!("For now, rendering one frame. Use --headless for automated testing.\n");
-        
+
         // For this example, we'll use headless but indicate it should be windowed
         backend.initialize_headless(800, 600)?;
         println!("Backend initialized (800x600)");

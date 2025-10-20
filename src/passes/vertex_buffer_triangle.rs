@@ -51,11 +51,7 @@ impl VertexBufferTrianglePass {
     ) -> Self {
         let pass_id = graph.next_pass_id();
 
-        let mut pass = RenderPass::new(
-            pass_id,
-            "vertex_buffer_triangle",
-            PassKind::Graphics,
-        );
+        let mut pass = RenderPass::new(pass_id, "vertex_buffer_triangle", PassKind::Graphics);
 
         // Configure output: write to color buffer
         pass.add_output(ResourceAccess::new(
@@ -95,8 +91,8 @@ impl PassCallback for VertexBufferTriangleCallback {
 
         // Get raw pointer from the buffer for backend API
         // Arc<Box<dyn Buffer>> -> &dyn Buffer -> *const dyn Buffer -> *const c_void
-        let buffer_ptr = self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let buffer_ptr =
+            self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
 
         // Bind the vertex buffer
         if let Err(e) = context.bind_vertex_buffer(0, buffer_ptr, 0) {
@@ -190,10 +186,13 @@ struct ConfigurableVertexBufferCallback {
 
 impl PassCallback for ConfigurableVertexBufferCallback {
     fn execute(&self, context: &mut dyn PassExecutionContext) {
-        log::debug!("Executing vertex buffer pass with {} vertices", self.vertex_count);
+        log::debug!(
+            "Executing vertex buffer pass with {} vertices",
+            self.vertex_count
+        );
 
-        let buffer_ptr = self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let buffer_ptr =
+            self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
 
         if let Err(e) = context.bind_vertex_buffer(0, buffer_ptr, 0) {
             log::error!("Failed to bind vertex buffer: {e}");
@@ -212,7 +211,7 @@ impl PassCallback for ConfigurableVertexBufferCallback {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backends::{BufferDescriptor, BufferUsage, MemoryLocation};
+    use crate::backends::{BufferUsage, MemoryLocation};
     use crate::render_graph::{Extent3D, Format, ImageUsageFlags, ResourceDescriptor, SampleCount};
 
     // Helper to create a mock buffer for testing

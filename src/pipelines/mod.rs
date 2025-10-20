@@ -4,9 +4,9 @@
 //! are rendered. Instead of manually constructing render graphs for each
 //! scene, pipelines provide pre-configured rendering strategies.
 
-use anyhow::Result;
 use crate::render_graph::RenderGraph;
 use crate::scene::Scene;
+use anyhow::Result;
 
 pub mod simple;
 
@@ -19,15 +19,19 @@ pub use simple::SimplePipeline;
 pub trait RenderPipeline {
     /// Get the pipeline name
     fn name(&self) -> &str;
-    
+
     /// Setup the pipeline with a backend
     /// This is called once when the pipeline is first created
     fn setup(&mut self, backend: &mut dyn crate::backends::GraphicsBackend) -> Result<()>;
-    
+
     /// Build render graph for a scene
     /// This is called each frame to construct the render graph
-    fn build_graph(&mut self, scene: &Scene, backend: &mut dyn crate::backends::GraphicsBackend) -> Result<RenderGraph>;
-    
+    fn build_graph(
+        &mut self,
+        scene: &Scene,
+        backend: &mut dyn crate::backends::GraphicsBackend,
+    ) -> Result<RenderGraph>;
+
     /// Cleanup pipeline resources
     fn cleanup(&mut self, backend: &mut dyn crate::backends::GraphicsBackend);
 }
@@ -40,15 +44,13 @@ impl PipelineFactory {
     pub fn create(name: &str) -> Result<Box<dyn RenderPipeline>> {
         match name.to_lowercase().as_str() {
             "simple" => Ok(Box::new(SimplePipeline::new())),
-            _ => anyhow::bail!("Unknown pipeline: {}", name),
+            _ => anyhow::bail!("Unknown pipeline: {name}"),
         }
     }
-    
+
     /// List available pipelines
     pub fn list_pipelines() -> Vec<String> {
-        vec![
-            "simple".to_string(),
-        ]
+        vec!["simple".to_string()]
     }
 }
 
@@ -67,7 +69,7 @@ mod tests {
     fn test_create_pipeline() {
         let pipeline = PipelineFactory::create("simple");
         assert!(pipeline.is_ok());
-        
+
         let pipeline = PipelineFactory::create("invalid");
         assert!(pipeline.is_err());
     }

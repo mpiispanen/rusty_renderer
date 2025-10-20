@@ -20,14 +20,14 @@ pub struct Scene {
     /// Scene metadata
     #[serde(default)]
     pub metadata: SceneMetadata,
-    
+
     /// Objects in the scene
     #[serde(default)]
     pub objects: Vec<SceneObject>,
-    
+
     /// Camera configuration
     pub camera: Camera,
-    
+
     /// Optional lighting configuration
     #[serde(default)]
     pub lighting: Option<Lighting>,
@@ -38,11 +38,11 @@ pub struct Scene {
 pub struct SceneMetadata {
     /// Scene name
     pub name: String,
-    
+
     /// Scene description
     #[serde(default)]
     pub description: String,
-    
+
     /// Author
     #[serde(default)]
     pub author: String,
@@ -60,7 +60,7 @@ pub enum SceneObject {
         #[serde(default)]
         transform: Transform,
     },
-    
+
     /// glTF model reference
     #[serde(rename = "gltf")]
     GltfModel {
@@ -82,7 +82,7 @@ pub enum GeometryData {
         #[serde(default)]
         indices: Option<Vec<u32>>,
     },
-    
+
     /// Reference to external file
     #[serde(rename = "file")]
     File { path: String },
@@ -143,7 +143,7 @@ pub enum Camera {
         #[serde(default = "default_far")]
         far: f32,
     },
-    
+
     /// Free-fly camera (user controlled)
     #[serde(rename = "free_fly")]
     FreeFly {
@@ -212,7 +212,7 @@ pub enum Light {
         #[serde(default = "default_intensity")]
         intensity: f32,
     },
-    
+
     /// Point light
     #[serde(rename = "point")]
     Point {
@@ -239,25 +239,25 @@ impl Scene {
         if self.metadata.name.is_empty() {
             anyhow::bail!("Scene must have a name");
         }
-        
+
         // Validate objects
         for (i, obj) in self.objects.iter().enumerate() {
             match obj {
                 SceneObject::Mesh { geometry, .. } => {
                     if let GeometryData::Inline { vertices, .. } = geometry {
                         if vertices.is_empty() {
-                            anyhow::bail!("Object {} has no vertices", i);
+                            anyhow::bail!("Object {i} has no vertices");
                         }
                     }
                 }
                 SceneObject::GltfModel { path, .. } => {
                     if path.is_empty() {
-                        anyhow::bail!("Object {} has empty path", i);
+                        anyhow::bail!("Object {i} has empty path");
                     }
                 }
             }
         }
-        
+
         Ok(())
     }
 }
@@ -291,7 +291,7 @@ mod tests {
             },
             lighting: None,
         };
-        
+
         assert!(scene.validate().is_ok());
     }
 
@@ -313,7 +313,7 @@ mod tests {
             },
             lighting: None,
         };
-        
+
         assert!(scene.validate().is_err());
     }
 }

@@ -27,7 +27,7 @@ fn main() -> Result<()> {
     let scenes = SceneLoader::list_scenes("scenes")?;
     println!("✓ Available scenes:");
     for scene_name in scenes {
-        println!("  - {}", scene_name);
+        println!("  - {scene_name}");
     }
 
     println!("\n=== Scene loading works! ===");

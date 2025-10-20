@@ -13,41 +13,40 @@ impl SceneLoader {
         let path = path.as_ref();
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read scene file: {}", path.display()))?;
-        
+
         Self::load_from_string(&content)
     }
-    
+
     /// Load a scene from a TOML string
     pub fn load_from_string(content: &str) -> Result<Scene> {
-        let scene: Scene = toml::from_str(content)
-            .context("Failed to parse scene TOML")?;
-        
+        let scene: Scene = toml::from_str(content).context("Failed to parse scene TOML")?;
+
         // Validate the scene
         scene.validate()?;
-        
+
         Ok(scene)
     }
-    
+
     /// List available scenes in a directory
     pub fn list_scenes<P: AsRef<Path>>(dir: P) -> Result<Vec<String>> {
         let dir = dir.as_ref();
         let mut scenes = Vec::new();
-        
+
         if !dir.exists() {
             return Ok(scenes);
         }
-        
+
         for entry in std::fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.extension().and_then(|s| s.to_str()) == Some("toml") {
                 if let Some(name) = path.file_stem().and_then(|s| s.to_str()) {
                     scenes.push(name.to_string());
                 }
             }
         }
-        
+
         scenes.sort();
         Ok(scenes)
     }
@@ -70,7 +69,7 @@ mod tests {
             target = [0.0, 0.0, 0.0]
             fov = 45.0
         "#;
-        
+
         let scene = SceneLoader::load_from_string(toml).unwrap();
         assert_eq!(scene.metadata.name, "Test Scene");
         assert_eq!(scene.metadata.description, "A test scene");
@@ -99,10 +98,10 @@ mod tests {
             position = [0.0, 0.0, 3.0]
             target = [0.0, 0.0, 0.0]
         "#;
-        
+
         let scene = SceneLoader::load_from_string(toml).unwrap();
         assert_eq!(scene.objects.len(), 1);
-        
+
         match &scene.objects[0] {
             SceneObject::Mesh { name, geometry, .. } => {
                 assert_eq!(name, "triangle");
@@ -128,7 +127,7 @@ mod tests {
             position = [0.0, 0.0, 3.0]
             target = [0.0, 0.0, 0.0]
         "#;
-        
+
         assert!(SceneLoader::load_from_string(toml).is_err());
     }
 }
