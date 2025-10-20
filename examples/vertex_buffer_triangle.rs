@@ -1,46 +1,17 @@
-//! Vertex buffer triangle example
+//! Vertex buffer triangle example (M9 - updated)
 //!
 //! This example demonstrates rendering a triangle using actual vertex buffers
-//! instead of hardcoded vertices in the shader. This is the M8.2 milestone
-//! demonstrating proper vertex/index buffer rendering.
+//! and proper render pass classes. This is the M9 milestone update showing
+//! clean architecture without raw pointer workarounds.
 
 use anyhow::Result;
 use rusty_renderer::backends::{
     create_backend, BackendType, BufferDescriptor, BufferUsage, MemoryLocation, Vertex,
 };
+use rusty_renderer::passes::VertexBufferTrianglePass;
 use rusty_renderer::render_graph::{
-    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback, PassExecutionContext,
-    PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess, SampleCount,
+    Extent3D, Format, ImageUsageFlags, RenderGraph, SampleCount,
 };
-
-/// Triangle pass that uses a vertex buffer
-struct VertexBufferTrianglePass {
-    vertex_buffer_ptr: *const std::ffi::c_void,
-}
-
-// Safety: The vertex buffer pointer is only used during rendering within a single thread
-unsafe impl Send for VertexBufferTrianglePass {}
-unsafe impl Sync for VertexBufferTrianglePass {}
-
-impl PassCallback for VertexBufferTrianglePass {
-    fn execute(&self, context: &mut dyn PassExecutionContext) {
-        log::debug!("Executing vertex buffer triangle pass");
-
-        // Bind the vertex buffer
-        if let Err(e) = context.bind_vertex_buffer(0, self.vertex_buffer_ptr, 0) {
-            log::error!("Failed to bind vertex buffer: {e}");
-            return;
-        }
-
-        // Draw 3 vertices (triangle), 1 instance
-        if let Err(e) = context.draw(3, 1, 0, 0) {
-            log::error!("Failed to draw triangle: {e}");
-            return;
-        }
-
-        log::debug!("Vertex buffer triangle drawn successfully");
-    }
-}
 
 /// Create triangle vertices using the Vertex struct
 fn create_triangle_vertices() -> Vec<Vertex> {
@@ -132,28 +103,8 @@ fn main() -> Result<()> {
     };
     let color_buffer = graph.create_resource("color_buffer", color_desc);
 
-    // Create triangle pass
-    let pass_id = graph.next_pass_id();
-    let mut pass = RenderPass::new(pass_id, "vertex_buffer_triangle", PassKind::Graphics);
-
-    // Output: write to color buffer
-    pass.add_output(ResourceAccess::new(
-        color_buffer,
-        AccessType::Write,
-        PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
-        Some(ImageLayout::ColorAttachment),
-    ));
-
-    // Get raw pointer to buffer (safe because buffer lives longer than pass execution)
-    let buffer_ptr = vertex_buffer.as_ref() as *const _ as *const std::ffi::c_void;
-
-    // Set callback with vertex buffer
-    let callback = Box::new(VertexBufferTrianglePass {
-        vertex_buffer_ptr: buffer_ptr,
-    });
-    pass = pass.with_callback(callback);
-
-    graph.add_pass(pass);
+    // Create vertex buffer triangle pass using the proper pass class (M9)
+    let _pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
 
     println!("\nRender graph built with vertex buffer triangle pass");
 

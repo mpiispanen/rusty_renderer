@@ -5,5 +5,7 @@
 //! render graphs.
 
 pub mod triangle_pass;
+pub mod vertex_buffer_triangle;
 
 pub use triangle_pass::TrianglePass;
+pub use vertex_buffer_triangle::{VertexBufferTrianglePass, VertexBufferTrianglePassBuilder};
