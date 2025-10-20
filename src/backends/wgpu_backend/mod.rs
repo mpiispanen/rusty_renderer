@@ -100,44 +100,13 @@ impl WgpuBackend {
         });
 
         // Create render pipeline
-        let vertex_buffer_layout = wgpu::VertexBufferLayout {
-            array_stride: crate::backends::Vertex::stride() as u64,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                // Position (location = 0)
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: 0,
-                    shader_location: 0,
-                },
-                // Normal (location = 1)
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x3,
-                    offset: 12,
-                    shader_location: 1,
-                },
-                // UV (location = 2)
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x2,
-                    offset: 24,
-                    shader_location: 2,
-                },
-                // Color (location = 3)
-                wgpu::VertexAttribute {
-                    format: wgpu::VertexFormat::Float32x4,
-                    offset: 32,
-                    shader_location: 3,
-                },
-            ],
-        };
-
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Triangle Pipeline"),
             layout: None, // Auto layout
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[vertex_buffer_layout],
+                buffers: &[], // No vertex buffers - vertices hardcoded in shader
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -705,9 +674,9 @@ impl GraphicsBackend for WgpuBackend {
             desc.size,
             desc.usage
         );
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         // Convert usage flags
         let mut wgpu_usage = wgpu::BufferUsages::empty();
         if desc.usage.vertex {
@@ -725,14 +694,14 @@ impl GraphicsBackend for WgpuBackend {
         if desc.usage.transfer_dst {
             wgpu_usage |= wgpu::BufferUsages::COPY_DST;
         }
-        
+
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: desc.label.as_deref(),
             size: desc.size,
             usage: wgpu_usage,
             mapped_at_creation: false,
         });
-        
+
         Ok(Box::new(WgpuBuffer {
             buffer,
             size: desc.size,
@@ -748,12 +717,12 @@ impl GraphicsBackend for WgpuBackend {
         offset: u64,
     ) -> Result<()> {
         let queue = self.queue.as_ref().context("Queue not initialized")?;
-        
+
         let wgpu_buffer = buffer
             .as_any()
             .downcast_ref::<WgpuBuffer>()
             .context("Buffer is not a WgpuBuffer")?;
-        
+
         // Check bounds
         if offset + data.len() as u64 > buffer.size() {
             anyhow::bail!(
@@ -763,7 +732,7 @@ impl GraphicsBackend for WgpuBackend {
                 buffer.size()
             );
         }
-        
+
         queue.write_buffer(&wgpu_buffer.buffer, offset, data);
         Ok(())
     }

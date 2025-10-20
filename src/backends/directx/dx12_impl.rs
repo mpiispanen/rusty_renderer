@@ -1204,11 +1204,11 @@ impl DirectXBackendImpl {
             desc.size,
             desc.usage
         );
-        
+
         use windows::Win32::Graphics::Direct3D12::*;
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         // Map heap properties based on memory location
         let heap_props = match desc.memory_location {
             crate::backends::MemoryLocation::GpuOnly => D3D12_HEAP_PROPERTIES {
@@ -1224,7 +1224,7 @@ impl DirectXBackendImpl {
                 ..Default::default()
             },
         };
-        
+
         // Map buffer usage to resource state
         let initial_state = if desc.usage.vertex {
             D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
@@ -1235,7 +1235,7 @@ impl DirectXBackendImpl {
         } else {
             D3D12_RESOURCE_STATE_COMMON
         };
-        
+
         let buffer_desc = D3D12_RESOURCE_DESC {
             Dimension: D3D12_RESOURCE_DIMENSION_BUFFER,
             Alignment: 0,
@@ -1251,7 +1251,7 @@ impl DirectXBackendImpl {
             Layout: D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
             Flags: D3D12_RESOURCE_FLAG_NONE,
         };
-        
+
         let mut resource: Option<ID3D12Resource> = None;
         unsafe {
             device.CreateCommittedResource(
@@ -1263,9 +1263,9 @@ impl DirectXBackendImpl {
                 &mut resource,
             )?;
         }
-        
+
         let resource = resource.context("Failed to create D3D12 buffer resource")?;
-        
+
         Ok(Box::new(DirectXBuffer {
             resource,
             size: desc.size,
@@ -1284,7 +1284,7 @@ impl DirectXBackendImpl {
             .as_any()
             .downcast_ref::<DirectXBuffer>()
             .context("Buffer is not a DirectXBuffer")?;
-        
+
         // Check bounds
         if offset + data.len() as u64 > buffer.size() {
             anyhow::bail!(
@@ -1294,18 +1294,18 @@ impl DirectXBackendImpl {
                 buffer.size()
             );
         }
-        
+
         // Map and copy data
         unsafe {
             let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
             dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
-            
+
             let dst = (mapped_ptr as *mut u8).add(offset as usize);
             std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
-            
+
             dx_buffer.resource.Unmap(0, None);
         }
-        
+
         Ok(())
     }
 
