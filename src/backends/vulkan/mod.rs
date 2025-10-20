@@ -2426,6 +2426,12 @@ impl GraphicsBackend for VulkanBackend {
         let texture =
             resources::VulkanTexture::new(device.clone(), desc, self.physical_device, instance)?;
 
+        // Upload initial data if provided
+        if let Some(data) = desc.initial_data {
+            log::debug!("Uploading initial data to Vulkan texture");
+            self.upload_to_texture(&texture, data, 0)?;
+        }
+
         Ok(Box::new(texture))
     }
 
