@@ -801,6 +801,9 @@ impl GraphicsBackend for WgpuBackend {
             );
         }
 
+        // Create texture view for binding
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
         log::debug!(
             "Created wgpu texture: {}x{}, format: {:?}, mip_levels: {}",
             desc.width,
@@ -811,6 +814,7 @@ impl GraphicsBackend for WgpuBackend {
 
         Ok(Box::new(WgpuTexture {
             texture,
+            view,
             width: desc.width,
             height: desc.height,
             format: desc.format,
@@ -969,24 +973,54 @@ impl GraphicsBackend for WgpuBackend {
             .get(layout_handle)
             .context("Invalid bind group layout handle")?;
 
-        let entries = Vec::new();
+        let mut entries = Vec::new();
 
-        for (_binding, resource) in bind_group.resources() {
+        for (binding, resource) in bind_group.resources() {
             match resource {
-                BoundResource::UniformBuffer(_buffer) | BoundResource::StorageBuffer(_buffer) => {
-                    // TODO: Get wgpu buffer from our Buffer trait
-                    log::warn!("wgpu buffer binding not yet fully implemented");
+                BoundResource::UniformBuffer(buffer) | BoundResource::StorageBuffer(buffer) => {
+                    // Downcast to WgpuBuffer
+                    let wgpu_buffer = buffer
+                        .as_any()
+                        .downcast_ref::<WgpuBuffer>()
+                        .context("Expected WgpuBuffer")?;
+
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: *binding,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &wgpu_buffer.buffer,
+                            offset: 0,
+                            size: None,
+                        }),
+                    });
                 }
-                BoundResource::Texture(_texture) => {
-                    log::warn!("wgpu texture binding not yet implemented");
+                BoundResource::Texture(texture) => {
+                    // Downcast to WgpuTexture
+                    let wgpu_texture = texture
+                        .as_any()
+                        .downcast_ref::<WgpuTexture>()
+                        .context("Expected WgpuTexture")?;
+
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: *binding,
+                        resource: wgpu::BindingResource::TextureView(wgpu_texture.view()),
+                    });
                 }
-                BoundResource::Sampler(_sampler) => {
-                    log::warn!("wgpu sampler binding not yet implemented");
+                BoundResource::Sampler(sampler) => {
+                    // Downcast to WgpuSampler
+                    let wgpu_sampler = sampler
+                        .as_any()
+                        .downcast_ref::<WgpuSampler>()
+                        .context("Expected WgpuSampler")?;
+
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: *binding,
+                        resource: wgpu::BindingResource::Sampler(&wgpu_sampler.sampler),
+                    });
                 }
             }
         }
 
-        // For now, create empty bind group
+        // Create bind group with actual entries
         let wgpu_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Bind Group"),
             layout,
@@ -1244,11 +1278,19 @@ impl super::Buffer for WgpuBuffer {
 // WgpuTexture implementation
 struct WgpuTexture {
     texture: wgpu::Texture,
+    view: wgpu::TextureView,
     width: u32,
     height: u32,
     format: super::TextureFormat,
     usage: super::TextureUsage,
     mip_levels: u32,
+}
+
+impl WgpuTexture {
+    /// Get the texture view for binding
+    pub fn view(&self) -> &wgpu::TextureView {
+        &self.view
+    }
 }
 
 impl super::Texture for WgpuTexture {
@@ -1282,7 +1324,6 @@ impl super::Texture for WgpuTexture {
 }
 
 // WgpuSampler implementation
-#[allow(dead_code)] // Field will be used when binding samplers in Phase 4
 struct WgpuSampler {
     sampler: wgpu::Sampler,
 }

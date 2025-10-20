@@ -172,7 +172,7 @@ pub fn update_descriptor_set(
 ) -> Result<()> {
     let mut writes: Vec<vk::WriteDescriptorSet> = Vec::new();
     let mut buffer_infos: Vec<vk::DescriptorBufferInfo> = Vec::new();
-    let mut _image_infos: Vec<vk::DescriptorImageInfo> = Vec::new(); // For M8.4
+    let mut image_infos: Vec<vk::DescriptorImageInfo> = Vec::new();
 
     for (binding, resource) in bind_group.resources() {
         match resource {
@@ -207,13 +207,52 @@ pub fn update_descriptor_set(
 
                 writes.push(write);
             }
-            BoundResource::Texture(_texture) => {
-                // TODO: Implement texture binding in M8.4
-                log::warn!("Texture binding not yet implemented");
+            BoundResource::Texture(texture) => {
+                // Downcast to get Vulkan texture
+                let vk_texture = texture
+                    .as_any()
+                    .downcast_ref::<crate::backends::vulkan::resources::VulkanTexture>()
+                    .context("Failed to downcast to VulkanTexture")?;
+
+                let image_info = vk::DescriptorImageInfo::builder()
+                    .image_view(vk_texture.vk_image_view())
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .build();
+
+                image_infos.push(image_info);
+
+                let write = vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_set)
+                    .dst_binding(*binding)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::SAMPLED_IMAGE)
+                    .image_info(std::slice::from_ref(image_infos.last().unwrap()))
+                    .build();
+
+                writes.push(write);
             }
-            BoundResource::Sampler(_sampler) => {
-                // TODO: Implement sampler binding in M8.4
-                log::warn!("Sampler binding not yet implemented");
+            BoundResource::Sampler(sampler) => {
+                // Downcast to get Vulkan sampler
+                let vk_sampler = sampler
+                    .as_any()
+                    .downcast_ref::<crate::backends::vulkan::resources::VulkanSampler>()
+                    .context("Failed to downcast to VulkanSampler")?;
+
+                let image_info = vk::DescriptorImageInfo::builder()
+                    .sampler(vk_sampler.vk_sampler())
+                    .build();
+
+                image_infos.push(image_info);
+
+                let write = vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_set)
+                    .dst_binding(*binding)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::SAMPLER)
+                    .image_info(std::slice::from_ref(image_infos.last().unwrap()))
+                    .build();
+
+                writes.push(write);
             }
         }
     }
