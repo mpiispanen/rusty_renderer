@@ -13,13 +13,13 @@ This is a cross-platform graphics rendering sandbox developed in Rust to aid lea
 # Ubuntu/Debian example:
 sudo apt install vulkan-tools libvulkan-dev
 
-# Clone and run the triangle example
+# Clone and run the render graph triangle example
 git clone https://github.com/mpiispanen/rusty_renderer.git
 cd rusty_renderer
-cargo run --example triangle --release
+cargo run --example render_graph_triangle --release
 ```
 
-You should see a colorful RGB triangle! 🎨
+You should see a colorful RGB triangle rendered through the render graph! 🎨
 
 ## Features
 
@@ -53,16 +53,18 @@ cargo build
 # Build in release mode
 cargo build --release
 
-# Run triangle example
-cargo run --example triangle --release
+# Run render graph triangle example
+cargo run --example render_graph_triangle --release
 
 # Run with detailed logging
-RUST_LOG=debug cargo run --example triangle
-
-# Run with validation layers (for debugging)
-cargo run -- --debug
+RUST_LOG=debug cargo run --example render_graph_triangle
 
 # Try different backends
+cargo run --example render_graph_triangle wgpu
+cargo run --example render_graph_triangle vulkan
+
+# Run vertex buffer example
+cargo run --example vertex_buffer_triangle --release
 cargo run -- --backend wgpu
 cargo run -- --backend directx  # Windows only
 ```

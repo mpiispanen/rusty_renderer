@@ -1,3 +1,9 @@
+//! Test texture generator utility
+//!
+//! This utility creates test textures (checkerboard and gradient) for use in
+//! rendering examples and tests. It's not a render graph example, but a helper
+//! tool to generate assets.
+
 use rusty_renderer::resources::TextureLoader;
 
 fn main() {
