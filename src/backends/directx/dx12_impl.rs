@@ -1157,7 +1157,7 @@ impl DirectXBackendImpl {
                     };
 
                     // Execute the pass callback
-                    callback.execute(&mut context)?;
+                    callback.execute(&mut context);
                 } else {
                     log::warn!("Pass {:?} has no callback, skipping", pass_id);
                 }
