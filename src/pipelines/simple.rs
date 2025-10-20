@@ -39,7 +39,7 @@ impl RenderPipeline for SimplePipeline {
         Ok(())
     }
 
-    fn build_graph(&mut self, scene: &Scene, backend: &mut dyn crate::backends::GraphicsBackend) -> Result<RenderGraph> {
+    fn build_graph(&mut self, scene: &Scene, _backend: &mut dyn crate::backends::GraphicsBackend) -> Result<RenderGraph> {
         log::debug!("Building render graph for scene: {}", scene.metadata.name);
         
         // For M10 Phase 0, we're just setting up the structure

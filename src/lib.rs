@@ -5,6 +5,7 @@
 
 // Module declarations - public for testing and library use
 pub mod app;
+pub mod application;
 pub mod backends;
 pub mod config;
 pub mod passes;

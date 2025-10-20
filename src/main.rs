@@ -3,24 +3,19 @@
 //! This is the main entry point for the Rusty Renderer application.
 
 use anyhow::Result;
-use rusty_renderer::{app, config};
+use rusty_renderer::application::ApplicationRunner;
 
 fn main() -> Result<()> {
-    // Parse command-line arguments
-    let config = config::Config::parse_args();
-
-    // Initialize logging with the configured level
+    // Initialize logging
     env_logger::Builder::from_default_env()
-        .filter_level(config.log_level)
+        .filter_level(log::LevelFilter::Info)
         .init();
 
     log::info!("Rusty Renderer v{}", env!("CARGO_PKG_VERSION"));
 
-    // Validate configuration
-    config.validate()?;
-
-    // Run the application
-    app::App::run(config)?;
+    // Create and run the application
+    let runner = ApplicationRunner::from_args()?;
+    runner.run()?;
 
     log::info!("Shutdown complete");
     Ok(())
