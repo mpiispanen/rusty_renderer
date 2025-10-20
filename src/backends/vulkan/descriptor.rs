@@ -138,12 +138,9 @@ pub fn create_descriptor_set_layout(
     for binding in layout.bindings() {
         let descriptor_type = match binding {
             ShaderBinding::UniformBuffer { .. } => vk::DescriptorType::UNIFORM_BUFFER,
-            ShaderBinding::StorageBuffer { readonly, .. } => {
-                if *readonly {
-                    vk::DescriptorType::STORAGE_BUFFER
-                } else {
-                    vk::DescriptorType::STORAGE_BUFFER
-                }
+            ShaderBinding::StorageBuffer { .. } => {
+                // In Vulkan, both readonly and writable storage buffers use STORAGE_BUFFER
+                vk::DescriptorType::STORAGE_BUFFER
             }
             ShaderBinding::Texture { .. } => vk::DescriptorType::SAMPLED_IMAGE,
             ShaderBinding::Sampler { .. } => vk::DescriptorType::SAMPLER,

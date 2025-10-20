@@ -785,7 +785,7 @@ impl GraphicsBackend for WgpuBackend {
         self.bind_group_layouts.push(wgpu_layout);
         let handle = self.bind_group_layouts.len() - 1;
 
-        log::debug!("Created wgpu bind group layout with handle {}", handle);
+        log::debug!("Created wgpu bind group layout with handle {handle}");
         Ok(handle)
     }
 
@@ -797,7 +797,7 @@ impl GraphicsBackend for WgpuBackend {
             .get(layout_handle)
             .context("Invalid bind group layout handle")?;
 
-        let mut entries = Vec::new();
+        let entries = Vec::new();
 
         for (_binding, resource) in bind_group.resources() {
             match resource {
@@ -824,7 +824,7 @@ impl GraphicsBackend for WgpuBackend {
         self.bind_groups.push(wgpu_bind_group);
         let handle = self.bind_groups.len() - 1;
 
-        log::debug!("Created wgpu bind group with handle {}", handle);
+        log::debug!("Created wgpu bind group with handle {handle}");
         Ok(handle)
     }
 }

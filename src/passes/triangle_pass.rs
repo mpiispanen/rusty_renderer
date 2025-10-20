@@ -48,7 +48,7 @@ impl TrianglePass {
         let pass_id = graph.next_pass_id();
 
         // Create triangle vertices
-        let vertices = vec![
+        let vertices = [
             Vertex::new_2d([0.0, -0.5], [1.0, 0.0, 0.0]),  // Bottom - Red
             Vertex::new_2d([0.5, 0.5], [0.0, 1.0, 0.0]),   // Top Right - Green
             Vertex::new_2d([-0.5, 0.5], [0.0, 0.0, 1.0]),  // Top Left - Blue
@@ -68,15 +68,14 @@ impl TrianglePass {
         // Upload vertex data
         let vertex_data = vertices
             .iter()
-            .flat_map(|v| bytemuck::bytes_of(v))
+            .flat_map(bytemuck::bytes_of)
             .copied()
             .collect::<Vec<u8>>();
 
         backend.upload_to_buffer(vertex_buffer.as_ref(), &vertex_data, 0)?;
 
         log::debug!(
-            "Created triangle vertex buffer: {} bytes",
-            vertex_buffer_size
+            "Created triangle vertex buffer: {vertex_buffer_size} bytes"
         );
 
         // Convert to raw pointer for callback

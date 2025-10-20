@@ -2537,7 +2537,7 @@ impl GraphicsBackend for VulkanBackend {
         self.descriptor_set_layouts.push(vk_layout);
         let handle = self.descriptor_set_layouts.len() - 1;
         
-        log::debug!("Created descriptor set layout with handle {}", handle);
+        log::debug!("Created descriptor set layout with handle {handle}");
         Ok(handle)
     }
 
@@ -2567,7 +2567,7 @@ impl GraphicsBackend for VulkanBackend {
         self.descriptor_sets.push(descriptor_set);
         let handle = self.descriptor_sets.len() - 1;
 
-        log::debug!("Created descriptor set with handle {}", handle);
+        log::debug!("Created descriptor set with handle {handle}");
         Ok(handle)
     }
 
