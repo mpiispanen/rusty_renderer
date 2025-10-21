@@ -221,7 +221,8 @@ impl ApplicationRunner {
             let max_frames = self.args.max_frames;
             Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
 
-            // Cleanup - drop graph and compiled first to release buffer references
+            // Cleanup - wait for GPU, then drop graph to release buffer references
+            backend.wait_idle()?;
             drop(compiled);
             drop(graph);
             
@@ -317,6 +318,11 @@ impl Drop for ApplicationRunner {
 impl Drop for WindowedApp {
     fn drop(&mut self) {
         log::info!("Cleaning up windowed application");
+        
+        // Wait for GPU to finish before destroying anything
+        if let Some(backend) = &mut self.backend {
+            let _ = backend.wait_idle();
+        }
         
         // Drop graph and compiled first to release buffer references
         self.compiled = None;

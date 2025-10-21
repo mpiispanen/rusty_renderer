@@ -1011,6 +1011,13 @@ impl DirectXBackendImpl {
         }
     }
 
+    pub fn wait_idle(&mut self) -> Result<()> {
+        if self.fence.is_some() {
+            self.wait_for_previous_frame()?;
+        }
+        Ok(())
+    }
+
     pub fn cleanup(&mut self) {
         log::info!("Cleaning up DirectX 12 backend");
 

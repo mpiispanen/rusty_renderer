@@ -184,6 +184,11 @@ pub trait GraphicsBackend: Send + Sync {
     /// any size-dependent resources.
     fn resize(&mut self, width: u32, height: u32) -> Result<()>;
 
+    /// Wait for the GPU to finish all pending work
+    ///
+    /// Should be called before destroying resources to ensure they're not in use.
+    fn wait_idle(&mut self) -> Result<()>;
+
     /// Cleanup resources
     ///
     /// Called before the backend is dropped. Should release all GPU resources.

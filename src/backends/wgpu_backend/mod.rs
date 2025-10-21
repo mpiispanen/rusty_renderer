@@ -592,6 +592,11 @@ impl GraphicsBackend for WgpuBackend {
         Ok((width, height, pixels))
     }
 
+    fn wait_idle(&mut self) -> Result<()> {
+        // wgpu handles synchronization automatically
+        Ok(())
+    }
+
     fn cleanup(&mut self) {
         log::info!("Cleaning up wgpu backend");
 

@@ -142,6 +142,17 @@ impl GraphicsBackend for DirectXBackend {
         }
     }
 
+    fn wait_idle(&mut self) -> Result<()> {
+        #[cfg(windows)]
+        {
+            self.inner.wait_idle()
+        }
+        #[cfg(not(windows))]
+        {
+            Ok(())
+        }
+    }
+
     fn cleanup(&mut self) {
         #[cfg(windows)]
         {

@@ -27,6 +27,8 @@ const VALIDATION_LAYER: vk::ExtensionName =
 
 const DEVICE_EXTENSIONS: &[vk::ExtensionName] = &[vk::KHR_SWAPCHAIN_EXTENSION.name];
 
+const MAX_FRAMES_IN_FLIGHT: usize = 2;
+
 /// Vulkan backend implementation
 pub struct VulkanBackend {
     // Core Vulkan objects (wrapped in Option for initialization order)
@@ -79,7 +81,7 @@ pub struct VulkanBackend {
     // Shader resource binding (M8.3)
     descriptor_pool_manager: Option<descriptor::DescriptorPoolManager>,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    descriptor_sets: Vec<vk::DescriptorSet>,
+    descriptor_sets: Vec<Vec<vk::DescriptorSet>>, // [frame_in_flight][set_index]
 
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
@@ -1986,6 +1988,15 @@ impl GraphicsBackend for VulkanBackend {
         Ok(())
     }
 
+    fn wait_idle(&mut self) -> Result<()> {
+        if let Some(device) = &self.device {
+            unsafe {
+                device.device_wait_idle()?;
+            }
+        }
+        Ok(())
+    }
+
     fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
         log::info!("Initializing Vulkan backend in headless mode: {width}x{height}");
 
@@ -2636,8 +2647,14 @@ impl GraphicsBackend for VulkanBackend {
         // Update descriptor set with bound resources
         descriptor::update_descriptor_set(device, descriptor_set, bind_group)?;
 
-        self.descriptor_sets.push(descriptor_set);
-        let handle = self.descriptor_sets.len() - 1;
+        // TODO: This API is incompatible with per-frame descriptor sets
+        // For now, store in frame 0 only. This API should be deprecated
+        // in favor of the per-frame bind_uniform_buffer approach.
+        if self.descriptor_sets.is_empty() {
+            self.descriptor_sets.push(Vec::new());
+        }
+        self.descriptor_sets[0].push(descriptor_set);
+        let handle = self.descriptor_sets[0].len() - 1;
 
         log::debug!("Created descriptor set with handle {handle}");
         Ok(handle)
@@ -2959,17 +2976,24 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
 
             let layout = backend.descriptor_set_layouts[set as usize];
             let pipeline_layout = backend.pipeline_layout;
+            let current_frame = backend.current_frame;
 
-            // Allocate descriptor set if needed
-            let descriptor_set = if backend.descriptor_sets.len() <= set as usize {
+            // Ensure we have descriptor sets for all frames
+            while backend.descriptor_sets.len() < MAX_FRAMES_IN_FLIGHT {
+                backend.descriptor_sets.push(Vec::new());
+            }
+
+            // Get or allocate descriptor set for current frame
+            let frame_sets = &mut backend.descriptor_sets[current_frame];
+            let descriptor_set = if frame_sets.len() <= set as usize {
                 let pool_manager = backend.descriptor_pool_manager.as_mut()
                     .context("Descriptor pool manager not initialized")?;
                 
                 let desc_set = pool_manager.allocate(layout)?;
-                backend.descriptor_sets.push(desc_set);
+                frame_sets.push(desc_set);
                 desc_set
             } else {
-                backend.descriptor_sets[set as usize]
+                frame_sets[set as usize]
             };
 
             (descriptor_set, pipeline_layout)
