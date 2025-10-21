@@ -1,8 +1,8 @@
 # Rusty Renderer - Project Status
 
-**Last Updated:** 2025-10-20 21:30 UTC  
+**Last Updated:** 2025-10-21 16:35 UTC  
 **Version:** 0.1.0  
-**Current Focus:** M10 Phase 1 (Integration)
+**Current Focus:** M10 Phase 2 (Camera System)
 
 ---
 
@@ -25,40 +25,66 @@
 
 ### Phase Status
 - ✅ **Phase 0:** Foundation (Complete, 2025-10-20)
-- 🎯 **Phase 1:** Integration (Next Session)
-- ⏳ **Phase 2:** Camera System (TODO)
+- ✅ **Phase 1:** Integration (Complete, 2025-10-21)
+- 🎯 **Phase 2:** Camera System (Next Session)
 - ⏳ **Phase 3:** Forward Rendering (TODO)
 - ⏳ **Phase 4:** Materials & Textures (TODO)
 
 ### What Works Now
 ```bash
+# Render scenes with screenshot
+cargo run -- --scene scenes/triangle.toml --screenshot out.png
+
+# Use different backends
+cargo run -- --scene scenes/triangle.toml --backend vulkan
+cargo run -- --scene scenes/triangle.toml --backend wgpu
+cargo run -- --scene scenes/triangle.toml --backend directx
+
 # List available scenes
 cargo run -- --list-scenes
 
 # List available pipelines
 cargo run -- --list-pipelines
-
-# Load and validate a scene
-cargo run -- --scene scenes/triangle.toml
 ```
 
-### What's Coming (Phase 1)
+### What's Coming (Phase 2)
 ```bash
-# Actually render the scene
-cargo run -- --scene scenes/triangle.toml --pipeline simple
+# Interactive camera controls (WASD + mouse)
+cargo run -- --scene scenes/triangle.toml --interactive
 
-# Render headless and save screenshot
-cargo run -- --scene scenes/triangle.toml --headless --screenshot out.png
-
-# Render with different backends
-cargo run -- --scene scenes/triangle.toml --backend vulkan
-cargo run -- --scene scenes/triangle.toml --backend wgpu
-cargo run -- --scene scenes/triangle.toml --backend directx
+# Different camera configurations from scene
+cargo run -- --scene scenes/3d_scene.toml
 ```
 
 ---
 
 ## Completed Milestones
+
+### M10 Phase 1: Integration ✅
+**Completed:** 2025-10-21  
+**Duration:** ~1 hour
+
+**Key Achievements:**
+- ApplicationRunner full integration
+- Backend initialization (Vulkan/wgpu/DirectX)
+- SimplePipeline render graph building
+- Vertex buffer creation from scene data
+- Screenshot capture working
+- All backends tested
+
+**Working Commands:**
+```bash
+cargo run -- --scene scenes/triangle.toml --screenshot triangle.png
+cargo run -- --scene scenes/quad.toml --backend wgpu
+```
+
+**Documentation:**
+- M10_PHASE1_COMPLETE.md
+
+**Known Issues:**
+- Minor validation warnings (image layouts)
+- Buffer cleanup warnings (Arc lifecycle)
+- Occasional segfault on exit (cleanup order)
 
 ### M9: Render Graph Execution ✅
 **Completed:** 2025-10-20  

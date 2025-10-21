@@ -6,6 +6,7 @@ use super::ApplicationArgs;
 use crate::pipelines::{PipelineFactory, RenderPipeline};
 use crate::scene::{Scene, SceneLoader};
 use anyhow::{Context, Result};
+use std::path::PathBuf;
 
 /// Application runner
 ///
@@ -148,7 +149,6 @@ impl ApplicationRunner {
     /// Initialize backend and run the render loop
     fn initialize_and_run(&mut self) -> Result<()> {
         let scene = self.scene.as_ref().context("No scene loaded")?;
-
         let pipeline = self.pipeline.as_mut().context("No pipeline created")?;
 
         log::info!("Initializing application...");
@@ -163,17 +163,109 @@ impl ApplicationRunner {
             }
         );
 
-        // For now, just log what we would do
-        // Full integration will be done in the next phase
+        // Determine backend type
+        let backend_type = self.args.backend_type();
 
-        log::info!("Application initialized successfully");
-        log::info!("Note: Full rendering integration coming in next phase");
+        // Create backend
+        log::info!("Creating backend: {}", backend_type);
+        let mut backend = crate::backends::create_backend(backend_type, true)?;
 
-        // TODO: Initialize backend
-        // TODO: Setup pipeline
-        // TODO: Build render graph
-        // TODO: Run event loop
-        // TODO: Execute render graph each frame
+        // Initialize backend (headless or windowed)
+        if self.args.headless {
+            backend.initialize_headless(self.args.width, self.args.height)?;
+            log::info!(
+                "Backend initialized (headless {}x{})",
+                self.args.width,
+                self.args.height
+            );
+        } else {
+            // For now, use headless mode even for interactive
+            // TODO: Implement proper windowed mode with event loop
+            backend.initialize_headless(self.args.width, self.args.height)?;
+            log::info!(
+                "Backend initialized ({}x{})",
+                self.args.width,
+                self.args.height
+            );
+            log::warn!("Note: Windowed mode with event loop coming in future update");
+        }
+
+        // Setup pipeline
+        log::info!("Setting up pipeline...");
+        pipeline.setup(&mut *backend)?;
+
+        // Build render graph
+        log::info!("Building render graph...");
+        let mut graph = pipeline.build_graph(scene, &mut *backend)?;
+
+        // Compile render graph
+        log::info!("Compiling render graph...");
+        let compiled = graph.compile()?;
+        log::info!("Render graph compiled: {} passes", compiled.execution_order.len());
+
+        // Run rendering
+        let screenshot = self.args.screenshot.clone();
+        let max_frames = self.args.max_frames;
+        if self.args.headless {
+            Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
+        } else {
+            // For now, same as headless
+            // TODO: Implement proper event loop
+            Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
+        }
+
+        // Cleanup
+        pipeline.cleanup(&mut *backend);
+        backend.cleanup();
+
+        log::info!("Application shutdown complete");
+
+        Ok(())
+    }
+
+    /// Run in headless mode (single frame or limited frames)
+    fn run_headless_static(
+        backend: &mut dyn crate::backends::GraphicsBackend,
+        graph: &crate::render_graph::RenderGraph,
+        compiled: &crate::render_graph::CompiledGraph,
+        max_frames: u32,
+        screenshot: Option<PathBuf>,
+    ) -> Result<()> {
+        let max_frames = if max_frames > 0 {
+            max_frames
+        } else {
+            1 // Default to single frame in headless
+        };
+
+        log::info!("Rendering {} frame(s)...", max_frames);
+
+        for frame in 0..max_frames {
+            log::debug!("Frame {}/{}", frame + 1, max_frames);
+
+            backend.begin_frame()?;
+            backend.execute_graph(graph, compiled)?;
+            backend.end_frame()?;
+        }
+
+        log::info!("Rendering complete");
+
+        // Capture screenshot if requested
+        if let Some(screenshot_path) = screenshot {
+            log::info!("Capturing screenshot...");
+            let (width, height, pixels) = backend.capture_frame()?;
+            log::info!("Frame captured: {}x{} ({} bytes)", width, height, pixels.len());
+
+            image::save_buffer(
+                &screenshot_path,
+                &pixels,
+                width,
+                height,
+                image::ColorType::Rgba8,
+            )
+            .with_context(|| format!("Failed to save screenshot: {}", screenshot_path.display()))?;
+
+            log::info!("Screenshot saved to: {}", screenshot_path.display());
+        }
 
         Ok(())
     }

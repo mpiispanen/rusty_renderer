@@ -87,6 +87,26 @@ impl ApplicationArgs {
     pub fn scene_directory(&self) -> PathBuf {
         PathBuf::from("scenes")
     }
+
+    /// Get the backend type from args or default
+    pub fn backend_type(&self) -> crate::backends::BackendType {
+        use crate::backends::BackendType;
+
+        if let Some(backend) = &self.backend {
+            match backend.to_lowercase().as_str() {
+                "vulkan" | "vk" => BackendType::Vulkan,
+                "directx" | "dx12" | "directx12" => BackendType::DirectX12,
+                "wgpu" => BackendType::Wgpu,
+                _ => {
+                    log::warn!("Unknown backend '{}', defaulting to Vulkan", backend);
+                    BackendType::Vulkan
+                }
+            }
+        } else {
+            // Default to Vulkan
+            BackendType::Vulkan
+        }
+    }
 }
 
 #[cfg(test)]
