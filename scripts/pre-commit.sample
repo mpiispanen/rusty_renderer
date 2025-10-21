@@ -1,0 +1,53 @@
+#!/bin/bash
+# Pre-commit hook for rusty_renderer
+# Ensures code quality before committing
+#
+# To install: cp scripts/pre-commit.sample .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+echo "🔍 Running pre-commit checks..."
+echo
+
+# 1. Format check
+echo "📝 Checking code formatting..."
+if ! cargo fmt --check --quiet; then
+    echo "❌ Code is not formatted properly"
+    echo "   Run: cargo fmt"
+    exit 1
+fi
+echo "✅ Formatting OK"
+echo
+
+# 2. Clippy
+echo "🔎 Running clippy..."
+if ! cargo clippy --all-targets --quiet -- -D warnings 2>&1 | grep -q "^$"; then
+    echo "❌ Clippy found issues"
+    echo "   Run: cargo clippy --all-targets -- -D warnings"
+    exit 1
+fi
+echo "✅ Clippy OK"
+echo
+
+# 3. Tests
+echo "🧪 Running tests..."
+if ! cargo test --lib --quiet; then
+    echo "❌ Tests failed"
+    echo "   Run: cargo test --lib"
+    exit 1
+fi
+echo "✅ Tests OK"
+echo
+
+# 4. Build check
+echo "🔨 Checking build..."
+if ! cargo build --quiet 2>&1 | grep -q "^$"; then
+    echo "❌ Build failed"
+    echo "   Run: cargo build"
+    exit 1
+fi
+echo "✅ Build OK"
+echo
+
+echo "✨ All pre-commit checks passed!"
+echo "   Proceeding with commit..."

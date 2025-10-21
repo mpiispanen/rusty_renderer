@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.4.0  
-**Last Updated:** 2025-10-19  
-**Status:** Render Graph Foundation Complete - Planning Real Rendering Pipeline
+**Version:** 0.5.0  
+**Last Updated:** 2025-10-21  
+**Status:** Forward Rendering with Lighting Complete - Multi-Backend Production Ready
 
 ## Project Vision
 
@@ -18,16 +18,16 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 
 ## Current State
 
-**Phase:** Moving from Proof-of-Concept to Production-Ready  
-**Status:** Render graph architecture complete, planning real rendering pipeline
+**Phase:** Foundation Complete - Building Production Renderer  
+**Status:** Forward rendering with lighting working on Vulkan (0 validation errors)
 
-### Completed (Foundation)
+### Completed (Production Ready on Vulkan)
 - ✅ Repository setup with CI/CD pipeline
 - ✅ Project structure with proper module organization
 - ✅ Backend abstraction layer with trait definitions
-- ✅ Three working backends: Vulkan (primary), wgpu, DirectX 12
+- ✅ Three backend implementations: Vulkan (complete), wgpu (partial), DirectX 12 (partial)
 - ✅ Command-line argument parsing for backend selection
-- ✅ Validation layer support across all backends
+- ✅ Validation layer support (zero errors on Vulkan)
 - ✅ Render graph architecture with automatic dependency resolution
 - ✅ Render graph execution on all backends
 - ✅ Modular pass system (passes in separate files)
@@ -35,19 +35,39 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ✅ DirectX 12 testing via Proton on Linux
 - ✅ Headless rendering and screenshot capture
 - ✅ Visual testing infrastructure (FLIP integration)
+- ✅ **Scene system with TOML definitions**
+- ✅ **Vertex and index buffer support**
+- ✅ **Forward rendering with Blinn-Phong lighting**
+- ✅ **Directional and point lights (up to 8)**
+- ✅ **Per-object transforms via push constants**
+- ✅ **Per-frame descriptor sets (proper synchronization)**
+- ✅ **Camera system with view-projection matrices**
+- ✅ **Normal transformation for non-uniform scaling**
 
-### Current Limitations (Placeholders)
-- ❌ **Triangle vertices hardcoded in shaders**
-- ❌ **No vertex/index buffer support**
-- ❌ **No texture loading or binding**
-- ❌ **No shader resource binding (descriptors/bind groups)**
+### Working Features (Vulkan)
+- Forward renderer with diffuse + specular lighting
+- Multiple light types (directional, point)
+- Per-object position, rotation, scale
+- Ambient lighting
+- Material colors
+- Proper resource cleanup (0 validation errors)
+- Headless and windowed modes
+
+### Known Limitations
+- ❌ **wgpu: Push constants not implemented** (needs dynamic uniforms)
+- ❌ **DirectX: Push constants not implemented** (needs root constants)
+- ❌ **No texture loading or sampling**
 - ❌ **No model loading (glTF)**
 - ❌ **No material system**
-- ❌ **Placeholder render pass callbacks**
+- ❌ **Shaders hardcoded in backends** (should be defined by passes)
+- ❌ **No shadow mapping**
+- ❌ **No post-processing**
+- ❌ **No UI for debugging**
 
 ### In Progress
-- **Milestone 8**: Real rendering pipeline (vertex buffers, textures, glTF)
-  - See `docs/M8_PLANNING.md` for detailed roadmap
+- **Multi-Backend Completion**: wgpu and DirectX push constants
+- **Resource Management**: Automatic shader loading and pipeline creation
+- See `docs/ROADMAP_2025.md` for detailed plan
 
 ### Coordinate System Handling
 All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
