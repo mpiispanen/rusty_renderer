@@ -92,7 +92,7 @@ struct ForwardPassCallback {
 
 impl PassCallback for ForwardPassCallback {
     fn execute(&self, context: &mut dyn PassExecutionContext) {
-        log::debug!("Executing forward rendering pass");
+        log::info!("Executing forward rendering pass with {} vertices", self.vertex_count);
 
         // Bind camera uniforms (set 0, binding 0)
         let camera_ptr = self.camera_buffer.as_ref().as_ref() as *const dyn Buffer
@@ -103,7 +103,7 @@ impl PassCallback for ForwardPassCallback {
             log::error!("Failed to bind camera uniforms: {e}");
             return;
         }
-        log::debug!("Camera uniforms bound");
+        log::info!("Camera uniforms bound");
 
         // Bind lighting uniforms (set 0, binding 1)
         let lighting_ptr = self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer
@@ -114,7 +114,7 @@ impl PassCallback for ForwardPassCallback {
             log::error!("Failed to bind lighting uniforms: {e}");
             return;
         }
-        log::debug!("Lighting uniforms bound");
+        log::info!("Lighting uniforms bound");
 
         // Bind vertex buffer
         let vertex_ptr = self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer
@@ -124,7 +124,7 @@ impl PassCallback for ForwardPassCallback {
             log::error!("Failed to bind vertex buffer: {e}");
             return;
         }
-        log::debug!("Vertex buffer bound");
+        log::info!("Vertex buffer bound");
 
         // Draw vertices
         if let Err(e) = context.draw(self.vertex_count, 1, 0, 0) {
@@ -132,6 +132,6 @@ impl PassCallback for ForwardPassCallback {
             return;
         }
 
-        log::debug!("Forward pass drawn {} vertices successfully", self.vertex_count);
+        log::info!("Forward pass completed successfully");
     }
 }
