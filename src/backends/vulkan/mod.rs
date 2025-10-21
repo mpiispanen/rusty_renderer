@@ -639,10 +639,13 @@ impl VulkanBackend {
         let device = self.device.as_ref().context("Device not initialized")?;
 
         log::info!("Creating shader modules");
-        // Create shader modules
-        let vert_shader_module = self.create_shader_module(shaders::VERTEX_SHADER)?;
+        // Create shader modules - using forward rendering shaders
+        let vert_spirv = shaders::bytes_to_u32_vec(shaders::FORWARD_VERTEX_SHADER);
+        let frag_spirv = shaders::bytes_to_u32_vec(shaders::FORWARD_FRAGMENT_SHADER);
+        
+        let vert_shader_module = self.create_shader_module(&vert_spirv)?;
         log::info!("Vertex shader module created");
-        let frag_shader_module = self.create_shader_module(shaders::FRAGMENT_SHADER)?;
+        let frag_shader_module = self.create_shader_module(&frag_spirv)?;
         log::info!("Fragment shader module created");
 
         let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
