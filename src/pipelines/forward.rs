@@ -198,6 +198,27 @@ impl RenderPipeline for ForwardPipeline {
         let lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
         let lighting_uniforms = LightingUniforms::from_scene(&lighting);
 
+        log::info!(
+            "Lighting uniforms - ambient: [{:.2}, {:.2}, {:.2}], light_count: {}",
+            lighting_uniforms.ambient_light_count[0],
+            lighting_uniforms.ambient_light_count[1],
+            lighting_uniforms.ambient_light_count[2],
+            lighting_uniforms.ambient_light_count[3]
+        );
+        
+        // Log first light for debugging
+        if lighting_uniforms.ambient_light_count[3] > 0.0 {
+            let light = &lighting_uniforms.lights[0];
+            log::info!(
+                "Light 0 - type: {}, color: [{:.2}, {:.2}, {:.2}], intensity: {:.2}",
+                light.light_type,
+                light.color_intensity[0],
+                light.color_intensity[1],
+                light.color_intensity[2],
+                light.color_intensity[3]
+            );
+        }
+
         // Create lighting uniform buffer
         let lighting_buffer = Self::create_lighting_buffer(backend, &lighting_uniforms, "lighting_uniforms")
             .context("Failed to create lighting uniform buffer")?;
