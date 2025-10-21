@@ -7,6 +7,7 @@
 pub mod app;
 pub mod application;
 pub mod backends;
+pub mod camera;
 pub mod config;
 pub mod passes;
 pub mod pipelines;
