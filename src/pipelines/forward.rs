@@ -10,14 +10,15 @@ use super::*;
 use crate::backends::{
     BufferDescriptor, BufferUsage, GraphicsBackend, MemoryLocation, Vertex as BackendVertex,
 };
-use crate::camera::CameraController;
+use crate::camera::{CameraController, CameraUniforms};
 use crate::lighting::LightingUniforms;
-use crate::passes::VertexBufferTrianglePass;
+use crate::passes::ForwardPass;
 use crate::render_graph::{
     Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
+use std::sync::Arc;
 
 /// Forward rendering pipeline with lighting
 pub struct ForwardPipeline {
@@ -84,13 +85,53 @@ impl ForwardPipeline {
 
         backend.upload_to_buffer(vertex_buffer.as_ref(), &vertex_data, 0)?;
 
-        log::info!(
-            "Created vertex buffer '{}': {} vertices",
-            label,
-            backend_vertices.len()
-        );
-
         Ok(vertex_buffer)
+    }
+
+    /// Create uniform buffer for camera
+    fn create_camera_buffer(
+        backend: &mut dyn GraphicsBackend,
+        camera_uniforms: &CameraUniforms,
+        label: &str,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
+        let buffer_size = std::mem::size_of::<CameraUniforms>() as u64;
+        let buffer_desc = BufferDescriptor {
+            size: buffer_size,
+            usage: BufferUsage::uniform(),
+            memory_location: MemoryLocation::CpuToGpu,
+            label: Some(label.to_string()),
+        };
+
+        let buffer = backend.create_buffer(&buffer_desc)?;
+        
+        // Upload camera data
+        let data = bytemuck::bytes_of(camera_uniforms);
+        backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
+
+        Ok(buffer)
+    }
+
+    /// Create uniform buffer for lighting
+    fn create_lighting_buffer(
+        backend: &mut dyn GraphicsBackend,
+        lighting_uniforms: &LightingUniforms,
+        label: &str,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
+        let buffer_size = std::mem::size_of::<LightingUniforms>() as u64;
+        let buffer_desc = BufferDescriptor {
+            size: buffer_size,
+            usage: BufferUsage::uniform(),
+            memory_location: MemoryLocation::CpuToGpu,
+            label: Some(label.to_string()),
+        };
+
+        let buffer = backend.create_buffer(&buffer_desc)?;
+        
+        // Upload lighting data
+        let data = bytemuck::bytes_of(lighting_uniforms);
+        backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
+
+        Ok(buffer)
     }
 
     /// Calculate default normals for geometry without normals
@@ -141,14 +182,26 @@ impl RenderPipeline for ForwardPipeline {
 
         // Create camera controller
         let camera = CameraController::from_scene_camera(&scene.camera, width, height);
-        let _camera_uniforms = camera.uniforms();
+        let camera_uniforms = camera.uniforms();
 
         // Store camera for later use
         self.camera = Some(camera);
 
+        // Create camera uniform buffer
+        let camera_buffer = Self::create_camera_buffer(backend, &camera_uniforms, "camera_uniforms")
+            .context("Failed to create camera uniform buffer")?;
+        let camera_buffer = Arc::new(camera_buffer);
+
+        log::info!("Created camera uniform buffer");
+
         // Get lighting configuration
         let lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
-        let _lighting_uniforms = LightingUniforms::from_scene(&lighting);
+        let lighting_uniforms = LightingUniforms::from_scene(&lighting);
+
+        // Create lighting uniform buffer
+        let lighting_buffer = Self::create_lighting_buffer(backend, &lighting_uniforms, "lighting_uniforms")
+            .context("Failed to create lighting uniform buffer")?;
+        let lighting_buffer = Arc::new(lighting_buffer);
 
         log::info!(
             "Forward pipeline: {} lights, ambient {:?}",
@@ -183,7 +236,7 @@ impl RenderPipeline for ForwardPipeline {
         // Process each object in the scene
         for obj in scene.objects.iter() {
             match obj {
-                SceneObject::Mesh { name, geometry, transform } => match geometry {
+                SceneObject::Mesh { name, geometry, transform: _ } => match geometry {
                     GeometryData::Inline { vertices, .. } => {
                         let vertex_count = vertices.len();
                         log::info!("  - Mesh '{name}': {vertex_count} vertices");
@@ -198,16 +251,18 @@ impl RenderPipeline for ForwardPipeline {
                             format!("Failed to create vertex buffer for mesh '{name}'")
                         })?;
 
-                        // Log transform for debugging
-                        log::debug!("    Transform: position={:?}, rotation={:?}, scale={:?}",
-                            transform.position, transform.rotation, transform.scale);
+                        // Add forward rendering pass with camera and lighting
+                        let vertex_count = vertices_with_normals.len() as u32;
+                        let _pass = ForwardPass::new(
+                            &mut graph,
+                            color_buffer,
+                            vertex_buffer,
+                            camera_buffer.clone(),
+                            lighting_buffer.clone(),
+                            vertex_count,
+                        );
 
-                        // Add render pass for this mesh
-                        // TODO: Create ForwardPass that uses camera and lighting uniforms
-                        let _pass =
-                            VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
-
-                        log::debug!("Added render pass for mesh '{name}'");
+                        log::debug!("Added forward rendering pass for mesh '{name}' with {vertex_count} vertices");
                     }
                     GeometryData::File { path } => {
                         log::warn!("  - Mesh '{name}': external file '{path}' not yet supported");
