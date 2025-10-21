@@ -587,6 +587,15 @@ impl VulkanBackend {
     fn create_render_pass(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
+        // Choose appropriate final layout based on mode
+        let final_layout = if self.headless {
+            // In headless mode, use TRANSFER_SRC_OPTIMAL for reading back
+            vk::ImageLayout::TRANSFER_SRC_OPTIMAL
+        } else {
+            // In windowed mode, use PRESENT_SRC_KHR for swapchain presentation
+            vk::ImageLayout::PRESENT_SRC_KHR
+        };
+
         let color_attachment = vk::AttachmentDescription::builder()
             .format(self.swapchain_format)
             .samples(vk::SampleCountFlags::_1)
@@ -595,7 +604,7 @@ impl VulkanBackend {
             .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
             .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
             .initial_layout(vk::ImageLayout::UNDEFINED)
-            .final_layout(vk::ImageLayout::PRESENT_SRC_KHR);
+            .final_layout(final_layout);
 
         let color_attachment_ref = vk::AttachmentReference::builder()
             .attachment(0)
@@ -2062,34 +2071,8 @@ impl GraphicsBackend for VulkanBackend {
 
         unsafe { device.begin_command_buffer(cmd_buffer, &begin_info)? };
 
-        // Transition image layout for transfer
-        let barrier = vk::ImageMemoryBarrier::builder()
-            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-            .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
-            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
-            .image(self.offscreen_image)
-            .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
-                base_mip_level: 0,
-                level_count: 1,
-                base_array_layer: 0,
-                layer_count: 1,
-            })
-            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-            .dst_access_mask(vk::AccessFlags::TRANSFER_READ);
-
-        unsafe {
-            device.cmd_pipeline_barrier(
-                cmd_buffer,
-                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-                vk::PipelineStageFlags::TRANSFER,
-                vk::DependencyFlags::empty(),
-                &[] as &[vk::MemoryBarrier],
-                &[] as &[vk::BufferMemoryBarrier],
-                &[barrier],
-            );
-        }
+        // Image is already in TRANSFER_SRC_OPTIMAL from render pass, no transition needed
+        // (The render pass final_layout handles this in headless mode)
 
         // Copy image to buffer
         let region = vk::BufferImageCopy::builder()

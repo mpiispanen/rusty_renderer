@@ -221,7 +221,10 @@ impl ApplicationRunner {
             let max_frames = self.args.max_frames;
             Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
 
-            // Cleanup
+            // Cleanup - drop graph and compiled first to release buffer references
+            drop(compiled);
+            drop(graph);
+            
             pipeline.cleanup(&mut *backend);
             backend.cleanup();
 
@@ -308,6 +311,24 @@ impl ApplicationRunner {
 impl Drop for ApplicationRunner {
     fn drop(&mut self) {
         log::debug!("Application runner cleanup");
+    }
+}
+
+impl Drop for WindowedApp {
+    fn drop(&mut self) {
+        log::info!("Cleaning up windowed application");
+        
+        // Drop graph and compiled first to release buffer references
+        self.compiled = None;
+        self.graph = None;
+        
+        // Cleanup pipeline
+        if let Some(backend) = &mut self.backend {
+            self.pipeline.cleanup(&mut **backend);
+            backend.cleanup();
+        }
+        
+        log::info!("Windowed application cleaned up");
     }
 }
 
