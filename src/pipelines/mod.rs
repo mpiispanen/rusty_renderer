@@ -8,8 +8,10 @@ use crate::render_graph::RenderGraph;
 use crate::scene::Scene;
 use anyhow::Result;
 
+pub mod forward;
 pub mod simple;
 
+pub use forward::ForwardPipeline;
 pub use simple::SimplePipeline;
 
 /// Render pipeline trait
@@ -44,13 +46,14 @@ impl PipelineFactory {
     pub fn create(name: &str) -> Result<Box<dyn RenderPipeline>> {
         match name.to_lowercase().as_str() {
             "simple" => Ok(Box::new(SimplePipeline::new())),
+            "forward" => Ok(Box::new(ForwardPipeline::new())),
             _ => anyhow::bail!("Unknown pipeline: {name}"),
         }
     }
 
     /// List available pipelines
     pub fn list_pipelines() -> Vec<String> {
-        vec!["simple".to_string()]
+        vec!["simple".to_string(), "forward".to_string()]
     }
 }
 
