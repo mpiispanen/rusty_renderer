@@ -84,13 +84,17 @@ impl WgpuBackend {
 
     /// Create render pipeline
     fn create_render_pipeline(&mut self) -> Result<()> {
+        log::info!("Creating wgpu render pipeline");
+
+        // Create bind group layouts first (M8.3 MVP)
+        log::info!("Creating bind group layouts");
+        self.create_uniform_bind_group_layouts()?;
+
         let device = self.device.as_ref().context("Device not initialized")?;
         let config = self
             .surface_config
             .as_ref()
             .context("Surface config not set")?;
-
-        log::info!("Creating wgpu render pipeline");
 
         // Load shader
         let shader_source = self.load_shader();
@@ -99,10 +103,18 @@ impl WgpuBackend {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
+        // Create pipeline layout with bind group layouts
+        let layout_refs: Vec<&wgpu::BindGroupLayout> = self.bind_group_layouts.iter().collect();
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            label: Some("Pipeline Layout"),
+            bind_group_layouts: &layout_refs,
+            push_constant_ranges: &[],
+        });
+
         // Create render pipeline
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Triangle Pipeline"),
-            layout: None, // Auto layout
+            layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
@@ -141,6 +153,49 @@ impl WgpuBackend {
         self.render_pipeline = Some(pipeline);
         log::info!("Render pipeline created successfully");
 
+        Ok(())
+    }
+
+    /// Create bind group layouts for uniform buffers (M8.3 MVP)
+    ///
+    /// Creates bind group layouts for:
+    /// - Group 0, Binding 0: Camera uniforms
+    /// - Group 0, Binding 1: Lighting uniforms
+    fn create_uniform_bind_group_layouts(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Group 0: Global uniforms (camera + lighting)
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Global Uniforms Bind Group Layout"),
+            entries: &[
+                // Binding 0: Camera uniforms
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Binding 1: Lighting uniforms
+                wgpu::BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+
+        self.bind_group_layouts.push(bind_group_layout);
+
+        log::info!("Bind group layouts created");
         Ok(())
     }
 }
@@ -565,6 +620,9 @@ impl GraphicsBackend for WgpuBackend {
         graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
+        // Get raw pointer to backend early to avoid borrow checker issues
+        let backend_ptr = self as *mut WgpuBackend;
+        
         let device = self
             .device
             .as_ref()
@@ -651,8 +709,8 @@ impl GraphicsBackend for WgpuBackend {
                 // Execute pass callback (M9)
                 if let Some(pass) = graph.get_pass(*pass_id) {
                     if let Some(callback) = &pass.callback {
-                        // Create execution context
-                        let mut context = WgpuPassContext::new(&mut render_pass);
+                        // Create execution context (backend_ptr created earlier)
+                        let mut context = WgpuPassContext::new(&mut render_pass, backend_ptr);
 
                         // Execute the pass
                         callback.execute(&mut context);
@@ -1349,6 +1407,7 @@ impl super::Sampler for WgpuSampler {
 /// Uses raw pointer to avoid borrow checker issues with render pass in loop
 struct WgpuPassContext {
     render_pass: *mut (),
+    backend: *mut WgpuBackend,
 }
 
 // Safety: The render pass pointer is only used during rendering within a single thread
@@ -1356,14 +1415,19 @@ unsafe impl Send for WgpuPassContext {}
 unsafe impl Sync for WgpuPassContext {}
 
 impl WgpuPassContext {
-    fn new<'a>(render_pass: &mut wgpu::RenderPass<'a>) -> Self {
+    fn new<'a>(render_pass: &mut wgpu::RenderPass<'a>, backend: *mut WgpuBackend) -> Self {
         Self {
             render_pass: render_pass as *mut _ as *mut (),
+            backend,
         }
     }
 
     fn render_pass<'a>(&mut self) -> &mut wgpu::RenderPass<'a> {
         unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass<'a>) }
+    }
+
+    fn backend(&mut self) -> &mut WgpuBackend {
+        unsafe { &mut *self.backend }
     }
 }
 
@@ -1450,16 +1514,55 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         &mut self,
         set: u32,
         binding: u32,
-        _buffer_ptr: *const std::ffi::c_void,
-        _offset: u64,
-        _size: u64,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        size: u64,
     ) -> Result<()> {
-        // TODO: Implement bind group binding
-        log::warn!(
-            "bind_uniform_buffer not yet implemented (set={}, binding={})",
-            set,
-            binding
+        log::debug!(
+            "WgpuPassContext: Binding uniform buffer at set {set}, binding {binding}, offset {offset}, size {size}"
         );
+
+        // Get the buffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
+
+        // For MVP, we only support set 0
+        if set != 0 {
+            log::warn!("Only bind group 0 is currently supported, ignoring set {set}");
+            return Ok(());
+        }
+
+        // Get backend to access bind group layouts and device
+        let backend = self.backend();
+        
+        if backend.bind_group_layouts.is_empty() {
+            log::warn!("No bind group layouts created yet");
+            return Ok(());
+        }
+
+        let device = backend.device.as_ref()
+            .context("Device not initialized")?;
+        let layout = &backend.bind_group_layouts[set as usize];
+
+        // Create bind group with this buffer at the specified binding
+        // For MVP, we create a new bind group each time
+        // TODO: Cache and reuse bind groups when possible
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("Uniform Buffer Bind Group"),
+            layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding,
+                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                    buffer: &buffer_ref.buffer,
+                    offset,
+                    size: Some(std::num::NonZeroU64::new(size).context("Buffer size cannot be zero")?),
+                }),
+            }],
+        });
+
+        // Bind the group to the render pass
+        self.render_pass().set_bind_group(set, &bind_group, &[]);
+
+        log::debug!("WgpuPassContext: Uniform buffer bound successfully");
         Ok(())
     }
 }
