@@ -132,8 +132,8 @@ impl RenderPipeline for SimplePipeline {
                         let label = format!("{name}_vertices");
                         let vertex_buffer = Self::create_vertex_buffer(backend, vertices, &label)
                             .with_context(|| {
-                                format!("Failed to create vertex buffer for mesh '{name}'")
-                            })?;
+                            format!("Failed to create vertex buffer for mesh '{name}'")
+                        })?;
 
                         // Add render pass for this mesh
                         let _pass =
