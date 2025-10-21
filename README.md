@@ -13,20 +13,30 @@ This is a cross-platform graphics rendering sandbox developed in Rust to aid lea
 # Ubuntu/Debian example:
 sudo apt install vulkan-tools libvulkan-dev
 
-# Clone and run the render graph triangle example
+# Clone the repository
 git clone https://github.com/mpiispanen/rusty_renderer.git
 cd rusty_renderer
-cargo run --example render_graph_triangle --release
+
+# List available scenes
+cargo run --release -- --list-scenes
+
+# Render triangle in windowed mode (interactive)
+cargo run --release -- --scene scenes/triangle.toml
+
+# Render in headless mode with screenshot
+cargo run --release -- --scene scenes/triangle.toml --headless --screenshot triangle.png
 ```
 
-You should see a colorful RGB triangle rendered through the render graph! 🎨
+You should see a colorful RGB triangle! Press Escape to exit windowed mode. 🎨
 
 ## Features
 
 - **Multi-backend support**: Vulkan (via vulkanalia), DirectX 12 (Windows), and wgpu
-- **Modern architecture**: Render graph system for automatic dependency management
+- **Scene-driven rendering**: TOML-based scene files with geometry, cameras, and lighting
+- **Dual-mode operation**: Windowed (interactive) and headless (CI/testing) modes
+- **Render graph system**: Automatic dependency management and execution
 - **Cross-platform**: Linux, Windows, and macOS support
-- **Well-tested**: Comprehensive unit and integration tests
+- **Well-tested**: Comprehensive unit and integration tests (122+ tests)
 - **CI/CD**: Automated builds, tests, and GPU validation
 - **Validation layers**: Debug mode with validation on all backends (see [docs/VALIDATION_LAYERS.md](docs/VALIDATION_LAYERS.md))
 
@@ -47,29 +57,94 @@ You should see a colorful RGB triangle rendered through the render graph! 🎨
 git clone https://github.com/mpiispanen/rusty_renderer.git
 cd rusty_renderer
 
-# Build in debug mode
-cargo build
-
-# Build in release mode
+# Build in release mode (recommended)
 cargo build --release
 
-# Run render graph triangle example
-cargo run --example render_graph_triangle --release
+# List available scenes
+cargo run --release -- --list-scenes
 
-# Run with detailed logging
-RUST_LOG=debug cargo run --example render_graph_triangle
+# List available pipelines
+cargo run --release -- --list-pipelines
+
+# Run with triangle scene (windowed mode)
+cargo run --release -- --scene scenes/triangle.toml
+
+# Run in headless mode with screenshot
+cargo run --release -- --scene scenes/triangle.toml --headless --screenshot output.png
 
 # Try different backends
-cargo run --example render_graph_triangle wgpu
-cargo run --example render_graph_triangle vulkan
+cargo run --release -- --scene scenes/triangle.toml --backend wgpu
+cargo run --release -- --scene scenes/triangle.toml --backend vulkan
+cargo run --release -- --scene scenes/triangle.toml --backend directx  # Windows only
 
-# Run vertex buffer example
-cargo run --example vertex_buffer_triangle --release
-cargo run -- --backend wgpu
-cargo run -- --backend directx  # Windows only
+# Use forward rendering pipeline (when descriptor sets are available)
+cargo run --release -- --scene scenes/cube.toml --pipeline forward
+
+# Run with detailed logging
+RUST_LOG=debug cargo run --release -- --scene scenes/triangle.toml
 ```
 
 For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md).
+
+## Usage
+
+### Windowed Mode (Interactive)
+
+Default mode when `--headless` is not specified:
+
+```bash
+# Opens a window and renders continuously
+cargo run --release -- --scene scenes/triangle.toml
+
+# Controls:
+#   Escape - Close window
+#   Close button - Clean shutdown with optional screenshot
+```
+
+### Headless Mode (CI/Testing)
+
+For automated testing and screenshot generation:
+
+```bash
+# Render single frame and save screenshot
+cargo run --release -- --scene scenes/triangle.toml --headless --screenshot out.png
+
+# Render N frames (for benchmarking)
+cargo run --release -- --scene scenes/triangle.toml --headless --max-frames 100
+
+# Works in CI environments (no display required)
+```
+
+### Scene Files
+
+Scenes are defined in TOML format in the `scenes/` directory:
+
+```toml
+# scenes/triangle.toml
+[metadata]
+name = "RGB Triangle"
+description = "Simple colored triangle"
+
+[[objects]]
+type = "mesh"
+name = "triangle"
+
+[objects.geometry]
+source = "inline"
+vertices = [
+    { position = [0.0, -0.5, 0.0], color = [1.0, 0.0, 0.0] },
+    { position = [0.5, 0.5, 0.0], color = [0.0, 1.0, 0.0] },
+    { position = [-0.5, 0.5, 0.0], color = [0.0, 0.0, 1.0] },
+]
+
+[camera]
+type = "perspective"
+position = [0.0, 0.0, 3.0]
+target = [0.0, 0.0, 0.0]
+fov = 45.0
+```
+
+See `scenes/` directory for more examples.
 
 ## Command-Line Options
 
@@ -77,16 +152,39 @@ For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](doc
 Usage: rusty_renderer [OPTIONS]
 
 Options:
-  -b, --backend <BACKEND>    Graphics backend [default: vulkan] [possible values: vulkan, directx, wgpu]
-  -s, --scene <SCENE>        Scene to render [default: triangle]
-      --width <WIDTH>        Window width [default: 1280]
-      --height <HEIGHT>      Window height [default: 720]
-  -d, --debug                Enable debug mode and validation layers
-      --vsync                Enable VSync [default: true]
-      --log-level <LEVEL>    Log level [default: info] [possible values: off, error, warn, info, debug, trace]
-      --max-frames <N>       Maximum frames to render (for testing)
-  -h, --help                 Print help
-  -V, --version              Print version
+  -s, --scene <SCENE>          Scene file to render (required, or use --list-scenes)
+  -p, --pipeline <PIPELINE>    Rendering pipeline [default: simple] [possible values: simple, forward]
+  -b, --backend <BACKEND>      Graphics backend [default: vulkan] [possible values: vulkan, wgpu, directx]
+      --headless               Run in headless mode (no window)
+      --width <WIDTH>          Window/render width [default: 800]
+      --height <HEIGHT>        Window/render height [default: 600]
+      --max-frames <N>         Maximum frames to render (0 = unlimited)
+      --screenshot <FILE>      Save screenshot on exit (PNG format)
+      --list-scenes            List available scene files
+      --list-pipelines         List available rendering pipelines
+  -h, --help                   Print help
+  -V, --version                Print version
+```
+
+### Examples
+
+```bash
+# List what's available
+cargo run --release -- --list-scenes
+cargo run --release -- --list-pipelines
+
+# Basic rendering
+cargo run --release -- --scene scenes/triangle.toml
+cargo run --release -- --scene scenes/quad.toml --backend wgpu
+
+# Headless mode for CI/testing
+cargo run --release -- --scene scenes/triangle.toml --headless --screenshot test.png
+
+# Limit frames (good for testing)
+cargo run --release -- --scene scenes/triangle.toml --max-frames 60
+
+# Different pipeline (when descriptor sets available)
+cargo run --release -- --scene scenes/cube.toml --pipeline forward
 ```
 
 Note: `directx` backend is only available on Windows.
