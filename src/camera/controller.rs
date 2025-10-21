@@ -236,7 +236,7 @@ mod tests {
     fn test_camera_uniforms() {
         let view = Mat4::IDENTITY;
         let proj = Mat4::IDENTITY;
-        let uniforms = CameraUniforms::new(view, proj);
+        let _uniforms = CameraUniforms::new(view, proj);
 
         // Check size matches expected GPU layout
         assert_eq!(std::mem::size_of::<CameraUniforms>(), 64); // 16 floats * 4 bytes

@@ -167,7 +167,7 @@ impl ApplicationRunner {
         let backend_type = self.args.backend_type();
 
         // Create backend
-        log::info!("Creating backend: {}", backend_type);
+        log::info!("Creating backend: {backend_type}");
         let mut backend = crate::backends::create_backend(backend_type, true)?;
 
         // Initialize backend (headless or windowed)
@@ -201,7 +201,10 @@ impl ApplicationRunner {
         // Compile render graph
         log::info!("Compiling render graph...");
         let compiled = graph.compile()?;
-        log::info!("Render graph compiled: {} passes", compiled.execution_order.len());
+        log::info!(
+            "Render graph compiled: {} passes",
+            compiled.execution_order.len()
+        );
 
         // Run rendering
         let screenshot = self.args.screenshot.clone();
@@ -237,7 +240,7 @@ impl ApplicationRunner {
             1 // Default to single frame in headless
         };
 
-        log::info!("Rendering {} frame(s)...", max_frames);
+        log::info!("Rendering {max_frames} frame(s)...");
 
         for frame in 0..max_frames {
             log::debug!("Frame {}/{}", frame + 1, max_frames);
@@ -253,7 +256,12 @@ impl ApplicationRunner {
         if let Some(screenshot_path) = screenshot {
             log::info!("Capturing screenshot...");
             let (width, height, pixels) = backend.capture_frame()?;
-            log::info!("Frame captured: {}x{} ({} bytes)", width, height, pixels.len());
+            log::info!(
+                "Frame captured: {}x{} ({} bytes)",
+                width,
+                height,
+                pixels.len()
+            );
 
             image::save_buffer(
                 &screenshot_path,

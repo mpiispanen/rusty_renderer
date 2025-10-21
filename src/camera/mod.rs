@@ -50,11 +50,7 @@ mod tests {
 
     #[test]
     fn test_look_at_view() {
-        let view = look_at_view(
-            Vec3::new(0.0, 0.0, 5.0),
-            Vec3::ZERO,
-            Vec3::Y,
-        );
+        let view = look_at_view(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO, Vec3::Y);
         assert!(!view.is_nan());
     }
 

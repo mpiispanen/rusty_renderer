@@ -5,8 +5,7 @@
 
 use super::*;
 use crate::backends::{
-    Buffer, BufferDescriptor, BufferUsage, GraphicsBackend, MemoryLocation,
-    Vertex as BackendVertex,
+    BufferDescriptor, BufferUsage, GraphicsBackend, MemoryLocation, Vertex as BackendVertex,
 };
 use crate::passes::VertexBufferTrianglePass;
 use crate::render_graph::{
@@ -19,8 +18,6 @@ use anyhow::Context as _;
 pub struct SimplePipeline {
     /// Pipeline name
     name: String,
-    /// Vertex buffers created by this pipeline (need to keep alive)
-    vertex_buffers: Vec<Box<dyn Buffer>>,
 }
 
 impl SimplePipeline {
@@ -28,16 +25,12 @@ impl SimplePipeline {
     pub fn new() -> Self {
         Self {
             name: "Simple".to_string(),
-            vertex_buffers: Vec::new(),
         }
     }
 
     /// Convert scene vertex data to backend vertex format
     fn convert_vertex(vertex: &VertexData) -> BackendVertex {
-        BackendVertex::new_2d(
-            [vertex.position[0], vertex.position[1]],
-            vertex.color,
-        )
+        BackendVertex::new_2d([vertex.position[0], vertex.position[1]], vertex.color)
     }
 
     /// Create vertex buffer from scene vertices
@@ -47,10 +40,8 @@ impl SimplePipeline {
         label: &str,
     ) -> Result<Box<dyn crate::backends::Buffer>> {
         // Convert to backend vertex format
-        let backend_vertices: Vec<BackendVertex> = vertices
-            .iter()
-            .map(Self::convert_vertex)
-            .collect();
+        let backend_vertices: Vec<BackendVertex> =
+            vertices.iter().map(Self::convert_vertex).collect();
 
         // Create buffer descriptor
         let vertex_buffer_size = (backend_vertices.len() * BackendVertex::size()) as u64;
@@ -76,7 +67,11 @@ impl SimplePipeline {
 
         backend.upload_to_buffer(vertex_buffer.as_ref(), &vertex_data, 0)?;
 
-        log::info!("Created vertex buffer '{}': {} vertices", label, backend_vertices.len());
+        log::info!(
+            "Created vertex buffer '{}': {} vertices",
+            label,
+            backend_vertices.len()
+        );
 
         Ok(vertex_buffer)
     }
@@ -126,36 +121,32 @@ impl RenderPipeline for SimplePipeline {
         );
 
         // Process each object in the scene
-        for (_i, obj) in scene.objects.iter().enumerate() {
+        for obj in scene.objects.iter() {
             match obj {
                 SceneObject::Mesh { name, geometry, .. } => match geometry {
                     GeometryData::Inline { vertices, .. } => {
-                        log::info!("  - Mesh '{}': {} vertices", name, vertices.len());
+                        let vertex_count = vertices.len();
+                        log::info!("  - Mesh '{name}': {vertex_count} vertices");
 
                         // Create vertex buffer
-                        let label = format!("{}_vertices", name);
-                        let vertex_buffer = Self::create_vertex_buffer(
-                            backend,
-                            vertices,
-                            &label,
-                        )
-                        .with_context(|| format!("Failed to create vertex buffer for mesh '{}'", name))?;
+                        let label = format!("{name}_vertices");
+                        let vertex_buffer = Self::create_vertex_buffer(backend, vertices, &label)
+                            .with_context(|| {
+                                format!("Failed to create vertex buffer for mesh '{name}'")
+                            })?;
 
                         // Add render pass for this mesh
-                        let _pass = VertexBufferTrianglePass::new(
-                            &mut graph,
-                            color_buffer,
-                            vertex_buffer,
-                        );
+                        let _pass =
+                            VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
 
-                        log::debug!("Added VertexBufferTrianglePass for mesh '{}'", name);
+                        log::debug!("Added VertexBufferTrianglePass for mesh '{name}'");
                     }
                     GeometryData::File { path } => {
-                        log::warn!("  - Mesh '{}': external file '{}' not yet supported", name, path);
+                        log::warn!("  - Mesh '{name}': external file '{path}' not yet supported");
                     }
                 },
                 SceneObject::GltfModel { name, path, .. } => {
-                    log::warn!("  - glTF Model '{}': '{}' not yet supported", name, path);
+                    log::warn!("  - glTF Model '{name}': '{path}' not yet supported");
                 }
             }
         }
