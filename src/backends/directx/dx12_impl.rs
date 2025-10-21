@@ -398,10 +398,35 @@ impl DirectXBackendImpl {
             let vs_bytecode = self.compile_shader("VSMain", "vs_5_0")?;
             let ps_bytecode = self.compile_shader("PSMain", "ps_5_0")?;
 
-            // Create empty root signature (no parameters needed for this simple triangle)
+            // Create root signature with CBV parameters (M8.3)
+            // Root parameter 0: Camera uniforms (CBV)
+            // Root parameter 1: Lighting uniforms (CBV)
+            let mut root_parameters = vec![
+                D3D12_ROOT_PARAMETER {
+                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                    Anonymous: D3D12_ROOT_PARAMETER_0 {
+                        Descriptor: D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: 0, // b0 in HLSL
+                            RegisterSpace: 0,
+                        },
+                    },
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                },
+                D3D12_ROOT_PARAMETER {
+                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                    Anonymous: D3D12_ROOT_PARAMETER_0 {
+                        Descriptor: D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: 1, // b1 in HLSL
+                            RegisterSpace: 0,
+                        },
+                    },
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                },
+            ];
+
             let root_signature_desc = D3D12_ROOT_SIGNATURE_DESC {
-                NumParameters: 0,
-                pParameters: std::ptr::null(),
+                NumParameters: root_parameters.len() as u32,
+                pParameters: root_parameters.as_ptr(),
                 NumStaticSamplers: 0,
                 pStaticSamplers: std::ptr::null(),
                 Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
@@ -1151,9 +1176,11 @@ impl DirectXBackendImpl {
                     .context("Pass not found in graph")?;
 
                 if let Some(callback) = &pass.callback {
-                    // Create pass context with command list pointer
+                    // Create pass context with command list and backend pointers
+                    let backend_ptr = self as *mut DirectXBackendImpl;
                     let mut context = DirectXPassContext {
                         command_list: command_list as *const _ as *mut (),
+                        backend: backend_ptr,
                     };
 
                     // Execute the pass callback
@@ -2027,6 +2054,17 @@ mod dx12_helpers {
 /// Uses raw pointer to avoid borrow checker issues (same pattern as Vulkan/wgpu).
 struct DirectXPassContext {
     command_list: *mut (),
+    backend: *mut DirectXBackendImpl,
+}
+
+impl DirectXPassContext {
+    fn command_list(&self) -> &ID3D12GraphicsCommandList {
+        unsafe { &*(self.command_list as *const ID3D12GraphicsCommandList) }
+    }
+
+    fn backend(&mut self) -> &mut DirectXBackendImpl {
+        unsafe { &mut *self.backend }
+    }
 }
 
 impl PassExecutionContext for DirectXPassContext {
@@ -2037,7 +2075,7 @@ impl PassExecutionContext for DirectXPassContext {
         offset: u64,
     ) -> Result<()> {
         unsafe {
-            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            let command_list = self.command_list();
 
             // Downcast to DirectX buffer
             let buffer = &*(buffer_ptr as *const DirectXBuffer);
@@ -2072,7 +2110,7 @@ impl PassExecutionContext for DirectXPassContext {
         index_type: crate::render_graph::IndexType,
     ) -> Result<()> {
         unsafe {
-            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            let command_list = self.command_list();
 
             // Downcast to DirectX buffer
             let buffer = &*(buffer_ptr as *const DirectXBuffer);
@@ -2106,7 +2144,7 @@ impl PassExecutionContext for DirectXPassContext {
         first_instance: u32,
     ) -> Result<()> {
         unsafe {
-            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            let command_list = self.command_list();
             command_list.DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
 
             log::trace!(
@@ -2127,7 +2165,7 @@ impl PassExecutionContext for DirectXPassContext {
         first_instance: u32,
     ) -> Result<()> {
         unsafe {
-            let command_list = &*(self.command_list as *const ID3D12GraphicsCommandList);
+            let command_list = self.command_list();
             command_list.DrawIndexedInstanced(
                 index_count,
                 instance_count,
@@ -2157,20 +2195,44 @@ impl PassExecutionContext for DirectXPassContext {
         &mut self,
         set: u32,
         binding: u32,
-        _buffer_ptr: *const std::ffi::c_void,
-        _offset: u64,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
         _size: u64,
     ) -> Result<()> {
-        // TODO: Implement root signature CBV binding (M8.3 Phase 2)
-        // DirectX 12 requires:
-        // 1. Root signature definition with CBV slots
-        // 2. SetGraphicsRootConstantBufferView() calls
-        // 3. Different architecture than descriptor sets
-        log::warn!(
-            "DirectX uniform buffer binding not yet implemented (set={}, binding={}) - use wgpu backend for DirectX 12 support",
-            set,
-            binding
+        log::debug!(
+            "DirectXPassContext: Binding uniform buffer at set {set}, binding {binding}, offset {offset}"
         );
+
+        // For MVP, we only support set 0
+        if set != 0 {
+            log::warn!("Only root parameter set 0 is currently supported, ignoring set {set}");
+            return Ok(());
+        }
+
+        unsafe {
+            let command_list = self.command_list();
+
+            // Downcast to DirectX buffer
+            let buffer = &*(buffer_ptr as *const DirectXBuffer);
+            let dx_buffer = &buffer.resource;
+
+            // Get GPU virtual address
+            let gpu_address = dx_buffer.GetGPUVirtualAddress() + offset;
+
+            // DirectX uses root parameter indices directly
+            // binding 0 -> root parameter 0 (camera)
+            // binding 1 -> root parameter 1 (lighting)
+            let root_parameter_index = binding;
+
+            // Set the constant buffer view (CBV) for this root parameter
+            command_list.SetGraphicsRootConstantBufferView(root_parameter_index, gpu_address);
+
+            log::debug!(
+                "DirectXPassContext: Uniform buffer bound to root parameter {}",
+                root_parameter_index
+            );
+        }
+
         Ok(())
     }
 }
