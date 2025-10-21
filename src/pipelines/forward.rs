@@ -210,8 +210,27 @@ impl RenderPipeline for ForwardPipeline {
         if lighting_uniforms.ambient_light_count[3] > 0.0 {
             let light = &lighting_uniforms.lights[0];
             log::info!(
-                "Light 0 - type: {}, color: [{:.2}, {:.2}, {:.2}], intensity: {:.2}",
+                "Light 0 - type: {}, dir/pos: [{:.2}, {:.2}, {:.2}], color: [{:.2}, {:.2}, {:.2}], intensity: {:.2}",
                 light.light_type,
+                light.position_or_direction[0],
+                light.position_or_direction[1],
+                light.position_or_direction[2],
+                light.color_intensity[0],
+                light.color_intensity[1],
+                light.color_intensity[2],
+                light.color_intensity[3]
+            );
+        }
+        
+        // Log second light too
+        if lighting_uniforms.ambient_light_count[3] > 1.0 {
+            let light = &lighting_uniforms.lights[1];
+            log::info!(
+                "Light 1 - type: {}, dir/pos: [{:.2}, {:.2}, {:.2}], color: [{:.2}, {:.2}, {:.2}], intensity: {:.2}",
+                light.light_type,
+                light.position_or_direction[0],
+                light.position_or_direction[1],
+                light.position_or_direction[2],
                 light.color_intensity[0],
                 light.color_intensity[1],
                 light.color_intensity[2],

@@ -12,7 +12,9 @@
 // Light data structure (matches GPU layout in Rust)
 struct Light {
     uint lightType;
-    uint _padding1[3];
+    uint padding1;
+    uint padding2;
+    uint padding3;
     vec4 positionOrDirection;  // xyz = position/direction, w = 0 for directional, 1 for point
     vec4 colorIntensity;       // rgb = color, a = intensity
 };

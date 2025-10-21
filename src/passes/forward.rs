@@ -102,6 +102,11 @@ impl PassCallback for ForwardPassCallback {
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
         
+        log::info!("Model matrix: [{:.2}, {:.2}, {:.2}, {:.2}]", 
+            model_matrix[0][0], model_matrix[0][1], model_matrix[0][2], model_matrix[0][3]);
+        log::info!("Normal matrix: [{:.2}, {:.2}, {:.2}, {:.2}]",
+            normal_matrix[0][0], normal_matrix[0][1], normal_matrix[0][2], normal_matrix[0][3]);
+        
         // Combine both matrices into a single byte array (128 bytes total)
         let mut push_data = Vec::with_capacity(128);
         
