@@ -7,6 +7,12 @@ use crate::pipelines::{PipelineFactory, RenderPipeline};
 use crate::scene::{Scene, SceneLoader};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
+use winit::{
+    application::ApplicationHandler,
+    event::WindowEvent,
+    event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    window::{Window, WindowId},
+};
 
 /// Application runner
 ///
@@ -21,6 +27,19 @@ pub struct ApplicationRunner {
     args: ApplicationArgs,
     scene: Option<Scene>,
     pipeline: Option<Box<dyn RenderPipeline>>,
+}
+
+/// Windowed application state for event loop
+struct WindowedApp {
+    window: Option<Window>,
+    backend: Option<Box<dyn crate::backends::GraphicsBackend>>,
+    scene: Scene,
+    pipeline: Box<dyn RenderPipeline>,
+    graph: Option<crate::render_graph::RenderGraph>,
+    compiled: Option<crate::render_graph::CompiledGraph>,
+    screenshot_path: Option<PathBuf>,
+    frame_count: u64,
+    max_frames: u32,
 }
 
 impl ApplicationRunner {
@@ -148,8 +167,8 @@ impl ApplicationRunner {
 
     /// Initialize backend and run the render loop
     fn initialize_and_run(&mut self) -> Result<()> {
-        let scene = self.scene.as_ref().context("No scene loaded")?;
-        let pipeline = self.pipeline.as_mut().context("No pipeline created")?;
+        let scene = self.scene.take().context("No scene loaded")?;
+        let pipeline = self.pipeline.take().context("No pipeline created")?;
 
         log::info!("Initializing application...");
         log::info!("  Scene: {}", scene.metadata.name);
@@ -159,7 +178,7 @@ impl ApplicationRunner {
             if self.args.headless {
                 "headless"
             } else {
-                "interactive"
+                "windowed"
             }
         );
 
@@ -170,58 +189,65 @@ impl ApplicationRunner {
         log::info!("Creating backend: {backend_type}");
         let mut backend = crate::backends::create_backend(backend_type, true)?;
 
-        // Initialize backend (headless or windowed)
+        // Run in appropriate mode
         if self.args.headless {
+            // Headless mode: initialize and run without window
             backend.initialize_headless(self.args.width, self.args.height)?;
             log::info!(
                 "Backend initialized (headless {}x{})",
                 self.args.width,
                 self.args.height
             );
-        } else {
-            // For now, use headless mode even for interactive
-            // TODO: Implement proper windowed mode with event loop
-            backend.initialize_headless(self.args.width, self.args.height)?;
+
+            // Setup pipeline
+            log::info!("Setting up pipeline...");
+            let mut pipeline = pipeline;
+            pipeline.setup(&mut *backend)?;
+
+            // Build render graph
+            log::info!("Building render graph...");
+            let mut graph = pipeline.build_graph(&scene, &mut *backend)?;
+
+            // Compile render graph
+            log::info!("Compiling render graph...");
+            let compiled = graph.compile()?;
             log::info!(
-                "Backend initialized ({}x{})",
-                self.args.width,
-                self.args.height
+                "Render graph compiled: {} passes",
+                compiled.execution_order.len()
             );
-            log::warn!("Note: Windowed mode with event loop coming in future update");
-        }
 
-        // Setup pipeline
-        log::info!("Setting up pipeline...");
-        pipeline.setup(&mut *backend)?;
-
-        // Build render graph
-        log::info!("Building render graph...");
-        let mut graph = pipeline.build_graph(scene, &mut *backend)?;
-
-        // Compile render graph
-        log::info!("Compiling render graph...");
-        let compiled = graph.compile()?;
-        log::info!(
-            "Render graph compiled: {} passes",
-            compiled.execution_order.len()
-        );
-
-        // Run rendering
-        let screenshot = self.args.screenshot.clone();
-        let max_frames = self.args.max_frames;
-        if self.args.headless {
+            // Run rendering
+            let screenshot = self.args.screenshot.clone();
+            let max_frames = self.args.max_frames;
             Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
+
+            // Cleanup
+            pipeline.cleanup(&mut *backend);
+            backend.cleanup();
+
+            log::info!("Application shutdown complete");
         } else {
-            // For now, same as headless
-            // TODO: Implement proper event loop
-            Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
+            // Windowed mode: create event loop and window
+            log::info!("Starting windowed mode...");
+            let event_loop = EventLoop::new()
+                .context("Failed to create event loop")?;
+            event_loop.set_control_flow(ControlFlow::Poll);
+
+            let mut app = WindowedApp {
+                window: None,
+                backend: Some(backend),
+                scene,
+                pipeline,
+                graph: None,
+                compiled: None,
+                screenshot_path: self.args.screenshot.clone(),
+                frame_count: 0,
+                max_frames: self.args.max_frames,
+            };
+
+            event_loop.run_app(&mut app)
+                .context("Event loop error")?;
         }
-
-        // Cleanup
-        pipeline.cleanup(&mut *backend);
-        backend.cleanup();
-
-        log::info!("Application shutdown complete");
 
         Ok(())
     }
@@ -282,6 +308,179 @@ impl ApplicationRunner {
 impl Drop for ApplicationRunner {
     fn drop(&mut self) {
         log::debug!("Application runner cleanup");
+    }
+}
+
+impl ApplicationHandler for WindowedApp {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_none() {
+            log::info!("Creating window: {}", self.scene.metadata.name);
+
+            let window_attributes = Window::default_attributes()
+                .with_title(&self.scene.metadata.name)
+                .with_inner_size(winit::dpi::LogicalSize::new(800u32, 600u32));
+
+            match event_loop.create_window(window_attributes) {
+                Ok(window) => {
+                    log::info!(
+                        "Window created: {}x{}",
+                        window.inner_size().width,
+                        window.inner_size().height
+                    );
+
+                    // Initialize backend with window
+                    if let Some(backend) = &mut self.backend {
+                        if let Err(e) = backend.initialize(&window) {
+                            log::error!("Failed to initialize backend: {e}");
+                            event_loop.exit();
+                            return;
+                        }
+                        log::info!("Backend initialized with window");
+
+                        // Setup pipeline
+                        if let Err(e) = self.pipeline.setup(&mut **backend) {
+                            log::error!("Failed to setup pipeline: {e}");
+                            event_loop.exit();
+                            return;
+                        }
+
+                        // Build render graph
+                        match self.pipeline.build_graph(&self.scene, &mut **backend) {
+                            Ok(mut graph) => {
+                                log::info!("Render graph built");
+                                
+                                // Compile graph
+                                match graph.compile() {
+                                    Ok(compiled) => {
+                                        log::info!("Render graph compiled: {} passes", compiled.execution_order.len());
+                                        self.compiled = Some(compiled);
+                                        self.graph = Some(graph);
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to compile render graph: {e}");
+                                        event_loop.exit();
+                                        return;
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to build render graph: {e}");
+                                event_loop.exit();
+                                return;
+                            }
+                        }
+                    }
+
+                    // Request initial redraw
+                    window.request_redraw();
+                    self.window = Some(window);
+                }
+                Err(e) => {
+                    log::error!("Failed to create window: {e}");
+                    event_loop.exit();
+                }
+            }
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        _window_id: WindowId,
+        event: WindowEvent,
+    ) {
+        match event {
+            WindowEvent::CloseRequested => {
+                log::info!("Close requested, shutting down");
+                
+                // Capture screenshot if requested
+                if let Some(ref path) = self.screenshot_path {
+                    log::info!("Capturing screenshot to {}", path.display());
+                    if let Some(backend) = &mut self.backend {
+                        match backend.capture_frame() {
+                            Ok((width, height, pixels)) => {
+                                if let Err(e) = image::save_buffer(
+                                    path,
+                                    &pixels,
+                                    width,
+                                    height,
+                                    image::ColorType::Rgba8,
+                                ) {
+                                    log::error!("Failed to save screenshot: {e}");
+                                } else {
+                                    log::info!("Screenshot saved: {width}x{height}");
+                                }
+                            }
+                            Err(e) => {
+                                log::error!("Failed to capture frame: {e}");
+                            }
+                        }
+                    }
+                }
+
+                // Cleanup
+                if let Some(backend) = &mut self.backend {
+                    self.pipeline.cleanup(&mut **backend);
+                    backend.cleanup();
+                }
+                event_loop.exit();
+            }
+            WindowEvent::Resized(size) => {
+                log::debug!("Window resized to {}x{}", size.width, size.height);
+                if let Some(backend) = &mut self.backend {
+                    if let Err(e) = backend.resize(size.width, size.height) {
+                        log::error!("Backend resize failed: {e}");
+                    }
+                }
+            }
+            WindowEvent::RedrawRequested => {
+                // Render a frame
+                if let (Some(backend), Some(graph), Some(compiled)) = 
+                    (&mut self.backend, &self.graph, &self.compiled) {
+                    
+                    if let Err(e) = backend.begin_frame() {
+                        log::error!("Failed to begin frame: {e}");
+                        return;
+                    }
+
+                    if let Err(e) = backend.execute_graph(graph, compiled) {
+                        log::error!("Failed to execute render graph: {e}");
+                        return;
+                    }
+
+                    if let Err(e) = backend.end_frame() {
+                        log::error!("Failed to end frame: {e}");
+                        return;
+                    }
+
+                    self.frame_count += 1;
+                    
+                    // Check if we've reached max frames
+                    if self.max_frames > 0 && self.frame_count >= self.max_frames as u64 {
+                        log::info!("Rendered {} frames, exiting", self.frame_count);
+                        event_loop.exit();
+                        return;
+                    }
+                    
+                    // Request next frame
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                // Handle keyboard input
+                if event.state.is_pressed() {
+                    use winit::keyboard::{KeyCode, PhysicalKey};
+                    
+                    if let PhysicalKey::Code(KeyCode::Escape) = event.physical_key {
+                        log::info!("Escape pressed, closing window");
+                        event_loop.exit();
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 }
 
