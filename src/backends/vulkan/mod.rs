@@ -631,6 +631,11 @@ impl VulkanBackend {
     /// Create graphics pipeline
     fn create_pipeline(&mut self) -> Result<()> {
         log::info!("Creating graphics pipeline");
+        
+        // Create descriptor set layouts first (M8.3 MVP)
+        log::info!("Creating descriptor set layouts");
+        let layouts = self.create_uniform_descriptor_layouts()?;
+        
         let device = self.device.as_ref().context("Device not initialized")?;
 
         log::info!("Creating shader modules");
@@ -747,11 +752,14 @@ impl VulkanBackend {
             .logic_op(vk::LogicOp::COPY)
             .attachments(color_blend_attachments);
 
-        // Pipeline layout (no descriptors)
+        // Pipeline layout with descriptor sets
         log::info!("Creating pipeline layout");
-        let layout_info = vk::PipelineLayoutCreateInfo::builder();
+        
+        let layout_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&layouts);
         self.pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None)? };
         log::info!("Pipeline layout created");
+
 
         // Create pipeline
         log::info!("Building graphics pipeline create info");
@@ -799,6 +807,46 @@ impl VulkanBackend {
             .code(code);
 
         Ok(unsafe { device.create_shader_module(&info, None)? })
+    }
+
+    /// Create descriptor set layouts for uniform buffers (M8.3 MVP)
+    ///
+    /// Creates a simple layout with:
+    /// - Set 0, Binding 0: Camera uniforms (Vertex + Fragment)
+    /// - Set 0, Binding 1: Lighting uniforms (Vertex + Fragment)
+    fn create_uniform_descriptor_layouts(&mut self) -> Result<Vec<vk::DescriptorSetLayout>> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        // Set 0: Global uniforms (camera + lighting)
+        let bindings = [
+            // Binding 0: Camera uniforms
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // Binding 1: Lighting uniforms
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+        ];
+
+        let layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
+            .bindings(&bindings);
+
+        let layout = unsafe {
+            device.create_descriptor_set_layout(&layout_info, None)
+                .context("Failed to create descriptor set layout")?
+        };
+
+        // Store for cleanup
+        self.descriptor_set_layouts.push(layout);
+
+        Ok(vec![layout])
     }
 
     /// Create framebuffers
@@ -852,6 +900,17 @@ impl VulkanBackend {
         self.command_pool = unsafe { device.create_command_pool(&info, None)? };
 
         log::info!("Command pool created");
+        Ok(())
+    }
+
+    /// Initialize descriptor pool manager (M8.3)
+    fn initialize_descriptor_pool(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        
+        log::info!("Creating descriptor pool manager");
+        self.descriptor_pool_manager = Some(descriptor::DescriptorPoolManager::new(device.clone()));
+        
+        log::info!("Descriptor pool manager created");
         Ok(())
     }
 
@@ -1736,6 +1795,10 @@ impl GraphicsBackend for VulkanBackend {
         self.create_command_pool()
             .context("Failed to create command pool")?;
 
+        // Create descriptor pool manager (M8.3)
+        self.initialize_descriptor_pool()
+            .context("Failed to create descriptor pool")?;
+
         // Create command buffers
         self.create_command_buffers()
             .context("Failed to create command buffers")?;
@@ -1922,6 +1985,9 @@ impl GraphicsBackend for VulkanBackend {
 
         // Create command pool (needed for image transitions)
         self.create_command_pool()?;
+
+        // Create descriptor pool manager (M8.3)
+        self.initialize_descriptor_pool()?;
 
         // Create offscreen render target
         self.create_offscreen_image(width, height)?;
@@ -2205,10 +2271,13 @@ impl GraphicsBackend for VulkanBackend {
         graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
-        let device = self
+        // Get raw pointers before any borrows to avoid borrow checker issues
+        let device_ptr = self
             .device
             .as_ref()
-            .context("Device not initialized for graph execution")?;
+            .context("Device not initialized for graph execution")? as *const VkDevice;
+        let device = unsafe { &*device_ptr };
+        let backend_ptr = self as *mut VulkanBackend;
 
         log::debug!(
             "Executing render graph with {} passes, {} barriers",
@@ -2277,8 +2346,8 @@ impl GraphicsBackend for VulkanBackend {
             // Execute pass callback (M8.2)
             if let Some(pass) = graph.get_pass(*pass_id) {
                 if let Some(callback) = &pass.callback {
-                    // Create execution context
-                    let mut context = VulkanPassContext::new(device, command_buffer);
+                    // Create execution context (backend_ptr created earlier to avoid borrow issues)
+                    let mut context = VulkanPassContext::new(device, command_buffer, backend_ptr);
 
                     // Execute the pass
                     callback.execute(&mut context);
@@ -2730,18 +2799,24 @@ impl Resource for VulkanResource {
 struct VulkanPassContext {
     device: *const VkDevice,
     command_buffer: vk::CommandBuffer,
+    backend: *mut VulkanBackend,
 }
 
 impl VulkanPassContext {
-    fn new(device: &VkDevice, command_buffer: vk::CommandBuffer) -> Self {
+    fn new(device: &VkDevice, command_buffer: vk::CommandBuffer, backend: *mut VulkanBackend) -> Self {
         Self {
             device: device as *const VkDevice,
             command_buffer,
+            backend,
         }
     }
 
     fn device(&self) -> &VkDevice {
         unsafe { &*self.device }
+    }
+
+    fn backend(&mut self) -> &mut VulkanBackend {
+        unsafe { &mut *self.backend }
     }
 }
 
@@ -2857,16 +2932,89 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         &mut self,
         set: u32,
         binding: u32,
-        _buffer_ptr: *const std::ffi::c_void,
-        _offset: u64,
-        _size: u64,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        size: u64,
     ) -> Result<()> {
-        // TODO: Implement descriptor set binding
-        log::warn!(
-            "bind_uniform_buffer not yet implemented (set={}, binding={})",
-            set,
-            binding
+        log::debug!(
+            "VulkanPassContext: Binding uniform buffer at set {set}, binding {binding}, offset {offset}, size {size}"
         );
+
+        // Get the buffer
+        let buffer_ref = unsafe { &*(buffer_ptr as *const resources::VulkanBuffer) };
+        let vk_buffer = buffer_ref.handle();
+
+        // For MVP, we only support set 0
+        if set != 0 {
+            log::warn!("Only descriptor set 0 is currently supported, ignoring set {set}");
+            return Ok(());
+        }
+
+        // Get backend info we need and allocate descriptor set
+        // Use a scope to limit the borrow
+        let (descriptor_set, pipeline_layout) = {
+            let backend = self.backend();
+            
+            if backend.descriptor_set_layouts.is_empty() {
+                log::warn!("No descriptor set layouts created yet");
+                return Ok(());
+            }
+
+            let layout = backend.descriptor_set_layouts[set as usize];
+            let pipeline_layout = backend.pipeline_layout;
+
+            // Allocate descriptor set if needed
+            let descriptor_set = if backend.descriptor_sets.len() <= set as usize {
+                let pool_manager = backend.descriptor_pool_manager.as_mut()
+                    .context("Descriptor pool manager not initialized")?;
+                
+                let desc_set = pool_manager.allocate(layout)?;
+                backend.descriptor_sets.push(desc_set);
+                desc_set
+            } else {
+                backend.descriptor_sets[set as usize]
+            };
+
+            (descriptor_set, pipeline_layout)
+        }; // backend borrow ends here
+
+        // Update descriptor set with buffer binding
+        let buffer_info = vk::DescriptorBufferInfo::builder()
+            .buffer(vk_buffer)
+            .offset(offset)
+            .range(size)
+            .build();
+
+        let buffer_info_slice = std::slice::from_ref(&buffer_info);
+
+        let write = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_set)
+            .dst_binding(binding)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(buffer_info_slice)
+            .build();
+
+        // Now use device (no backend borrow active)
+        unsafe {
+            let copies: &[vk::CopyDescriptorSet] = &[];
+            self.device().update_descriptor_sets(&[write], copies);
+        }
+
+        // Bind descriptor set to command buffer
+        let command_buffer = self.command_buffer;
+        unsafe {
+            self.device().cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline_layout,
+                set,
+                &[descriptor_set],
+                &[],
+            );
+        }
+
+        log::debug!("VulkanPassContext: Uniform buffer bound successfully");
         Ok(())
     }
 }
