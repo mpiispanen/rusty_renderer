@@ -221,6 +221,19 @@ pub trait PassExecutionContext {
         offset: u64,
         size: u64,
     ) -> anyhow::Result<()>;
+
+    /// Push constants to the shader (for per-draw data like model matrices)
+    ///
+    /// # Arguments
+    /// * `stage_flags` - Shader stages that will access the constants
+    /// * `offset` - Offset in bytes into the push constant block
+    /// * `data` - Raw bytes to push
+    fn push_constants(
+        &mut self,
+        stage_flags: u32, // Shader stage flags
+        offset: u32,
+        data: &[u8],
+    ) -> anyhow::Result<()>;
 }
 
 /// Index buffer data type (re-exported for pass callbacks)

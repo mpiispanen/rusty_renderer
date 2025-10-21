@@ -2235,4 +2235,21 @@ impl PassExecutionContext for DirectXPassContext {
 
         Ok(())
     }
+
+    fn push_constants(
+        &mut self,
+        stage_flags: u32,
+        offset: u32,
+        data: &[u8],
+    ) -> Result<()> {
+        log::debug!(
+            "DirectXPassContext: Push constants not yet implemented (stub) - {} bytes at offset {}",
+            data.len(),
+            offset
+        );
+        // TODO: Implement push constants for DirectX backend
+        // DirectX uses root constants instead of push constants
+        // Will need to configure root signature and use SetGraphicsRoot32BitConstants
+        Ok(())
+    }
 }

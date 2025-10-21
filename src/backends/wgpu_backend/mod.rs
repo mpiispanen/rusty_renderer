@@ -1565,6 +1565,23 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         log::debug!("WgpuPassContext: Uniform buffer bound successfully");
         Ok(())
     }
+
+    fn push_constants(
+        &mut self,
+        stage_flags: u32,
+        offset: u32,
+        data: &[u8],
+    ) -> Result<()> {
+        log::debug!(
+            "WgpuPassContext: Push constants not yet implemented (stub) - {} bytes at offset {}",
+            data.len(),
+            offset
+        );
+        // TODO: Implement push constants for wgpu backend
+        // wgpu doesn't have push constants in the same way as Vulkan
+        // Will need to use uniform buffers or different approach
+        Ok(())
+    }
 }
 
 #[cfg(test)]

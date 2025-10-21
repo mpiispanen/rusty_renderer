@@ -35,6 +35,7 @@ impl ForwardPass {
     /// * `vertex_buffer` - The vertex buffer containing geometry data
     /// * `camera_buffer` - Shared buffer containing camera uniforms
     /// * `lighting_buffer` - Shared buffer containing lighting uniforms
+    /// * `transform` - Object transform (position, rotation, scale)
     /// * `vertex_count` - Number of vertices to draw
     ///
     /// # Returns
@@ -46,6 +47,7 @@ impl ForwardPass {
         vertex_buffer: Box<dyn Buffer>,
         camera_buffer: Arc<Box<dyn Buffer>>,
         lighting_buffer: Arc<Box<dyn Buffer>>,
+        transform: crate::scene::Transform,
         vertex_count: u32,
     ) -> Self {
         let pass_id = graph.next_pass_id();
@@ -63,11 +65,12 @@ impl ForwardPass {
         // Wrap vertex buffer in Arc, use provided Arc for uniforms
         let vertex_buffer_arc = Arc::new(vertex_buffer);
 
-        // Set up callback with all buffers
+        // Set up callback with all buffers and transform
         pass = pass.with_callback(Box::new(ForwardPassCallback {
             vertex_buffer: vertex_buffer_arc,
             camera_buffer,
             lighting_buffer,
+            transform,
             vertex_count,
         }));
 
@@ -87,12 +90,41 @@ struct ForwardPassCallback {
     vertex_buffer: Arc<Box<dyn Buffer>>,
     camera_buffer: Arc<Box<dyn Buffer>>,
     lighting_buffer: Arc<Box<dyn Buffer>>,
+    transform: crate::scene::Transform,
     vertex_count: u32,
 }
 
 impl PassCallback for ForwardPassCallback {
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::info!("Executing forward rendering pass with {} vertices", self.vertex_count);
+
+        // Push model and normal matrices as push constants
+        let model_matrix = self.transform.matrix();
+        let normal_matrix = self.transform.normal_matrix();
+        
+        // Combine both matrices into a single byte array (128 bytes total)
+        let mut push_data = Vec::with_capacity(128);
+        
+        // Add model matrix (64 bytes)
+        for row in &model_matrix {
+            for &val in row {
+                push_data.extend_from_slice(&val.to_ne_bytes());
+            }
+        }
+        
+        // Add normal matrix (64 bytes)
+        for row in &normal_matrix {
+            for &val in row {
+                push_data.extend_from_slice(&val.to_ne_bytes());
+            }
+        }
+        
+        // Push constants to vertex shader (stage flag 0x1 = VERTEX)
+        if let Err(e) = context.push_constants(0x1, 0, &push_data) {
+            log::error!("Failed to push constants: {e}");
+            return;
+        }
+        log::info!("Push constants uploaded (model + normal matrices)");
 
         // Bind camera uniforms (set 0, binding 0)
         let camera_ptr = self.camera_buffer.as_ref().as_ref() as *const dyn Buffer

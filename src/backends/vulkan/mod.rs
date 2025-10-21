@@ -764,13 +764,24 @@ impl VulkanBackend {
             .logic_op(vk::LogicOp::COPY)
             .attachments(color_blend_attachments);
 
-        // Pipeline layout with descriptor sets
+        // Pipeline layout with descriptor sets and push constants
         log::info!("Creating pipeline layout");
         
+        // Define push constant range for model matrices (2 x mat4 = 128 bytes)
+        // Used in forward rendering for per-object transforms
+        let push_constant_range = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX)
+            .offset(0)
+            .size(128) // 2 * sizeof(mat4) = 2 * 64 = 128 bytes
+            .build();
+        
+        let push_constant_ranges = &[push_constant_range];
+        
         let layout_info = vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(&layouts);
+            .set_layouts(&layouts)
+            .push_constant_ranges(push_constant_ranges);
         self.pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None)? };
-        log::info!("Pipeline layout created");
+        log::info!("Pipeline layout created with push constants");
 
 
         // Create pipeline
@@ -3001,6 +3012,46 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         }
 
         log::debug!("VulkanPassContext: Uniform buffer bound successfully");
+        Ok(())
+    }
+
+    fn push_constants(
+        &mut self,
+        stage_flags: u32,
+        offset: u32,
+        data: &[u8],
+    ) -> Result<()> {
+        log::debug!(
+            "VulkanPassContext: Pushing {} bytes of constants at offset {}",
+            data.len(),
+            offset
+        );
+
+        // Convert stage flags to Vulkan shader stage flags
+        let vk_stage_flags = if stage_flags & 0x1 != 0 {
+            vk::ShaderStageFlags::VERTEX
+        } else if stage_flags & 0x10 != 0 {
+            vk::ShaderStageFlags::FRAGMENT
+        } else {
+            vk::ShaderStageFlags::VERTEX // Default to vertex
+        };
+
+        // Get pipeline layout from backend
+        let backend = self.backend();
+        let pipeline_layout = backend.pipeline_layout;
+
+        // Push constants
+        unsafe {
+            self.device().cmd_push_constants(
+                self.command_buffer,
+                pipeline_layout,
+                vk_stage_flags,
+                offset,
+                data,
+            );
+        }
+
+        log::debug!("VulkanPassContext: Push constants uploaded successfully");
         Ok(())
     }
 }

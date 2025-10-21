@@ -236,7 +236,7 @@ impl RenderPipeline for ForwardPipeline {
         // Process each object in the scene
         for obj in scene.objects.iter() {
             match obj {
-                SceneObject::Mesh { name, geometry, transform: _ } => match geometry {
+                SceneObject::Mesh { name, geometry, transform } => match geometry {
                     GeometryData::Inline { vertices, .. } => {
                         let vertex_count = vertices.len();
                         log::info!("  - Mesh '{name}': {vertex_count} vertices");
@@ -259,6 +259,7 @@ impl RenderPipeline for ForwardPipeline {
                             vertex_buffer,
                             camera_buffer.clone(),
                             lighting_buffer.clone(),
+                            *transform,
                             vertex_count,
                         );
 
