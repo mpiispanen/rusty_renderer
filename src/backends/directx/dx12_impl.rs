@@ -2161,9 +2161,13 @@ impl PassExecutionContext for DirectXPassContext {
         _offset: u64,
         _size: u64,
     ) -> Result<()> {
-        // TODO: Implement root signature CBV binding
+        // TODO: Implement root signature CBV binding (M8.3 Phase 2)
+        // DirectX 12 requires:
+        // 1. Root signature definition with CBV slots
+        // 2. SetGraphicsRootConstantBufferView() calls
+        // 3. Different architecture than descriptor sets
         log::warn!(
-            "bind_uniform_buffer not yet implemented (set={}, binding={})",
+            "DirectX uniform buffer binding not yet implemented (set={}, binding={}) - use wgpu backend for DirectX 12 support",
             set,
             binding
         );
