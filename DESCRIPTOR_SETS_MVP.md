@@ -95,9 +95,12 @@ Can expand later without API changes.
 - [x] Can bind uniform buffers in passes
 - [x] Vulkan implementation complete
 - [x] wgpu implementation complete
+- [x] DirectX implementation complete
 - [ ] Camera uniforms reach shaders (verify with MVP transform)
 - [ ] Lighting uniforms reach shaders (verify with lit rendering)
 - [x] No validation errors (basic tests pass)
+
+**All backend implementations complete!**
 
 ---
 
@@ -106,8 +109,8 @@ Can expand later without API changes.
 **API:** ✅ Added to PassExecutionContext  
 **Vulkan:** ✅ Fully implemented  
 **wgpu:** ✅ Fully implemented  
-**DirectX:** ⏸️ Deferred (wgpu provides DX12 support)  
+**DirectX:** ✅ Fully implemented  
 **Testing:** ✅ All tests passing  
 **Integration:** ⏳ Next step
 
-Implementation complete! Ready for ForwardPipeline integration.
+**All backends complete!** Ready for ForwardPipeline integration.
