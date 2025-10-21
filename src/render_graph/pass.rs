@@ -201,6 +201,26 @@ pub trait PassExecutionContext {
         vertex_offset: i32,
         first_instance: u32,
     ) -> anyhow::Result<()>;
+
+    /// Bind a uniform buffer (M8.3)
+    ///
+    /// Binds a uniform buffer to the specified descriptor set and binding.
+    /// The buffer must have been created with BufferUsage::UNIFORM.
+    ///
+    /// # Arguments
+    /// * `set` - Descriptor set index (typically 0 for global uniforms)
+    /// * `binding` - Binding index within the set
+    /// * `buffer_ptr` - Pointer to the buffer implementation
+    /// * `offset` - Offset in bytes into the buffer
+    /// * `size` - Size in bytes of the uniform data
+    fn bind_uniform_buffer(
+        &mut self,
+        set: u32,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        size: u64,
+    ) -> anyhow::Result<()>;
 }
 
 /// Index buffer data type (re-exported for pass callbacks)

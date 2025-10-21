@@ -2152,4 +2152,21 @@ impl PassExecutionContext for DirectXPassContext {
     fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
         self
     }
+
+    fn bind_uniform_buffer(
+        &mut self,
+        set: u32,
+        binding: u32,
+        _buffer_ptr: *const std::ffi::c_void,
+        _offset: u64,
+        _size: u64,
+    ) -> Result<()> {
+        // TODO: Implement root signature CBV binding
+        log::warn!(
+            "bind_uniform_buffer not yet implemented (set={}, binding={})",
+            set,
+            binding
+        );
+        Ok(())
+    }
 }
