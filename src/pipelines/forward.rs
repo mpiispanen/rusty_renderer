@@ -30,6 +30,10 @@ pub struct ForwardPipeline {
     name: String,
     /// Camera controller (optional, created during build_graph)
     camera: Option<CameraController>,
+    /// Default white 1x1 texture for objects without textures
+    default_texture: Option<Arc<Box<dyn Texture>>>,
+    /// Default material for objects without materials
+    default_material_buffer: Option<Arc<Box<dyn crate::backends::Buffer>>>,
 }
 
 impl ForwardPipeline {
@@ -38,6 +42,8 @@ impl ForwardPipeline {
         Self {
             name: "Forward".to_string(),
             camera: None,
+            default_texture: None,
+            default_material_buffer: None,
         }
     }
 
@@ -188,6 +194,51 @@ impl ForwardPipeline {
         Ok(texture)
     }
 
+    /// Create a default 1x1 white texture
+    fn create_default_texture(backend: &mut dyn GraphicsBackend) -> Result<Box<dyn Texture>> {
+        // Create 1x1 white RGBA texture
+        let white_pixel = vec![255u8, 255, 255, 255]; // RGBA white
+        
+        let texture_desc = TextureDescriptor {
+            width: 1,
+            height: 1,
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsage::sampled(),
+            mip_levels: 1,
+            initial_data: Some(&white_pixel),
+            label: Some("default_white_texture".to_string()),
+        };
+
+        let texture = backend.create_texture(&texture_desc)?;
+        log::info!("Created default 1x1 white texture");
+
+        Ok(texture)
+    }
+
+    /// Create a default material buffer
+    fn create_default_material(backend: &mut dyn GraphicsBackend) -> Result<Box<dyn crate::backends::Buffer>> {
+        let default_material = GpuMaterial {
+            base_color: [1.0, 1.0, 1.0, 1.0], // White
+            properties: [0.0, 0.5, 0.0, 0.0], // No metallic, medium roughness, no texture
+        };
+
+        let buffer_size = GpuMaterial::size() as u64;
+        let buffer_desc = BufferDescriptor {
+            size: buffer_size,
+            usage: BufferUsage::uniform(),
+            memory_location: MemoryLocation::CpuToGpu,
+            label: Some("default_material".to_string()),
+        };
+
+        let buffer = backend.create_buffer(&buffer_desc)?;
+        let data = default_material.as_bytes();
+        backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
+
+        log::info!("Created default material buffer");
+
+        Ok(buffer)
+    }
+
     /// Calculate default normals for geometry without normals
     fn calculate_normals(vertices: &[VertexData]) -> Vec<VertexData> {
         // For now, just return vertices with default normals
@@ -327,6 +378,18 @@ impl RenderPipeline for ForwardPipeline {
             scene.objects.len()
         );
 
+        // Create default texture and material if not already created
+        if self.default_texture.is_none() {
+            log::info!("Creating default fallback texture and material");
+            let default_tex = Self::create_default_texture(backend)
+                .context("Failed to create default texture")?;
+            self.default_texture = Some(Arc::new(default_tex));
+            
+            let default_mat = Self::create_default_material(backend)
+                .context("Failed to create default material")?;
+            self.default_material_buffer = Some(Arc::new(default_mat));
+        }
+
         // Process each object in the scene
         for obj in scene.objects.iter() {
             match obj {
@@ -345,7 +408,7 @@ impl RenderPipeline for ForwardPipeline {
                             format!("Failed to create vertex buffer for mesh '{name}'")
                         })?;
 
-                        // Load material and texture if specified
+                        // Load material and texture if specified, otherwise use defaults
                         let (material_buffer, texture) = if let Some(mat_idx) = material {
                             if *mat_idx < scene.materials.len() {
                                 let scene_material = &scene.materials[*mat_idx];
@@ -356,28 +419,29 @@ impl RenderPipeline for ForwardPipeline {
                                 let material_buffer = Self::create_material_buffer(backend, &gpu_material, &format!("{}_material", name))
                                     .context("Failed to create material buffer")?;
                                 
-                                // Load texture if specified
+                                // Load texture if specified, otherwise use default white texture
                                 let texture = if let Some(ref texture_path) = scene_material.diffuse_texture {
                                     log::info!("  - Loading texture: {}", texture_path);
                                     match Self::load_texture(backend, texture_path, &format!("{}_diffuse", name)) {
                                         Ok(tex) => Some(Arc::new(tex)),
                                         Err(e) => {
-                                            log::warn!("  - Failed to load texture '{}': {}", texture_path, e);
-                                            None
+                                            log::warn!("  - Failed to load texture '{}': {}, using default", texture_path, e);
+                                            self.default_texture.clone()
                                         }
                                     }
                                 } else {
-                                    None
+                                    log::info!("  - No texture specified, using default white");
+                                    self.default_texture.clone()
                                 };
                                 
                                 (Some(Arc::new(material_buffer)), texture)
                             } else {
-                                log::warn!("  - Invalid material index {}, using default", mat_idx);
-                                (None, None)
+                                log::warn!("  - Invalid material index {}, using defaults", mat_idx);
+                                (self.default_material_buffer.clone(), self.default_texture.clone())
                             }
                         } else {
-                            log::info!("  - No material specified, using vertex colors");
-                            (None, None)
+                            log::info!("  - No material specified, using defaults");
+                            (self.default_material_buffer.clone(), self.default_texture.clone())
                         };
 
                         // Add forward rendering pass with camera and lighting
@@ -418,6 +482,8 @@ impl RenderPipeline for ForwardPipeline {
     fn cleanup(&mut self, _backend: &mut dyn crate::backends::GraphicsBackend) {
         log::info!("Forward pipeline cleanup");
         self.camera = None;
+        self.default_texture = None;
+        self.default_material_buffer = None;
     }
 }
 
