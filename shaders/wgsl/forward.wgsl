@@ -43,7 +43,7 @@ struct MaterialUniforms {
 @group(0) @binding(2) var diffuse_texture: texture_2d<f32>;
 @group(0) @binding(3) var<uniform> material: MaterialUniforms;
 @group(0) @binding(4) var texture_sampler: sampler;
-@group(2) @binding(0) var<uniform> transform: TransformUniforms;
+@group(1) @binding(0) var<uniform> transform: TransformUniforms;
 
 // Vertex input
 struct VertexInput {

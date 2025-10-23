@@ -12,6 +12,7 @@
 use super::*;
 use anyhow::Context;
 use std::sync::Arc;
+use wgpu::util::DeviceExt;
 
 /// wgpu backend implementation
 pub struct WgpuBackend {
@@ -83,7 +84,7 @@ impl WgpuBackend {
 
     /// Load WGSL shader
     fn load_shader(&self) -> &'static str {
-        include_str!("../../../shaders/wgsl/triangle.wgsl")
+        include_str!("../../../shaders/wgsl/forward.wgsl")
     }
 
     /// Create render pipeline
@@ -103,22 +104,38 @@ impl WgpuBackend {
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        // Create pipeline layout WITHOUT bind group layouts for now
-        // (bind groups will be added when forward rendering is implemented)
+        // Create pipeline layout with bind group layouts
+        // Group 0: Camera, lighting, textures, materials
+        // Group 1: Transform (emulates push constants)
+        let bind_group_layouts_refs: Vec<&wgpu::BindGroupLayout> = 
+            self.bind_group_layouts.iter().collect();
+        
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Pipeline Layout"),
-            bind_group_layouts: &[],
+            label: Some("Forward Pipeline Layout"),
+            bind_group_layouts: &bind_group_layouts_refs,
             push_constant_ranges: &[],
         });
 
         // Create render pipeline
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Triangle Pipeline"),
+            label: Some("Forward Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
                 entry_point: Some("vs_main"),
-                buffers: &[], // No vertex buffers - vertices hardcoded in shader
+                buffers: &[
+                    // Vertex buffer layout matching VertexData
+                    wgpu::VertexBufferLayout {
+                        array_stride: std::mem::size_of::<[f32; 12]>() as wgpu::BufferAddress, // pos(3) + normal(3) + uv(2) + color(4)
+                        step_mode: wgpu::VertexStepMode::Vertex,
+                        attributes: &wgpu::vertex_attr_array![
+                            0 => Float32x3, // position
+                            1 => Float32x3, // normal
+                            2 => Float32x2, // uv
+                            3 => Float32x4, // color
+                        ],
+                    }
+                ],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -227,7 +244,26 @@ impl WgpuBackend {
 
         self.bind_group_layouts.push(bind_group_layout);
 
-        log::info!("Bind group layouts created");
+        // Create bind group layout 1 for transform (emulates push constants)
+        let transform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            label: Some("Transform Bind Group Layout"),
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        
+        self.bind_group_layouts.push(transform_layout);
+
+        log::info!("Bind group layouts created (groups 0 and 1)");
         Ok(())
     }
 
@@ -352,6 +388,9 @@ impl GraphicsBackend for WgpuBackend {
 
         // Create default sampler
         self.create_default_sampler()?;
+
+        // Create bind group layouts
+        self.create_uniform_bind_group_layouts()?;
 
         // Create render pipeline
         self.create_render_pipeline()?;
@@ -555,6 +594,9 @@ impl GraphicsBackend for WgpuBackend {
 
         // Create default sampler
         self.create_default_sampler()?;
+
+        // Create bind group layouts
+        self.create_uniform_bind_group_layouts()?;
 
         // Create render pipeline
         self.create_render_pipeline()?;
@@ -1481,6 +1523,10 @@ struct WgpuPassContext {
     texture_bindings: Vec<(*const std::ffi::c_void, u32, u32)>, // (texture_ptr, set, binding)
     // Store push constant data (128 bytes)
     push_constant_data: Vec<u8>,
+    // Store bind groups to keep them alive for render pass duration (Solution 1)
+    bind_groups: Vec<wgpu::BindGroup>,
+    // Store temporary buffers (for push constants emulation)
+    temp_buffers: Vec<wgpu::Buffer>,
 }
 
 // Safety: The render pass pointer is only used during rendering within a single thread
@@ -1495,6 +1541,8 @@ impl WgpuPassContext {
             uniform_buffers: Vec::new(),
             texture_bindings: Vec::new(),
             push_constant_data: vec![0u8; 128],
+            bind_groups: Vec::new(),
+            temp_buffers: Vec::new(),
         }
     }
 
@@ -1564,10 +1612,16 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         // Create and bind bind groups with uniforms, textures, and samplers
         let backend = unsafe { &*self.backend };
         
+        log::info!("WgpuPassContext::draw - uniform_buffers: {}, texture_bindings: {}, push_constant_data: {}", 
+                   self.uniform_buffers.len(), self.texture_bindings.len(), self.push_constant_data.len());
+        
         // Need at least camera and lighting uniforms (bindings 0 and 1)
         if self.uniform_buffers.len() >= 2 {
+            log::info!("WgpuPassContext::draw - Creating bind groups");
             if let Some(device) = &backend.device {
+                log::info!("WgpuPassContext::draw - Device available");
                 if !backend.bind_group_layouts.is_empty() {
+                    log::info!("WgpuPassContext::draw - Bind group layouts available: {}", backend.bind_group_layouts.len());
                     let layout = &backend.bind_group_layouts[0];
                     
                     // Sort uniform buffers by binding number
@@ -1610,13 +1664,60 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                         }
                     }
                     
+                    log::info!("WgpuPassContext::draw - Creating bind group 0 with {} entries", entries.len());
                     let bind_group_0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
                         label: Some("Set 0: Uniforms + Textures"),
                         layout,
                         entries: &entries,
                     });
                     
-                    self.render_pass().set_bind_group(0, &bind_group_0, &[]);
+                    // SOLUTION 1: Store bind group FIRST to keep it alive!
+                    self.bind_groups.push(bind_group_0);
+                    let bind_group_idx = self.bind_groups.len() - 1;
+                    
+                    // Get raw pointer before borrowing (safe: vec won't be modified)
+                    let bind_groups_ptr = self.bind_groups.as_ptr();
+                    
+                    // Now bind it by reference from the vec
+                    log::info!("WgpuPassContext::draw - Setting bind group 0");
+                    let render_pass = self.render_pass();
+                    render_pass.set_bind_group(0, unsafe { &*bind_groups_ptr.add(bind_group_idx) }, &[]);
+                    log::info!("WgpuPassContext::draw - Bind group 0 set");
+                    
+                    // Create bind group 1 for transform (emulating push constants)
+                    if !self.push_constant_data.is_empty() && self.push_constant_data.len() == 128 {
+                        // Create a temporary buffer for push constant data
+                        let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                            label: Some("Transform Buffer (Push Constants)"),
+                            contents: &self.push_constant_data,
+                            usage: wgpu::BufferUsages::UNIFORM,
+                        });
+                        
+                        // Get bind group layout 1 from backend
+                        if backend.bind_group_layouts.len() > 1 {
+                            let transform_layout = &backend.bind_group_layouts[1];
+                            let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("Set 1: Transform"),
+                                layout: transform_layout,
+                                entries: &[wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: transform_buffer.as_entire_binding(),
+                                }],
+                            });
+                            
+                            // SOLUTION 1: Store both FIRST to keep them alive!
+                            self.temp_buffers.push(transform_buffer);
+                            self.bind_groups.push(bind_group_1);
+                            let bind_group_idx = self.bind_groups.len() - 1;
+                            
+                            // Get raw pointer before borrowing (safe: vec won't be modified)
+                            let bind_groups_ptr = self.bind_groups.as_ptr();
+                            
+                            // Now bind by reference from the vec
+                            let render_pass = self.render_pass();
+                            render_pass.set_bind_group(1, unsafe { &*bind_groups_ptr.add(bind_group_idx) }, &[]);
+                        }
+                    }
                 }
             }
         }
