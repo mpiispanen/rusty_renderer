@@ -46,6 +46,7 @@ pub struct WgpuBackend {
     // Shader resource binding (M8.3)
     bind_group_layouts: Vec<wgpu::BindGroupLayout>,
     bind_groups: Vec<wgpu::BindGroup>,
+    temp_buffers: Vec<wgpu::Buffer>, // Temporary buffers for bind groups (e.g., push constants)
     
     // Default sampler for textures (M10 Phase 4)
     default_sampler: Option<wgpu::Sampler>,
@@ -76,6 +77,7 @@ impl WgpuBackend {
             enable_validation,
             bind_group_layouts: vec![],
             bind_groups: vec![],
+            temp_buffers: vec![],
             default_sampler: None,
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
@@ -109,6 +111,8 @@ impl WgpuBackend {
         // Group 1: Transform (emulates push constants)
         let bind_group_layouts_refs: Vec<&wgpu::BindGroupLayout> = 
             self.bind_group_layouts.iter().collect();
+        
+        log::info!("Creating pipeline layout with {} bind group layouts", bind_group_layouts_refs.len());
         
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Forward Pipeline Layout"),
@@ -780,6 +784,10 @@ impl GraphicsBackend for WgpuBackend {
                 .as_ref()
                 .context("Offscreen view not initialized")?
         };
+
+        // Clear previous frame's bind groups and temp buffers
+        self.bind_groups.clear();
+        self.temp_buffers.clear();
 
         // Begin render pass
         {
@@ -1636,7 +1644,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         first_instance: u32,
     ) -> Result<()> {
         // Create and store bind groups (but don't set them yet)
-        let backend = unsafe { &*self.backend };
+        let backend = unsafe { &mut *self.backend };  // Mutable to store bind groups
         
         log::info!("WgpuPassContext::draw - uniform_buffers: {}, texture_bindings: {}, push_constant_data: {}", 
                    self.uniform_buffers.len(), self.texture_bindings.len(), self.push_constant_data.len());
@@ -1659,6 +1667,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                     // Add uniform buffer entries
                     for (ptr, binding, offset, size) in &uniforms {
                         let buffer_ref = unsafe { &*(*ptr as *const WgpuBuffer) };
+                        log::info!("Adding uniform buffer at binding {}", binding);
                         entries.push(wgpu::BindGroupEntry {
                             binding: *binding,
                             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
@@ -1673,6 +1682,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                     for (tex_ptr, _set, binding) in &self.texture_bindings {
                         let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
                         
+                        log::info!("Adding texture at binding {}", binding);
                         // Add texture view at its binding (should be 2)
                         entries.push(wgpu::BindGroupEntry {
                             binding: *binding,
@@ -1683,6 +1693,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                     // Add sampler if we have texture bindings (binding 4)
                     if !self.texture_bindings.is_empty() {
                         if let Some(ref sampler) = backend.default_sampler {
+                            log::info!("Adding sampler at binding 4");
                             entries.push(wgpu::BindGroupEntry {
                                 binding: 4, // Sampler at binding 4
                                 resource: wgpu::BindingResource::Sampler(sampler),
@@ -1697,8 +1708,8 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                         entries: &entries,
                     });
                     
-                    // SOLUTION 1: Store bind group to keep it alive!
-                    self.bind_groups.push(bind_group_0);
+                    // SOLUTION 1: Store bind group in BACKEND to keep it alive past render pass!
+                    backend.bind_groups.push(bind_group_0);
                     
                     // Create bind group 1 for transform (emulating push constants)
                     if !self.push_constant_data.is_empty() && self.push_constant_data.len() == 128 {
@@ -1721,21 +1732,41 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                                 }],
                             });
                             
-                            // SOLUTION 1: Store both to keep them alive!
-                            self.temp_buffers.push(transform_buffer);
-                            self.bind_groups.push(bind_group_1);
+                            // SOLUTION 1: Store both in BACKEND to keep them alive!
+                            backend.temp_buffers.push(transform_buffer);
+                            backend.bind_groups.push(bind_group_1);
                         }
                     }
                 }
             }
         }
         
-        // Now apply all bind groups and draw in one go
-        log::info!("WgpuPassContext::draw - Applying {} bind groups", self.bind_groups.len());
-        self.apply_bind_groups();
+        // Now apply all bind groups and draw using the SAME render pass reference
+        log::info!("WgpuPassContext::draw - Applying {} bind groups", backend.bind_groups.len());
+        log::info!("WgpuPassContext::draw - render_pass pointer: {:p}", self.render_pass);
+        
+        // Get render pass ONCE and use it for everything
+        let render_pass = unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass) };
+        log::info!("WgpuPassContext::draw - render_pass reference: {:p}", render_pass as *mut _);
+        
+        // Apply bind groups to THIS reference
+        if !backend.bind_groups.is_empty() {
+            let bind_groups_ptr = backend.bind_groups.as_ptr();
+            let num_bind_groups = backend.bind_groups.len();
+            
+            log::info!("apply_bind_groups: Setting {} bind groups", num_bind_groups);
+            
+            for i in 0..num_bind_groups {
+                let bind_group = unsafe { &*bind_groups_ptr.add(i) };
+                log::info!("apply_bind_groups: Setting bind group {} at index {} (ptr: {:p})", i, i, bind_group);
+                render_pass.set_bind_group(i as u32, bind_group, &[]);
+            }
+            
+            log::info!("apply_bind_groups: All bind groups set");
+        }
         
         log::info!("WgpuPassContext::draw - Drawing {} vertices", vertex_count);
-        self.render_pass().draw(
+        render_pass.draw(
             first_vertex..(first_vertex + vertex_count),
             first_instance..(first_instance + instance_count),
         );
@@ -1768,13 +1799,13 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         offset: u64,
         size: u64,
     ) -> Result<()> {
-        log::debug!(
-            "WgpuPassContext: Binding uniform buffer at set {set}, binding {binding}, offset {offset}, size {size}"
+        log::info!(
+            "WgpuPassContext::bind_uniform_buffer - set {set}, binding {binding}, offset {offset}, size {size}"
         );
 
         // Only support set 0 for now (camera + lighting)
         if set == 0 {
-            log::debug!("WgpuPassContext: Collecting uniform buffer at set {set}, binding {binding}");
+            log::info!("WgpuPassContext: Collecting uniform buffer at set {set}, binding {binding}");
             self.uniform_buffers.push((buffer_ptr, binding, offset, size));
         } else {
             log::warn!("WgpuPassContext: Only set 0 supported, ignoring set {set}");
