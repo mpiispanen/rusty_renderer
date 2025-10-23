@@ -808,6 +808,9 @@ impl GraphicsBackend for WgpuBackend {
                 render_pass.set_pipeline(pipeline);
             }
 
+            // Create execution context once for all passes
+            let mut context = WgpuPassContext::new(&mut render_pass, backend_ptr);
+
             // Execute passes in order (M9)
             for pass_id in &compiled.execution_order {
                 log::debug!("Executing pass: {pass_id:?}");
@@ -818,14 +821,13 @@ impl GraphicsBackend for WgpuBackend {
                 // Execute pass callback (M9)
                 if let Some(pass) = graph.get_pass(*pass_id) {
                     if let Some(callback) = &pass.callback {
-                        // Create execution context (backend_ptr created earlier)
-                        let mut context = WgpuPassContext::new(&mut render_pass, backend_ptr);
-
-                        // Execute the pass
+                        // Execute the pass with the same context
                         callback.execute(&mut context);
                     }
                 }
             }
+            
+            // Context (with bind_groups) stays alive until here!
         }
 
         // Submit commands
@@ -1553,6 +1555,30 @@ impl WgpuPassContext {
     fn backend(&mut self) -> &mut WgpuBackend {
         unsafe { &mut *self.backend }
     }
+    
+    /// Set all pending bind groups on the render pass
+    fn apply_bind_groups(&mut self) {
+        if self.bind_groups.is_empty() {
+            return;
+        }
+        
+        let bind_groups_ptr = self.bind_groups.as_ptr();
+        let num_bind_groups = self.bind_groups.len();
+        
+        log::info!("apply_bind_groups: Setting {} bind groups", num_bind_groups);
+        
+        // Get render pass directly from raw pointer
+        let render_pass = unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass) };
+        
+        // Set each bind group by index
+        for i in 0..num_bind_groups {
+            let bind_group = unsafe { &*bind_groups_ptr.add(i) };
+            log::info!("apply_bind_groups: Setting bind group {} at index {}", i, i);
+            render_pass.set_bind_group(i as u32, bind_group, &[]);
+        }
+        
+        log::info!("apply_bind_groups: All bind groups set");
+    }
 }
 
 impl crate::render_graph::PassExecutionContext for WgpuPassContext {
@@ -1609,7 +1635,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         first_vertex: u32,
         first_instance: u32,
     ) -> Result<()> {
-        // Create and bind bind groups with uniforms, textures, and samplers
+        // Create and store bind groups (but don't set them yet)
         let backend = unsafe { &*self.backend };
         
         log::info!("WgpuPassContext::draw - uniform_buffers: {}, texture_bindings: {}, push_constant_data: {}", 
@@ -1671,18 +1697,8 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                         entries: &entries,
                     });
                     
-                    // SOLUTION 1: Store bind group FIRST to keep it alive!
+                    // SOLUTION 1: Store bind group to keep it alive!
                     self.bind_groups.push(bind_group_0);
-                    let bind_group_idx = self.bind_groups.len() - 1;
-                    
-                    // Get raw pointer before borrowing (safe: vec won't be modified)
-                    let bind_groups_ptr = self.bind_groups.as_ptr();
-                    
-                    // Now bind it by reference from the vec
-                    log::info!("WgpuPassContext::draw - Setting bind group 0");
-                    let render_pass = self.render_pass();
-                    render_pass.set_bind_group(0, unsafe { &*bind_groups_ptr.add(bind_group_idx) }, &[]);
-                    log::info!("WgpuPassContext::draw - Bind group 0 set");
                     
                     // Create bind group 1 for transform (emulating push constants)
                     if !self.push_constant_data.is_empty() && self.push_constant_data.len() == 128 {
@@ -1705,23 +1721,20 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                                 }],
                             });
                             
-                            // SOLUTION 1: Store both FIRST to keep them alive!
+                            // SOLUTION 1: Store both to keep them alive!
                             self.temp_buffers.push(transform_buffer);
                             self.bind_groups.push(bind_group_1);
-                            let bind_group_idx = self.bind_groups.len() - 1;
-                            
-                            // Get raw pointer before borrowing (safe: vec won't be modified)
-                            let bind_groups_ptr = self.bind_groups.as_ptr();
-                            
-                            // Now bind by reference from the vec
-                            let render_pass = self.render_pass();
-                            render_pass.set_bind_group(1, unsafe { &*bind_groups_ptr.add(bind_group_idx) }, &[]);
                         }
                     }
                 }
             }
         }
         
+        // Now apply all bind groups and draw in one go
+        log::info!("WgpuPassContext::draw - Applying {} bind groups", self.bind_groups.len());
+        self.apply_bind_groups();
+        
+        log::info!("WgpuPassContext::draw - Drawing {} vertices", vertex_count);
         self.render_pass().draw(
             first_vertex..(first_vertex + vertex_count),
             first_instance..(first_instance + instance_count),
