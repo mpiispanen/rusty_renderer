@@ -50,6 +50,11 @@ impl DescriptorPoolManager {
                 .type_(vk::DescriptorType::SAMPLER)
                 .descriptor_count(100)
                 .build(),
+            // Combined image samplers (for textures)
+            vk::DescriptorPoolSize::builder()
+                .type_(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(100)
+                .build(),
         ];
 
         let pool_info = vk::DescriptorPoolCreateInfo::builder()

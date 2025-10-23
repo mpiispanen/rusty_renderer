@@ -82,6 +82,9 @@ pub struct VulkanBackend {
     descriptor_pool_manager: Option<descriptor::DescriptorPoolManager>,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     descriptor_sets: Vec<Vec<vk::DescriptorSet>>, // [frame_in_flight][set_index]
+    
+    // Default texture sampler (M10 Phase 4)
+    default_sampler: vk::Sampler,
 
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
@@ -135,6 +138,7 @@ impl VulkanBackend {
             descriptor_pool_manager: None,
             descriptor_set_layouts: vec![],
             descriptor_sets: vec![],
+            default_sampler: vk::Sampler::null(),
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -834,15 +838,17 @@ impl VulkanBackend {
         Ok(unsafe { device.create_shader_module(&info, None)? })
     }
 
-    /// Create descriptor set layouts for uniform buffers (M8.3 MVP)
+    /// Create descriptor set layouts for uniform buffers (M8.3 MVP + M10 Phase 4)
     ///
-    /// Creates a simple layout with:
+    /// Creates a layout with:
     /// - Set 0, Binding 0: Camera uniforms (Vertex + Fragment)
     /// - Set 0, Binding 1: Lighting uniforms (Vertex + Fragment)
+    /// - Set 0, Binding 2: Diffuse texture sampler (Fragment) - Optional
+    /// - Set 0, Binding 3: Material uniforms (Fragment) - Optional
     fn create_uniform_descriptor_layouts(&mut self) -> Result<Vec<vk::DescriptorSetLayout>> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
-        // Set 0: Global uniforms (camera + lighting)
+        // Set 0: Global uniforms (camera + lighting + texture + material)
         let bindings = [
             // Binding 0: Camera uniforms
             vk::DescriptorSetLayoutBinding::builder()
@@ -857,6 +863,20 @@ impl VulkanBackend {
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // Binding 2: Diffuse texture sampler (optional)
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // Binding 3: Material uniforms (optional)
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(3)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
         ];
 
@@ -936,6 +956,33 @@ impl VulkanBackend {
         self.descriptor_pool_manager = Some(descriptor::DescriptorPoolManager::new(device.clone()));
         
         log::info!("Descriptor pool manager created");
+        Ok(())
+    }
+
+    /// Create default texture sampler (M10 Phase 4)
+    fn create_default_sampler(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        
+        let sampler_info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::REPEAT)
+            .address_mode_v(vk::SamplerAddressMode::REPEAT)
+            .address_mode_w(vk::SamplerAddressMode::REPEAT)
+            .anisotropy_enable(false)
+            .max_anisotropy(1.0)
+            .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+            .unnormalized_coordinates(false)
+            .compare_enable(false)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .mip_lod_bias(0.0)
+            .min_lod(0.0)
+            .max_lod(0.0);
+        
+        self.default_sampler = unsafe { device.create_sampler(&sampler_info, None)? };
+        
+        log::info!("Created default texture sampler");
         Ok(())
     }
 
@@ -1824,6 +1871,10 @@ impl GraphicsBackend for VulkanBackend {
         self.initialize_descriptor_pool()
             .context("Failed to create descriptor pool")?;
 
+        // Create default texture sampler (M10 Phase 4)
+        self.create_default_sampler()
+            .context("Failed to create default sampler")?;
+
         // Create command buffers
         self.create_command_buffers()
             .context("Failed to create command buffers")?;
@@ -2022,6 +2073,9 @@ impl GraphicsBackend for VulkanBackend {
 
         // Create descriptor pool manager (M8.3)
         self.initialize_descriptor_pool()?;
+
+        // Create default texture sampler (M10 Phase 4)
+        self.create_default_sampler()?;
 
         // Create offscreen render target
         self.create_offscreen_image(width, height)?;
@@ -2236,6 +2290,11 @@ impl GraphicsBackend for VulkanBackend {
 
             // Clean up descriptor resources (M8.3)
             if let Some(device) = &self.device {
+                // Destroy default sampler (M10 Phase 4)
+                if !self.default_sampler.is_null() {
+                    device.destroy_sampler(self.default_sampler, None);
+                }
+                
                 // Destroy descriptor set layouts
                 for layout in &self.descriptor_set_layouts {
                     device.destroy_descriptor_set_layout(*layout, None);
@@ -3086,18 +3145,81 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
         log::debug!(
-            "VulkanPassContext: Binding texture at set {}, binding {} (stub)",
+            "VulkanPassContext: Binding texture at set {}, binding {}",
             set,
             binding
         );
 
-        // TODO: Implement actual texture binding
-        // Need to:
-        // 1. Cast to VulkanTexture
-        // 2. Get/create sampler
-        // 3. Update descriptor set with combined image sampler
-        
-        log::warn!("Texture binding not fully implemented yet");
+        // Cast to Vulkan texture
+        let texture = unsafe { &*(texture_ptr as *const resources::VulkanTexture) };
+
+        // Get backend info
+        let (descriptor_set, pipeline_layout, default_sampler) = {
+            let backend = self.backend();
+            
+            if backend.descriptor_set_layouts.is_empty() {
+                log::warn!("No descriptor set layouts created yet");
+                return Ok(());
+            }
+
+            let layout = backend.descriptor_set_layouts[set as usize];
+            let pipeline_layout = backend.pipeline_layout;
+            let current_frame = backend.current_frame;
+            let default_sampler = backend.default_sampler;
+
+            // Get or allocate descriptor set for current frame
+            let frame_sets = &mut backend.descriptor_sets[current_frame];
+            let descriptor_set = if frame_sets.len() <= set as usize {
+                let pool_manager = backend.descriptor_pool_manager.as_mut()
+                    .context("Descriptor pool manager not initialized")?;
+                
+                let desc_set = pool_manager.allocate(layout)?;
+                frame_sets.push(desc_set);
+                desc_set
+            } else {
+                frame_sets[set as usize]
+            };
+
+            (descriptor_set, pipeline_layout, default_sampler)
+        };
+
+        // Update descriptor set with texture binding
+        let image_info = vk::DescriptorImageInfo::builder()
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .image_view(texture.image_view)
+            .sampler(default_sampler)
+            .build();
+
+        let image_info_slice = std::slice::from_ref(&image_info);
+
+        let write = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_set)
+            .dst_binding(binding)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(image_info_slice)
+            .build();
+
+        unsafe {
+            self.device().update_descriptor_sets(
+                std::slice::from_ref(&write),
+                &[] as &[vk::CopyDescriptorSet],
+            );
+        }
+
+        // Bind descriptor set
+        unsafe {
+            self.device().cmd_bind_descriptor_sets(
+                self.command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                pipeline_layout,
+                set,
+                std::slice::from_ref(&descriptor_set),
+                &[],
+            );
+        }
+
+        log::debug!("VulkanPassContext: Texture bound successfully");
         Ok(())
     }
 }

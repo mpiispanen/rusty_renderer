@@ -88,8 +88,17 @@ void main() {
     // TODO: Pass camera position as uniform
     vec3 viewDir = normalize(-fragPosition);
     
-    // Use vertex color as base color (TODO: add material uniforms and textures)
-    vec3 baseColor = fragColor.rgb;
+    // Get base color from material
+    vec3 baseColor = material.baseColor.rgb;
+    
+    // Sample texture if available
+    if (material.properties.z > 0.5) {  // hasTexture flag
+        vec4 texColor = texture(diffuseTexture, fragUV);
+        baseColor *= texColor.rgb;  // Modulate base color with texture
+    }
+    
+    // Blend with vertex color
+    baseColor *= fragColor.rgb;
     
     // Start with ambient light
     vec3 ambient = lighting.ambientLightCount.xyz * baseColor;
