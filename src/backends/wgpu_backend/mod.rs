@@ -45,6 +45,9 @@ pub struct WgpuBackend {
     // Shader resource binding (M8.3)
     bind_group_layouts: Vec<wgpu::BindGroupLayout>,
     bind_groups: Vec<wgpu::BindGroup>,
+    
+    // Default sampler for textures (M10 Phase 4)
+    default_sampler: Option<wgpu::Sampler>,
 
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
@@ -72,6 +75,7 @@ impl WgpuBackend {
             enable_validation,
             bind_group_layouts: vec![],
             bind_groups: vec![],
+            default_sampler: None,
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
         })
@@ -152,17 +156,20 @@ impl WgpuBackend {
         Ok(())
     }
 
-    /// Create bind group layouts for uniform buffers (M8.3 MVP)
+    /// Create bind group layouts for uniform buffers (M8.3 MVP + M10 Phase 4)
     ///
     /// Creates bind group layouts for:
     /// - Group 0, Binding 0: Camera uniforms
     /// - Group 0, Binding 1: Lighting uniforms
+    /// - Group 0, Binding 2: Diffuse texture
+    /// - Group 0, Binding 3: Material uniforms
+    /// - Group 0, Binding 4: Texture sampler
     fn create_uniform_bind_group_layouts(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
-        // Group 0: Global uniforms (camera + lighting)
+        // Group 0: Global uniforms + textures + materials
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Global Uniforms Bind Group Layout"),
+            label: Some("Global Uniforms + Textures Bind Group Layout"),
             entries: &[
                 // Binding 0: Camera uniforms
                 wgpu::BindGroupLayoutEntry {
@@ -186,12 +193,65 @@ impl WgpuBackend {
                     },
                     count: None,
                 },
+                // Binding 2: Diffuse texture
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Texture {
+                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        view_dimension: wgpu::TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                // Binding 3: Material uniforms
+                wgpu::BindGroupLayoutEntry {
+                    binding: 3,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+                // Binding 4: Texture sampler
+                wgpu::BindGroupLayoutEntry {
+                    binding: 4,
+                    visibility: wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                    count: None,
+                },
             ],
         });
 
         self.bind_group_layouts.push(bind_group_layout);
 
         log::info!("Bind group layouts created");
+        Ok(())
+    }
+
+    /// Create default texture sampler (M10 Phase 4)
+    fn create_default_sampler(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        
+        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some("default_sampler"),
+            address_mode_u: wgpu::AddressMode::Repeat,
+            address_mode_v: wgpu::AddressMode::Repeat,
+            address_mode_w: wgpu::AddressMode::Repeat,
+            mag_filter: wgpu::FilterMode::Linear,
+            min_filter: wgpu::FilterMode::Linear,
+            mipmap_filter: wgpu::FilterMode::Linear,
+            lod_min_clamp: 0.0,
+            lod_max_clamp: 0.0,
+            compare: None,
+            anisotropy_clamp: 1,
+            border_color: None,
+        });
+        
+        self.default_sampler = Some(sampler);
+        log::info!("Created default texture sampler");
         Ok(())
     }
 }
@@ -289,6 +349,9 @@ impl GraphicsBackend for WgpuBackend {
         self.device = Some(device);
         self.queue = Some(queue);
         self.surface_config = Some(config);
+
+        // Create default sampler
+        self.create_default_sampler()?;
 
         // Create render pipeline
         self.create_render_pipeline()?;
@@ -489,6 +552,9 @@ impl GraphicsBackend for WgpuBackend {
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         });
+
+        // Create default sampler
+        self.create_default_sampler()?;
 
         // Create render pipeline
         self.create_render_pipeline()?;
@@ -1411,6 +1477,8 @@ struct WgpuPassContext {
     backend: *mut WgpuBackend,
     // Collect uniform buffer data for bind group 0 (camera + lighting)
     uniform_buffers: Vec<(*const std::ffi::c_void, u32, u64, u64)>, // (ptr, binding, offset, size)
+    // Collect texture bindings (M10 Phase 4)
+    texture_bindings: Vec<(*const std::ffi::c_void, u32, u32)>, // (texture_ptr, set, binding)
     // Store push constant data (128 bytes)
     push_constant_data: Vec<u8>,
 }
@@ -1425,6 +1493,7 @@ impl WgpuPassContext {
             render_pass: render_pass as *mut _ as *mut (),
             backend,
             uniform_buffers: Vec::new(),
+            texture_bindings: Vec::new(),
             push_constant_data: vec![0u8; 128],
         }
     }
@@ -1492,33 +1561,57 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         first_vertex: u32,
         first_instance: u32,
     ) -> Result<()> {
-        // Create and bind bind groups if we have uniform buffers
+        // Create and bind bind groups with uniforms, textures, and samplers
         let backend = unsafe { &*self.backend };
         
-        if self.uniform_buffers.len() == 2 {
+        // Need at least camera and lighting uniforms (bindings 0 and 1)
+        if self.uniform_buffers.len() >= 2 {
             if let Some(device) = &backend.device {
                 if !backend.bind_group_layouts.is_empty() {
                     let layout = &backend.bind_group_layouts[0];
                     
-                    // Sort by binding number
+                    // Sort uniform buffers by binding number
                     let mut uniforms = self.uniform_buffers.clone();
                     uniforms.sort_by_key(|(_, binding, _, _)| *binding);
                     
-                    // Create entries
-                    let entries: Vec<wgpu::BindGroupEntry> = uniforms.iter().map(|(ptr, binding, offset, size)| {
+                    let mut entries: Vec<wgpu::BindGroupEntry> = Vec::new();
+                    
+                    // Add uniform buffer entries
+                    for (ptr, binding, offset, size) in &uniforms {
                         let buffer_ref = unsafe { &*(*ptr as *const WgpuBuffer) };
-                        wgpu::BindGroupEntry {
+                        entries.push(wgpu::BindGroupEntry {
                             binding: *binding,
                             resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                                 buffer: &buffer_ref.buffer,
                                 offset: *offset,
                                 size: std::num::NonZeroU64::new(*size),
                             }),
+                        });
+                    }
+                    
+                    // Add texture entries (binding 2 for texture view, binding 4 for sampler)
+                    for (tex_ptr, _set, binding) in &self.texture_bindings {
+                        let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
+                        
+                        // Add texture view at its binding (should be 2)
+                        entries.push(wgpu::BindGroupEntry {
+                            binding: *binding,
+                            resource: wgpu::BindingResource::TextureView(texture.view()),
+                        });
+                    }
+                    
+                    // Add sampler if we have texture bindings (binding 4)
+                    if !self.texture_bindings.is_empty() {
+                        if let Some(ref sampler) = backend.default_sampler {
+                            entries.push(wgpu::BindGroupEntry {
+                                binding: 4, // Sampler at binding 4
+                                resource: wgpu::BindingResource::Sampler(sampler),
+                            });
                         }
-                    }).collect();
+                    }
                     
                     let bind_group_0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Set 0: Camera + Lighting"),
+                        label: Some("Set 0: Uniforms + Textures"),
                         layout,
                         entries: &entries,
                     });
@@ -1592,10 +1685,17 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         &mut self,
         set: u32,
         binding: u32,
-        _texture_ptr: *const std::ffi::c_void,
+        texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
-        log::debug!("WgpuPassContext: bind_texture stub - set {}, binding {} (not implemented)", set, binding);
-        // TODO: Implement texture binding for wgpu
+        log::debug!("WgpuPassContext: Collecting texture binding at set {}, binding {}", set, binding);
+        
+        // Only support set 0 for now
+        if set == 0 {
+            self.texture_bindings.push((texture_ptr, set, binding));
+        } else {
+            log::warn!("WgpuPassContext: Only set 0 supported, ignoring set {}", set);
+        }
+        
         Ok(())
     }
 }

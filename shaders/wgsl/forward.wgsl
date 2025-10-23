@@ -32,8 +32,17 @@ struct TransformUniforms {
     normal_matrix: mat4x4<f32>,
 };
 
+// Material uniforms (set 0, binding 3)
+struct MaterialUniforms {
+    base_color: vec4<f32>,
+    properties: vec4<f32>, // x = metallic, y = roughness, z = hasTexture, w = padding
+};
+
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;
 @group(0) @binding(1) var<uniform> lighting: LightingUniforms;
+@group(0) @binding(2) var diffuse_texture: texture_2d<f32>;
+@group(0) @binding(3) var<uniform> material: MaterialUniforms;
+@group(0) @binding(4) var texture_sampler: sampler;
 @group(2) @binding(0) var<uniform> transform: TransformUniforms;
 
 // Vertex input
@@ -79,8 +88,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     let N = normalize(in.normal);
     let V = normalize(-in.world_pos); // Camera at origin in view space
     
+    // Get base color from material
+    var base_color = material.base_color.rgb;
+    
+    // Sample texture if available
+    if (material.properties.z > 0.5) {  // hasTexture flag
+        let tex_color = textureSample(diffuse_texture, texture_sampler, in.uv);
+        base_color = base_color * tex_color.rgb;  // Modulate with texture
+    }
+    
+    // Blend with vertex color
+    base_color = base_color * in.color.rgb;
+    
     // Start with ambient
-    var final_color = lighting.ambient * in.color.rgb;
+    var final_color = lighting.ambient * base_color;
     
     // Material properties (hardcoded for now)
     let shininess: f32 = 32.0;
@@ -115,7 +136,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let specular = spec * light.color * light.intensity;
         
         // Accumulate
-        final_color += (diffuse + specular) * in.color.rgb * attenuation;
+        final_color += (diffuse + specular) * base_color * attenuation;
     }
     
     return vec4<f32>(final_color, in.color.a);
