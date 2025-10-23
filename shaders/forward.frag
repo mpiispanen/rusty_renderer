@@ -25,6 +25,15 @@ layout(set = 0, binding = 1) uniform LightingUniforms {
     Light lights[MAX_LIGHTS];
 } lighting;
 
+// Texture sampler (optional - for textured materials)
+layout(set = 0, binding = 2) uniform sampler2D diffuseTexture;
+
+// Material properties
+layout(set = 0, binding = 3) uniform MaterialUniforms {
+    vec4 baseColor;          // rgb = base color, a = alpha
+    vec4 properties;         // x = metallic, y = roughness, z = hasTexture, w = padding
+} material;
+
 // Inputs from vertex shader
 layout(location = 0) in vec3 fragPosition;  // World space
 layout(location = 1) in vec3 fragNormal;    // World space
@@ -79,8 +88,11 @@ void main() {
     // TODO: Pass camera position as uniform
     vec3 viewDir = normalize(-fragPosition);
     
+    // Use vertex color as base color (TODO: add material uniforms and textures)
+    vec3 baseColor = fragColor.rgb;
+    
     // Start with ambient light
-    vec3 ambient = lighting.ambientLightCount.xyz * fragColor.rgb;
+    vec3 ambient = lighting.ambientLightCount.xyz * baseColor;
     
     // Accumulate light contributions
     vec3 lighting_result = ambient;
@@ -88,7 +100,7 @@ void main() {
     
     for (int i = 0; i < lightCount && i < MAX_LIGHTS; i++) {
         vec3 lightContrib = calculateLight(lighting.lights[i], normal, viewDir);
-        lighting_result += lightContrib * fragColor.rgb;
+        lighting_result += lightContrib * baseColor;
     }
     
     // Final color with alpha

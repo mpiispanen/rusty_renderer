@@ -234,6 +234,19 @@ pub trait PassExecutionContext {
         offset: u32,
         data: &[u8],
     ) -> anyhow::Result<()>;
+
+    /// Bind a texture for sampling in shaders (M10 Phase 4)
+    ///
+    /// # Arguments
+    /// * `set` - Descriptor set index
+    /// * `binding` - Binding index within the set
+    /// * `texture_ptr` - Pointer to the texture implementation
+    fn bind_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        texture_ptr: *const std::ffi::c_void,
+    ) -> anyhow::Result<()>;
 }
 
 /// Index buffer data type (re-exported for pass callbacks)

@@ -35,6 +35,8 @@ impl ForwardPass {
     /// * `vertex_buffer` - The vertex buffer containing geometry data
     /// * `camera_buffer` - Shared buffer containing camera uniforms
     /// * `lighting_buffer` - Shared buffer containing lighting uniforms
+    /// * `material_buffer` - Optional material uniform buffer
+    /// * `texture` - Optional texture for sampling
     /// * `transform` - Object transform (position, rotation, scale)
     /// * `vertex_count` - Number of vertices to draw
     ///
@@ -47,6 +49,8 @@ impl ForwardPass {
         vertex_buffer: Box<dyn Buffer>,
         camera_buffer: Arc<Box<dyn Buffer>>,
         lighting_buffer: Arc<Box<dyn Buffer>>,
+        material_buffer: Option<Arc<Box<dyn Buffer>>>,
+        texture: Option<Arc<Box<dyn crate::backends::Texture>>>,
         transform: crate::scene::Transform,
         vertex_count: u32,
     ) -> Self {
@@ -70,6 +74,8 @@ impl ForwardPass {
             vertex_buffer: vertex_buffer_arc,
             camera_buffer,
             lighting_buffer,
+            material_buffer,
+            texture,
             transform,
             vertex_count,
         }));
@@ -90,6 +96,8 @@ struct ForwardPassCallback {
     vertex_buffer: Arc<Box<dyn Buffer>>,
     camera_buffer: Arc<Box<dyn Buffer>>,
     lighting_buffer: Arc<Box<dyn Buffer>>,
+    material_buffer: Option<Arc<Box<dyn Buffer>>>,
+    texture: Option<Arc<Box<dyn crate::backends::Texture>>>,
     transform: crate::scene::Transform,
     vertex_count: u32,
 }
@@ -152,6 +160,35 @@ impl PassCallback for ForwardPassCallback {
             return;
         }
         log::info!("Lighting uniforms bound");
+
+        // Bind material uniforms (set 0, binding 3) if available
+        if let Some(ref material_buffer) = self.material_buffer {
+            let material_ptr = material_buffer.as_ref().as_ref() as *const dyn Buffer
+                as *const std::ffi::c_void;
+            let material_size = 32u64; // GpuMaterial size
+            
+            if let Err(e) = context.bind_uniform_buffer(0, 3, material_ptr, 0, material_size) {
+                log::error!("Failed to bind material uniforms: {e}");
+                return;
+            }
+            log::info!("Material uniforms bound");
+        } else {
+            log::info!("No material - using default");
+        }
+
+        // Bind texture (set 0, binding 2) if available
+        if let Some(ref texture) = self.texture {
+            let texture_ptr = texture.as_ref().as_ref() as *const dyn crate::backends::Texture
+                as *const std::ffi::c_void;
+            
+            if let Err(e) = context.bind_texture(0, 2, texture_ptr) {
+                log::error!("Failed to bind texture: {e}");
+                return;
+            }
+            log::info!("Texture bound");
+        } else {
+            log::info!("No texture - using base color only");
+        }
 
         // Bind vertex buffer
         let vertex_ptr = self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer

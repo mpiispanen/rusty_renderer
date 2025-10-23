@@ -1587,6 +1587,17 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         self.push_constant_data[start..end].copy_from_slice(data);
         Ok(())
     }
+
+    fn bind_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        _texture_ptr: *const std::ffi::c_void,
+    ) -> Result<()> {
+        log::debug!("WgpuPassContext: bind_texture stub - set {}, binding {} (not implemented)", set, binding);
+        // TODO: Implement texture binding for wgpu
+        Ok(())
+    }
 }
 
 #[cfg(test)]

@@ -2259,4 +2259,15 @@ impl PassExecutionContext for DirectXPassContext {
         // Will need to configure root signature and use SetGraphicsRoot32BitConstants
         Ok(())
     }
+
+    fn bind_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        _texture_ptr: *const std::ffi::c_void,
+    ) -> Result<()> {
+        log::debug!("DirectXPassContext: bind_texture stub - set {}, binding {} (not implemented)", set, binding);
+        // TODO: Implement texture binding for DirectX
+        Ok(())
+    }
 }

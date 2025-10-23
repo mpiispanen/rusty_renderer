@@ -8,16 +8,20 @@
 
 use super::*;
 use crate::backends::{
-    BufferDescriptor, BufferUsage, GraphicsBackend, MemoryLocation, Vertex as BackendVertex,
+    BufferDescriptor, BufferUsage, GraphicsBackend, MemoryLocation, Texture, TextureDescriptor,
+    TextureFormat, TextureUsage, Vertex as BackendVertex,
 };
 use crate::camera::{CameraController, CameraUniforms};
 use crate::lighting::LightingUniforms;
+use crate::materials::GpuMaterial;
 use crate::passes::ForwardPass;
 use crate::render_graph::{
     Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
+use crate::resources::TextureLoader;
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
+use std::path::Path;
 use std::sync::Arc;
 
 /// Forward rendering pipeline with lighting
@@ -132,6 +136,56 @@ impl ForwardPipeline {
         backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
 
         Ok(buffer)
+    }
+
+    /// Create uniform buffer for material properties
+    fn create_material_buffer(
+        backend: &mut dyn GraphicsBackend,
+        material: &GpuMaterial,
+        label: &str,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
+        let buffer_size = GpuMaterial::size() as u64;
+        let buffer_desc = BufferDescriptor {
+            size: buffer_size,
+            usage: BufferUsage::uniform(),
+            memory_location: MemoryLocation::CpuToGpu,
+            label: Some(label.to_string()),
+        };
+
+        let buffer = backend.create_buffer(&buffer_desc)?;
+        
+        // Upload material data
+        let data = material.as_bytes();
+        backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
+
+        Ok(buffer)
+    }
+
+    /// Load a texture from file
+    fn load_texture(
+        backend: &mut dyn GraphicsBackend,
+        path: &str,
+        label: &str,
+    ) -> Result<Box<dyn Texture>> {
+        // Load image from file
+        let image = TextureLoader::load_from_file(Path::new(path))
+            .with_context(|| format!("Failed to load texture from '{}'", path))?;
+
+        // Create texture descriptor with initial data
+        let texture_desc = TextureDescriptor {
+            width: image.width,
+            height: image.height,
+            format: TextureFormat::Rgba8Unorm,
+            usage: TextureUsage::sampled(), // Use helper that sets transfer_dst automatically
+            mip_levels: 1,
+            initial_data: Some(&image.data),
+            label: Some(label.to_string()),
+        };
+
+        // Create texture (will upload initial_data automatically)
+        let texture = backend.create_texture(&texture_desc)?;
+
+        Ok(texture)
     }
 
     /// Calculate default normals for geometry without normals
@@ -276,7 +330,7 @@ impl RenderPipeline for ForwardPipeline {
         // Process each object in the scene
         for obj in scene.objects.iter() {
             match obj {
-                SceneObject::Mesh { name, geometry, transform, .. } => match geometry {
+                SceneObject::Mesh { name, geometry, transform, material } => match geometry {
                     GeometryData::Inline { vertices, .. } => {
                         let vertex_count = vertices.len();
                         log::info!("  - Mesh '{name}': {vertex_count} vertices");
@@ -291,6 +345,41 @@ impl RenderPipeline for ForwardPipeline {
                             format!("Failed to create vertex buffer for mesh '{name}'")
                         })?;
 
+                        // Load material and texture if specified
+                        let (material_buffer, texture) = if let Some(mat_idx) = material {
+                            if *mat_idx < scene.materials.len() {
+                                let scene_material = &scene.materials[*mat_idx];
+                                log::info!("  - Using material '{}' (index {})", scene_material.name, mat_idx);
+                                
+                                // Create material uniform buffer
+                                let gpu_material = GpuMaterial::from_scene(scene_material);
+                                let material_buffer = Self::create_material_buffer(backend, &gpu_material, &format!("{}_material", name))
+                                    .context("Failed to create material buffer")?;
+                                
+                                // Load texture if specified
+                                let texture = if let Some(ref texture_path) = scene_material.diffuse_texture {
+                                    log::info!("  - Loading texture: {}", texture_path);
+                                    match Self::load_texture(backend, texture_path, &format!("{}_diffuse", name)) {
+                                        Ok(tex) => Some(Arc::new(tex)),
+                                        Err(e) => {
+                                            log::warn!("  - Failed to load texture '{}': {}", texture_path, e);
+                                            None
+                                        }
+                                    }
+                                } else {
+                                    None
+                                };
+                                
+                                (Some(Arc::new(material_buffer)), texture)
+                            } else {
+                                log::warn!("  - Invalid material index {}, using default", mat_idx);
+                                (None, None)
+                            }
+                        } else {
+                            log::info!("  - No material specified, using vertex colors");
+                            (None, None)
+                        };
+
                         // Add forward rendering pass with camera and lighting
                         let vertex_count = vertices_with_normals.len() as u32;
                         let _pass = ForwardPass::new(
@@ -299,6 +388,8 @@ impl RenderPipeline for ForwardPipeline {
                             vertex_buffer,
                             camera_buffer.clone(),
                             lighting_buffer.clone(),
+                            material_buffer,
+                            texture,
                             *transform,
                             vertex_count,
                         );

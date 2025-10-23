@@ -3078,6 +3078,28 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         log::debug!("VulkanPassContext: Push constants uploaded successfully");
         Ok(())
     }
+
+    fn bind_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        texture_ptr: *const std::ffi::c_void,
+    ) -> Result<()> {
+        log::debug!(
+            "VulkanPassContext: Binding texture at set {}, binding {} (stub)",
+            set,
+            binding
+        );
+
+        // TODO: Implement actual texture binding
+        // Need to:
+        // 1. Cast to VulkanTexture
+        // 2. Get/create sampler
+        // 3. Update descriptor set with combined image sampler
+        
+        log::warn!("Texture binding not fully implemented yet");
+        Ok(())
+    }
 }
 
 /// Vulkan swapchain stub
