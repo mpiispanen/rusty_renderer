@@ -48,8 +48,9 @@ pub struct WgpuBackend {
     bind_groups: Vec<wgpu::BindGroup>,
     temp_buffers: Vec<wgpu::Buffer>, // Temporary buffers for bind groups (e.g., push constants)
     
-    // Default sampler for textures (M10 Phase 4)
+    // Default resources (M10 Phase 4)
     default_sampler: Option<wgpu::Sampler>,
+    default_texture: Option<(wgpu::Texture, wgpu::TextureView)>,
 
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
@@ -79,6 +80,7 @@ impl WgpuBackend {
             bind_groups: vec![],
             temp_buffers: vec![],
             default_sampler: None,
+            default_texture: None,
             device_wrapper: WgpuDevice,
             swapchain_wrapper: WgpuSwapchain::new(),
         })
@@ -294,6 +296,56 @@ impl WgpuBackend {
         log::info!("Created default texture sampler");
         Ok(())
     }
+    
+    /// Create default 1x1 white texture (M10 Phase 4)
+    fn create_default_texture(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let queue = self.queue.as_ref().context("Queue not initialized")?;
+        
+        // Create 1x1 white texture
+        let texture = device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("default_texture"),
+            size: wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        });
+        
+        // Upload white pixel data
+        let white_pixel: [u8; 4] = [255, 255, 255, 255];
+        queue.write_texture(
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &white_pixel,
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: Some(4),
+                rows_per_image: Some(1),
+            },
+            wgpu::Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+        );
+        
+        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        
+        self.default_texture = Some((texture, view));
+        log::info!("Created default 1x1 white texture");
+        Ok(())
+    }
 }
 
 impl GraphicsBackend for WgpuBackend {
@@ -390,8 +442,9 @@ impl GraphicsBackend for WgpuBackend {
         self.queue = Some(queue);
         self.surface_config = Some(config);
 
-        // Create default sampler
+        // Create default resources
         self.create_default_sampler()?;
+        self.create_default_texture()?;
 
         // Create bind group layouts
         self.create_uniform_bind_group_layouts()?;
@@ -596,8 +649,9 @@ impl GraphicsBackend for WgpuBackend {
             desired_maximum_frame_latency: 2,
         });
 
-        // Create default sampler
+        // Create default resources
         self.create_default_sampler()?;
+        self.create_default_texture()?;
 
         // Create bind group layouts
         self.create_uniform_bind_group_layouts()?;
@@ -1678,27 +1732,32 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
                         });
                     }
                     
-                    // Add texture entries (binding 2 for texture view, binding 4 for sampler)
-                    for (tex_ptr, _set, binding) in &self.texture_bindings {
-                        let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
-                        
-                        log::info!("Adding texture at binding {}", binding);
-                        // Add texture view at its binding (should be 2)
+                    // Add texture entries (binding 2) - use default if not provided
+                    if !self.texture_bindings.is_empty() {
+                        for (tex_ptr, _set, binding) in &self.texture_bindings {
+                            let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
+                            
+                            log::info!("Adding texture at binding {}", binding);
+                            entries.push(wgpu::BindGroupEntry {
+                                binding: *binding,
+                                resource: wgpu::BindingResource::TextureView(texture.view()),
+                            });
+                        }
+                    } else if let Some(ref default_tex) = backend.default_texture {
+                        log::info!("Adding default texture at binding 2");
                         entries.push(wgpu::BindGroupEntry {
-                            binding: *binding,
-                            resource: wgpu::BindingResource::TextureView(texture.view()),
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&default_tex.1), // Use view from tuple
                         });
                     }
                     
-                    // Add sampler if we have texture bindings (binding 4)
-                    if !self.texture_bindings.is_empty() {
-                        if let Some(ref sampler) = backend.default_sampler {
-                            log::info!("Adding sampler at binding 4");
-                            entries.push(wgpu::BindGroupEntry {
-                                binding: 4, // Sampler at binding 4
-                                resource: wgpu::BindingResource::Sampler(sampler),
-                            });
-                        }
+                    // Add sampler at binding 4 (always required)
+                    if let Some(ref sampler) = backend.default_sampler {
+                        log::info!("Adding sampler at binding 4");
+                        entries.push(wgpu::BindGroupEntry {
+                            binding: 4, // Sampler at binding 4
+                            resource: wgpu::BindingResource::Sampler(sampler),
+                        });
                     }
                     
                     log::info!("WgpuPassContext::draw - Creating bind group 0 with {} entries", entries.len());
@@ -1766,6 +1825,7 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         }
         
         log::info!("WgpuPassContext::draw - Drawing {} vertices", vertex_count);
+        log::info!("FINAL CHECK: About to draw. Pipeline set? Yes (at line 816). Bind groups set? {} groups", backend.bind_groups.len());
         render_pass.draw(
             first_vertex..(first_vertex + vertex_count),
             first_instance..(first_instance + instance_count),
