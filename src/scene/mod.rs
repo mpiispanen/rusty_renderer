@@ -31,6 +31,10 @@ pub struct Scene {
     /// Optional lighting configuration
     #[serde(default)]
     pub lighting: Option<Lighting>,
+
+    /// Materials in the scene
+    #[serde(default)]
+    pub materials: Vec<Material>,
 }
 
 /// Scene metadata
@@ -59,6 +63,9 @@ pub enum SceneObject {
         geometry: GeometryData,
         #[serde(default)]
         transform: Transform,
+        /// Optional material reference (index into scene.materials)
+        #[serde(default)]
+        material: Option<usize>,
     },
 
     /// glTF model reference
@@ -320,6 +327,45 @@ fn default_intensity() -> f32 {
     1.0
 }
 
+/// Material definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Material {
+    /// Material name
+    pub name: String,
+    
+    /// Base color (RGB)
+    #[serde(default = "default_white")]
+    pub base_color: [f32; 3],
+    
+    /// Optional diffuse texture path (relative to scene file)
+    #[serde(default)]
+    pub diffuse_texture: Option<String>,
+    
+    /// Metallic factor (0.0 = dielectric, 1.0 = metal)
+    #[serde(default)]
+    pub metallic: f32,
+    
+    /// Roughness factor (0.0 = smooth, 1.0 = rough)
+    #[serde(default = "default_roughness")]
+    pub roughness: f32,
+}
+
+fn default_roughness() -> f32 {
+    0.5
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            name: "default".to_string(),
+            base_color: [0.8, 0.8, 0.8],
+            diffuse_texture: None,
+            metallic: 0.0,
+            roughness: 0.5,
+        }
+    }
+}
+
 impl Scene {
     /// Validate the scene
     pub fn validate(&self) -> Result<()> {
@@ -331,10 +377,16 @@ impl Scene {
         // Validate objects
         for (i, obj) in self.objects.iter().enumerate() {
             match obj {
-                SceneObject::Mesh { geometry, .. } => {
+                SceneObject::Mesh { geometry, material, .. } => {
                     if let GeometryData::Inline { vertices, .. } = geometry {
                         if vertices.is_empty() {
                             anyhow::bail!("Object {i} has no vertices");
+                        }
+                    }
+                    // Validate material reference
+                    if let Some(mat_idx) = material {
+                        if *mat_idx >= self.materials.len() {
+                            anyhow::bail!("Object {i} references invalid material index {mat_idx}");
                         }
                     }
                 }
@@ -378,6 +430,7 @@ mod tests {
                 far: 1000.0,
             },
             lighting: None,
+            materials: vec![],
         };
 
         assert!(scene.validate().is_ok());
@@ -400,6 +453,7 @@ mod tests {
                 far: 1000.0,
             },
             lighting: None,
+            materials: vec![],
         };
 
         assert!(scene.validate().is_err());

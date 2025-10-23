@@ -10,6 +10,7 @@ pub mod backends;
 pub mod camera;
 pub mod config;
 pub mod lighting;
+pub mod materials;
 pub mod passes;
 pub mod pipelines;
 pub mod profiling;
