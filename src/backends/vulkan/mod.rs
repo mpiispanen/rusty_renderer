@@ -2413,6 +2413,11 @@ impl GraphicsBackend for VulkanBackend {
             // Execute pass callback (M8.2)
             if let Some(pass) = graph.get_pass(*pass_id) {
                 if let Some(callback) = &pass.callback {
+                    // Phase 1: Prepare resources (no-op for Vulkan)
+                    let mut prep_context = VulkanPrepContext;
+                    callback.prepare(&mut prep_context);
+
+                    // Phase 2: Execute rendering
                     // Create execution context (backend_ptr created earlier to avoid borrow issues)
                     let mut context = VulkanPassContext::new(device, command_buffer, backend_ptr);
 
@@ -2869,6 +2874,51 @@ impl Resource for VulkanResource {
 /// Vulkan pass execution context
 ///
 /// Provides access to Vulkan command buffer recording during pass execution.
+// Preparation context for Vulkan (no-op, Vulkan doesn't need separate preparation)
+struct VulkanPrepContext;
+
+impl crate::render_graph::PassPreparationContext for VulkanPrepContext {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+
+    fn prepare_uniform_buffer(
+        &mut self,
+        _set: u32,
+        _binding: u32,
+        _buffer_ptr: *const std::ffi::c_void,
+        _offset: u64,
+        _size: u64,
+    ) -> Result<()> {
+        // Vulkan creates descriptor sets on-the-fly in execute(), no prep needed
+        Ok(())
+    }
+
+    fn prepare_texture(
+        &mut self,
+        _set: u32,
+        _binding: u32,
+        _texture_ptr: *const std::ffi::c_void,
+    ) -> Result<()> {
+        // Vulkan creates descriptor sets on-the-fly in execute(), no prep needed
+        Ok(())
+    }
+
+    fn prepare_push_constants(
+        &mut self,
+        _stage_flags: u32,
+        _offset: u32,
+        _size: u32,
+    ) -> Result<()> {
+        // Push constants don't need preparation
+        Ok(())
+    }
+}
+
 struct VulkanPassContext {
     device: *const VkDevice,
     command_buffer: vk::CommandBuffer,

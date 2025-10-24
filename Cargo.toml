@@ -45,12 +45,14 @@ vulkanalia = { version = "0.31", features = ["libloading", "window"] }
 wgpu = "23.0"
 pollster = "0.3"  # For blocking on async operations
 glam = { version = "0.30.8", features = ["bytemuck"] }
+gltf = { version = "1.4.1", features = ["utils"] }
 
 # DirectX 12 bindings (M4, Windows only)
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_Graphics_Direct3D",
+    "Win32_Graphics_Direct3D_Fxc",
     "Win32_Graphics_Direct3D12",
     "Win32_Graphics_Dxgi",
     "Win32_Graphics_Dxgi_Common",

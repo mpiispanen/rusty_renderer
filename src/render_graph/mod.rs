@@ -12,7 +12,7 @@ mod resource;
 pub use barrier::{Barrier, BarrierType, ImageBarrier, MemoryAccess, MemoryBarrier};
 pub use graph::{CompiledGraph, RenderGraph};
 pub use pass::{
-    AccessType, ImageLayout, IndexType, PassCallback, PassExecutionContext, PassId, PassKind,
+    AccessType, ImageLayout, IndexType, PassCallback, PassExecutionContext, PassPreparationContext, PassId, PassKind,
     PipelineStage, RenderPass, ResourceAccess,
 };
 pub use resource::{

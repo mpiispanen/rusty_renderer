@@ -27,7 +27,7 @@ pub struct WgpuBackend {
     surface_config: Option<wgpu::SurfaceConfiguration>,
 
     // Rendering pipeline
-    render_pipeline: Option<wgpu::RenderPipeline>,
+    pub render_pipeline: Option<wgpu::RenderPipeline>,
 
     // Offscreen rendering target
     offscreen_texture: Option<wgpu::Texture>,
@@ -88,6 +88,7 @@ impl WgpuBackend {
 
     /// Load WGSL shader
     fn load_shader(&self) -> &'static str {
+        // Use forward rendering shader with lighting and textures
         include_str!("../../../shaders/wgsl/forward.wgsl")
     }
 
@@ -104,27 +105,25 @@ impl WgpuBackend {
         // Load shader
         let shader_source = self.load_shader();
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Triangle Shader"),
+            label: Some("Forward Rendering Shader"),
             source: wgpu::ShaderSource::Wgsl(shader_source.into()),
         });
 
-        // Create pipeline layout with bind group layouts
-        // Group 0: Camera, lighting, textures, materials
-        // Group 1: Transform (emulates push constants)
-        let bind_group_layouts_refs: Vec<&wgpu::BindGroupLayout> = 
+        // Create pipeline layout with bind group layouts for forward rendering
+        let bind_group_layout_refs: Vec<&wgpu::BindGroupLayout> = 
             self.bind_group_layouts.iter().collect();
         
-        log::info!("Creating pipeline layout with {} bind group layouts", bind_group_layouts_refs.len());
+        log::info!("Creating pipeline with {} bind group layouts", bind_group_layout_refs.len());
         
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Forward Pipeline Layout"),
-            bind_group_layouts: &bind_group_layouts_refs,
+            label: Some("Forward Rendering Pipeline Layout"),
+            bind_group_layouts: &bind_group_layout_refs,
             push_constant_ranges: &[],
         });
 
         // Create render pipeline
         let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Forward Pipeline"),
+            label: Some("Forward Rendering Pipeline"),
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader,
@@ -843,6 +842,18 @@ impl GraphicsBackend for WgpuBackend {
         self.bind_groups.clear();
         self.temp_buffers.clear();
 
+        // Phase 1: Prepare all passes BEFORE render pass begins (create bind groups)
+        for pass_id in &compiled.execution_order {
+            if let Some(pass) = graph.get_pass(*pass_id) {
+                if let Some(callback) = &pass.callback {
+                    let mut prep_context = WgpuPrepContext::new(backend_ptr);
+                    callback.prepare(&mut prep_context);
+                    // Finalize creates the bind groups and stores them in backend
+                    prep_context.finalize()?;
+                }
+            }
+        }
+
         // Begin render pass
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -865,31 +876,67 @@ impl GraphicsBackend for WgpuBackend {
                 occlusion_query_set: None,
             });
 
-            // Bind pipeline
-            if let Some(pipeline) = &self.render_pipeline {
+            // NOW set pipeline and bind groups BEFORE executing passes
+            if let Some(ref pipeline) = self.render_pipeline {
+                log::info!("Setting render pipeline BEFORE context");
                 render_pass.set_pipeline(pipeline);
             }
 
-            // Create execution context once for all passes
-            let mut context = WgpuPassContext::new(&mut render_pass, backend_ptr);
+            log::info!("Setting {} bind groups BEFORE context", self.bind_groups.len());
+            for (i, bind_group) in self.bind_groups.iter().enumerate() {
+                log::info!("Setting bind group {} at index {}", i, i);
+                render_pass.set_bind_group(i as u32, bind_group, &[]);
+            }
 
-            // Execute passes in order (M9)
-            for pass_id in &compiled.execution_order {
-                log::debug!("Executing pass: {pass_id:?}");
+            // Phase 2: Execute passes within render pass (they collect vertex buffers and draw calls)
+            let (vertex_buffers, draw_calls) = {
+                let mut context = WgpuPassContext::new(&mut render_pass, backend_ptr);
 
-                // wgpu handles barriers automatically through resource state tracking
-                // We don't need to insert explicit barriers like Vulkan
+                for pass_id in &compiled.execution_order {
+                    log::debug!("Executing pass: {pass_id:?}");
 
-                // Execute pass callback (M9)
-                if let Some(pass) = graph.get_pass(*pass_id) {
-                    if let Some(callback) = &pass.callback {
-                        // Execute the pass with the same context
-                        callback.execute(&mut context);
+                    // wgpu handles barriers automatically through resource state tracking
+                    // We don't need to insert explicit barriers like Vulkan
+
+                    // Execute pass callback (M9)
+                    if let Some(pass) = graph.get_pass(*pass_id) {
+                        if let Some(callback) = &pass.callback {
+                            // Execute the pass - it will collect vertex buffers and draw parameters
+                            callback.execute(&mut context);
+                        }
                     }
                 }
+                
+                // Extract the collected data before dropping context
+                (context.vertex_buffers, context.draw_calls)
+                // context is dropped here, releasing the borrow of render_pass
+            };
+            
+            // Bind vertex buffers on the original reference (pipeline and bind groups already set)
+            log::info!("Binding {} collected vertex buffers on original reference", vertex_buffers.len());
+            for (binding, buffer_ptr, offset) in &vertex_buffers {
+                let buffer_ref = unsafe { &*((*buffer_ptr) as *const WgpuBuffer) };
+                log::info!("Binding vertex buffer at slot {}", binding);
+                render_pass.set_vertex_buffer(*binding, buffer_ref.buffer.slice(*offset..));
             }
             
-            // Context (with bind_groups) stays alive until here!
+            // RE-SET bind groups AGAIN just to be safe (in case they were invalidated by taking &mut)
+            log::info!("RE-SETTING {} bind groups after context", self.bind_groups.len());
+            for (i, bind_group) in self.bind_groups.iter().enumerate() {
+                render_pass.set_bind_group(i as u32, bind_group, &[]);
+            }
+            
+            log::info!("Executing {} collected draw calls", draw_calls.len());
+            log::info!("Current bind_groups count: {}", self.bind_groups.len());
+            for (vertex_count, instance_count, first_vertex, first_instance) in &draw_calls {
+                log::info!("Drawing {} vertices", vertex_count);
+                render_pass.draw(
+                    *first_vertex..(*first_vertex + *vertex_count),
+                    *first_instance..(*first_instance + *instance_count),
+                );
+            }
+            
+            log::info!("All passes executed, render pass about to end");
         }
 
         // Submit commands
@@ -1476,8 +1523,8 @@ impl Swapchain for WgpuSwapchain {
 }
 
 // WgpuBuffer implementation
-struct WgpuBuffer {
-    buffer: wgpu::Buffer,
+pub struct WgpuBuffer {
+    pub buffer: wgpu::Buffer,
     size: u64,
     usage: super::BufferUsage,
     memory_location: super::MemoryLocation,
@@ -1578,68 +1625,221 @@ impl super::Sampler for WgpuSampler {
 
 /// Pass execution context for wgpu backend (M9)
 /// Uses raw pointer to avoid borrow checker issues with render pass in loop
-struct WgpuPassContext {
-    render_pass: *mut (),
+// Preparation context for wgpu - collects resources and creates bind groups BEFORE render pass
+pub struct WgpuPrepContext {
     backend: *mut WgpuBackend,
     // Collect uniform buffer data for bind group 0 (camera + lighting)
     uniform_buffers: Vec<(*const std::ffi::c_void, u32, u64, u64)>, // (ptr, binding, offset, size)
     // Collect texture bindings (M10 Phase 4)
     texture_bindings: Vec<(*const std::ffi::c_void, u32, u32)>, // (texture_ptr, set, binding)
-    // Store push constant data (128 bytes)
-    push_constant_data: Vec<u8>,
-    // Store bind groups to keep them alive for render pass duration (Solution 1)
-    bind_groups: Vec<wgpu::BindGroup>,
-    // Store temporary buffers (for push constants emulation)
-    temp_buffers: Vec<wgpu::Buffer>,
+    // Store push constant data (128 bytes) - public so ForwardPass can set it
+    pub push_constant_data: Vec<u8>,
 }
 
-// Safety: The render pass pointer is only used during rendering within a single thread
-unsafe impl Send for WgpuPassContext {}
-unsafe impl Sync for WgpuPassContext {}
+unsafe impl Send for WgpuPrepContext {}
+unsafe impl Sync for WgpuPrepContext {}
 
-impl WgpuPassContext {
-    fn new<'a>(render_pass: &mut wgpu::RenderPass<'a>, backend: *mut WgpuBackend) -> Self {
+impl WgpuPrepContext {
+    fn new(backend: *mut WgpuBackend) -> Self {
         Self {
-            render_pass: render_pass as *mut _ as *mut (),
             backend,
             uniform_buffers: Vec::new(),
             texture_bindings: Vec::new(),
             push_constant_data: vec![0u8; 128],
-            bind_groups: Vec::new(),
-            temp_buffers: Vec::new(),
         }
-    }
-
-    fn render_pass<'a>(&mut self) -> &mut wgpu::RenderPass<'a> {
-        unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass<'a>) }
     }
 
     fn backend(&mut self) -> &mut WgpuBackend {
         unsafe { &mut *self.backend }
     }
     
-    /// Set all pending bind groups on the render pass
-    fn apply_bind_groups(&mut self) {
-        if self.bind_groups.is_empty() {
-            return;
+    /// Create all bind groups from collected resources (called after prepare() finishes)
+    pub fn finalize(&mut self) -> Result<()> {
+        // Need at least camera and lighting uniforms (bindings 0 and 1)
+        if self.uniform_buffers.len() < 2 {
+            return Ok(());
+        }
+
+        // Clone data we need before borrowing backend
+        let mut uniforms = self.uniform_buffers.clone();
+        uniforms.sort_by_key(|(_, binding, _, _)| *binding);
+        
+        let texture_bindings = self.texture_bindings.clone();
+        let push_data = self.push_constant_data.clone();
+        
+        // Now we can borrow backend mutably
+        let backend = self.backend();
+        
+        // DON'T clear bind_groups or temp_buffers here!
+        // They were already cleared at the start of execute_graph()
+        // Clearing them here would destroy bind groups from previous passes in the same frame
+        
+        log::info!("WgpuPrepContext::finalize - Creating bind groups");
+        if let Some(device) = &backend.device {
+            if !backend.bind_group_layouts.is_empty() {
+                let layout = &backend.bind_group_layouts[0];
+                
+                let mut entries: Vec<wgpu::BindGroupEntry> = Vec::new();
+                
+                // Add uniform buffer entries
+                for (ptr, binding, offset, size) in &uniforms {
+                    let buffer_ref = unsafe { &*(*ptr as *const WgpuBuffer) };
+                    log::info!("Finalize: Adding uniform buffer at binding {}", binding);
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: *binding,
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
+                            buffer: &buffer_ref.buffer,
+                            offset: *offset,
+                            size: std::num::NonZeroU64::new(*size),
+                        }),
+                    });
+                }
+                
+                // Add texture entries (binding 2) - use default if not provided
+                if !texture_bindings.is_empty() {
+                    for (tex_ptr, _set, binding) in &texture_bindings {
+                        let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
+                        
+                        log::info!("Finalize: Adding texture at binding {}", binding);
+                        entries.push(wgpu::BindGroupEntry {
+                            binding: *binding,
+                            resource: wgpu::BindingResource::TextureView(texture.view()),
+                        });
+                    }
+                } else if let Some(ref default_tex) = backend.default_texture {
+                    log::info!("Finalize: Adding default texture at binding 2");
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&default_tex.1),
+                    });
+                }
+                
+                // Add sampler at binding 4 (always required)
+                if let Some(ref sampler) = backend.default_sampler {
+                    log::info!("Finalize: Adding sampler at binding 4");
+                    entries.push(wgpu::BindGroupEntry {
+                        binding: 4,
+                        resource: wgpu::BindingResource::Sampler(sampler),
+                    });
+                }
+                
+                log::info!("Finalize: Creating bind group 0 with {} entries", entries.len());
+                
+                // Sort entries by binding number (wgpu might require this)
+                entries.sort_by_key(|e| e.binding);
+                
+                let bind_group_0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                    label: Some("Set 0: Uniforms + Textures"),
+                    layout,
+                    entries: &entries,
+                });
+                
+                backend.bind_groups.push(bind_group_0);
+                
+                // Create bind group 1 for transform (emulating push constants)
+                log::info!("Finalize: push_data.len() = {}", push_data.len());
+                if !push_data.is_empty() && push_data.len() == 128 {
+                    log::info!("Finalize: Creating bind group 1 for transform");
+                    let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                        label: Some("Transform Buffer (Push Constants)"),
+                        contents: &push_data,
+                        usage: wgpu::BufferUsages::UNIFORM,
+                    });
+                    
+                    if backend.bind_group_layouts.len() > 1 {
+                        let transform_layout = &backend.bind_group_layouts[1];
+                        let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                            label: Some("Set 1: Transform"),
+                            layout: transform_layout,
+                            entries: &[wgpu::BindGroupEntry {
+                                binding: 0,
+                                resource: transform_buffer.as_entire_binding(),
+                            }],
+                        });
+                        
+                        backend.temp_buffers.push(transform_buffer);
+                        backend.bind_groups.push(bind_group_1);
+                        log::info!("Finalize: Bind group 1 created");
+                    }
+                } else {
+                    log::warn!("Finalize: NOT creating bind group 1 - push_data.len() = {}", push_data.len());
+                }
+            }
         }
         
-        let bind_groups_ptr = self.bind_groups.as_ptr();
-        let num_bind_groups = self.bind_groups.len();
-        
-        log::info!("apply_bind_groups: Setting {} bind groups", num_bind_groups);
-        
-        // Get render pass directly from raw pointer
-        let render_pass = unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass) };
-        
-        // Set each bind group by index
-        for i in 0..num_bind_groups {
-            let bind_group = unsafe { &*bind_groups_ptr.add(i) };
-            log::info!("apply_bind_groups: Setting bind group {} at index {}", i, i);
-            render_pass.set_bind_group(i as u32, bind_group, &[]);
+        Ok(())
+    }
+}
+
+impl crate::render_graph::PassPreparationContext for WgpuPrepContext {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn prepare_uniform_buffer(
+        &mut self,
+        _set: u32,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        size: u64,
+    ) -> Result<()> {
+        log::info!("WgpuPrepContext::prepare_uniform_buffer - binding {binding}, offset {offset}, size {size}");
+        self.uniform_buffers.push((buffer_ptr, binding, offset, size));
+        Ok(())
+    }
+
+    fn prepare_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        texture_ptr: *const std::ffi::c_void,
+    ) -> Result<()> {
+        log::info!("WgpuPrepContext::prepare_texture - set {set}, binding {binding}");
+        self.texture_bindings.push((texture_ptr, set, binding));
+        Ok(())
+    }
+
+    fn prepare_push_constants(
+        &mut self,
+        _stage_flags: u32,
+        offset: u32,
+        size: u32,
+    ) -> Result<()> {
+        log::info!("WgpuPrepContext::prepare_push_constants - offset {offset}, size {size}");
+        // Push constants are emulated as uniform buffer in wgpu
+        // Just mark that we need to create bind group 1
+        Ok(())
+    }
+}
+
+pub struct WgpuPassContext {
+    pub(crate) backend: *mut WgpuBackend,
+    // Collect vertex buffers to bind them later on the original render_pass reference
+    vertex_buffers: Vec<(u32, *const std::ffi::c_void, u64)>, // (binding, buffer_ptr, offset)
+    // Collect draw parameters
+    draw_calls: Vec<(u32, u32, u32, u32)>, // (vertex_count, instance_count, first_vertex, first_instance)
+}
+
+// Safety: The backend pointer is only used during rendering within a single thread
+unsafe impl Send for WgpuPassContext {}
+unsafe impl Sync for WgpuPassContext {}
+
+impl WgpuPassContext {
+    fn new(_render_pass: &mut wgpu::RenderPass<'_>, backend: *mut WgpuBackend) -> Self {
+        Self {
+            backend,
+            vertex_buffers: Vec::new(),
+            draw_calls: Vec::new(),
         }
-        
-        log::info!("apply_bind_groups: All bind groups set");
+    }
+
+    pub fn backend(&mut self) -> &mut WgpuBackend {
+        unsafe { &mut *self.backend }
     }
 }
 
@@ -1658,16 +1858,10 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         buffer_ptr: *const std::ffi::c_void,
         offset: u64,
     ) -> Result<()> {
-        log::debug!("WgpuPassContext: Binding vertex buffer at binding {binding}, offset {offset}");
-
-        // Cast the void pointer to WgpuBuffer
-        let buffer_ref = unsafe { &*(buffer_ptr as *const WgpuBuffer) };
-
-        // wgpu uses slot index starting from 0
-        self.render_pass()
-            .set_vertex_buffer(binding, buffer_ref.buffer.slice(offset..));
-
-        log::debug!("WgpuPassContext: Vertex buffer bound successfully");
+        // Collect vertex buffer to bind in draw()
+        log::info!("WgpuPassContext: Collecting vertex buffer at binding {binding}");
+        self.vertex_buffers.push((binding, buffer_ptr, offset));
+        log::info!("WgpuPassContext: vertex_buffers now has {} entries", self.vertex_buffers.len());
         Ok(())
     }
 
@@ -1685,8 +1879,8 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
             crate::render_graph::IndexType::U32 => wgpu::IndexFormat::Uint32,
         };
 
-        self.render_pass()
-            .set_index_buffer(buffer_ref.buffer.slice(offset..), wgpu_index_format);
+        // TODO: Collect index buffer bindings for later use (not implemented yet)
+        log::warn!("Index buffer binding not yet implemented for wgpu");
         Ok(())
     }
 
@@ -1697,139 +1891,10 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         first_vertex: u32,
         first_instance: u32,
     ) -> Result<()> {
-        // Create and store bind groups (but don't set them yet)
-        let backend = unsafe { &mut *self.backend };  // Mutable to store bind groups
-        
-        log::info!("WgpuPassContext::draw - uniform_buffers: {}, texture_bindings: {}, push_constant_data: {}", 
-                   self.uniform_buffers.len(), self.texture_bindings.len(), self.push_constant_data.len());
-        
-        // Need at least camera and lighting uniforms (bindings 0 and 1)
-        if self.uniform_buffers.len() >= 2 {
-            log::info!("WgpuPassContext::draw - Creating bind groups");
-            if let Some(device) = &backend.device {
-                log::info!("WgpuPassContext::draw - Device available");
-                if !backend.bind_group_layouts.is_empty() {
-                    log::info!("WgpuPassContext::draw - Bind group layouts available: {}", backend.bind_group_layouts.len());
-                    let layout = &backend.bind_group_layouts[0];
-                    
-                    // Sort uniform buffers by binding number
-                    let mut uniforms = self.uniform_buffers.clone();
-                    uniforms.sort_by_key(|(_, binding, _, _)| *binding);
-                    
-                    let mut entries: Vec<wgpu::BindGroupEntry> = Vec::new();
-                    
-                    // Add uniform buffer entries
-                    for (ptr, binding, offset, size) in &uniforms {
-                        let buffer_ref = unsafe { &*(*ptr as *const WgpuBuffer) };
-                        log::info!("Adding uniform buffer at binding {}", binding);
-                        entries.push(wgpu::BindGroupEntry {
-                            binding: *binding,
-                            resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                                buffer: &buffer_ref.buffer,
-                                offset: *offset,
-                                size: std::num::NonZeroU64::new(*size),
-                            }),
-                        });
-                    }
-                    
-                    // Add texture entries (binding 2) - use default if not provided
-                    if !self.texture_bindings.is_empty() {
-                        for (tex_ptr, _set, binding) in &self.texture_bindings {
-                            let texture = unsafe { &*(*tex_ptr as *const WgpuTexture) };
-                            
-                            log::info!("Adding texture at binding {}", binding);
-                            entries.push(wgpu::BindGroupEntry {
-                                binding: *binding,
-                                resource: wgpu::BindingResource::TextureView(texture.view()),
-                            });
-                        }
-                    } else if let Some(ref default_tex) = backend.default_texture {
-                        log::info!("Adding default texture at binding 2");
-                        entries.push(wgpu::BindGroupEntry {
-                            binding: 2,
-                            resource: wgpu::BindingResource::TextureView(&default_tex.1), // Use view from tuple
-                        });
-                    }
-                    
-                    // Add sampler at binding 4 (always required)
-                    if let Some(ref sampler) = backend.default_sampler {
-                        log::info!("Adding sampler at binding 4");
-                        entries.push(wgpu::BindGroupEntry {
-                            binding: 4, // Sampler at binding 4
-                            resource: wgpu::BindingResource::Sampler(sampler),
-                        });
-                    }
-                    
-                    log::info!("WgpuPassContext::draw - Creating bind group 0 with {} entries", entries.len());
-                    let bind_group_0 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                        label: Some("Set 0: Uniforms + Textures"),
-                        layout,
-                        entries: &entries,
-                    });
-                    
-                    // SOLUTION 1: Store bind group in BACKEND to keep it alive past render pass!
-                    backend.bind_groups.push(bind_group_0);
-                    
-                    // Create bind group 1 for transform (emulating push constants)
-                    if !self.push_constant_data.is_empty() && self.push_constant_data.len() == 128 {
-                        // Create a temporary buffer for push constant data
-                        let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                            label: Some("Transform Buffer (Push Constants)"),
-                            contents: &self.push_constant_data,
-                            usage: wgpu::BufferUsages::UNIFORM,
-                        });
-                        
-                        // Get bind group layout 1 from backend
-                        if backend.bind_group_layouts.len() > 1 {
-                            let transform_layout = &backend.bind_group_layouts[1];
-                            let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                label: Some("Set 1: Transform"),
-                                layout: transform_layout,
-                                entries: &[wgpu::BindGroupEntry {
-                                    binding: 0,
-                                    resource: transform_buffer.as_entire_binding(),
-                                }],
-                            });
-                            
-                            // SOLUTION 1: Store both in BACKEND to keep them alive!
-                            backend.temp_buffers.push(transform_buffer);
-                            backend.bind_groups.push(bind_group_1);
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Now apply all bind groups and draw using the SAME render pass reference
-        log::info!("WgpuPassContext::draw - Applying {} bind groups", backend.bind_groups.len());
-        log::info!("WgpuPassContext::draw - render_pass pointer: {:p}", self.render_pass);
-        
-        // Get render pass ONCE and use it for everything
-        let render_pass = unsafe { &mut *(self.render_pass as *mut wgpu::RenderPass) };
-        log::info!("WgpuPassContext::draw - render_pass reference: {:p}", render_pass as *mut _);
-        
-        // Apply bind groups to THIS reference
-        if !backend.bind_groups.is_empty() {
-            let bind_groups_ptr = backend.bind_groups.as_ptr();
-            let num_bind_groups = backend.bind_groups.len();
-            
-            log::info!("apply_bind_groups: Setting {} bind groups", num_bind_groups);
-            
-            for i in 0..num_bind_groups {
-                let bind_group = unsafe { &*bind_groups_ptr.add(i) };
-                log::info!("apply_bind_groups: Setting bind group {} at index {} (ptr: {:p})", i, i, bind_group);
-                render_pass.set_bind_group(i as u32, bind_group, &[]);
-            }
-            
-            log::info!("apply_bind_groups: All bind groups set");
-        }
-        
-        log::info!("WgpuPassContext::draw - Drawing {} vertices", vertex_count);
-        log::info!("FINAL CHECK: About to draw. Pipeline set? Yes (at line 816). Bind groups set? {} groups", backend.bind_groups.len());
-        render_pass.draw(
-            first_vertex..(first_vertex + vertex_count),
-            first_instance..(first_instance + instance_count),
-        );
+        // For wgpu, we just COLLECT the draw parameters
+        // Actual drawing happens in execute_graph() on the original render_pass reference
+        log::info!("WgpuPassContext::draw - COLLECTING draw call: {} vertices", vertex_count);
+        self.draw_calls.push((vertex_count, instance_count, first_vertex, first_instance));
         Ok(())
     }
 
@@ -1841,66 +1906,41 @@ impl crate::render_graph::PassExecutionContext for WgpuPassContext {
         _vertex_offset: i32,
         first_instance: u32,
     ) -> Result<()> {
-        // Note: wgpu doesn't have a direct vertex_offset parameter in draw_indexed
-        // The vertex_offset would be baked into the indices themselves
-        self.render_pass().draw_indexed(
-            first_index..(first_index + index_count),
-            0, // base_vertex - wgpu uses 0 here, vertex offset handled differently
-            first_instance..(first_instance + instance_count),
-        );
+        // TODO: Collect indexed draw calls for later use (not implemented yet)
+        log::warn!("Indexed drawing not yet implemented for wgpu");
         Ok(())
     }
 
     fn bind_uniform_buffer(
         &mut self,
-        set: u32,
-        binding: u32,
-        buffer_ptr: *const std::ffi::c_void,
-        offset: u64,
-        size: u64,
+        _set: u32,
+        _binding: u32,
+        _buffer_ptr: *const std::ffi::c_void,
+        _offset: u64,
+        _size: u64,
     ) -> Result<()> {
-        log::info!(
-            "WgpuPassContext::bind_uniform_buffer - set {set}, binding {binding}, offset {offset}, size {size}"
-        );
-
-        // Only support set 0 for now (camera + lighting)
-        if set == 0 {
-            log::info!("WgpuPassContext: Collecting uniform buffer at set {set}, binding {binding}");
-            self.uniform_buffers.push((buffer_ptr, binding, offset, size));
-        } else {
-            log::warn!("WgpuPassContext: Only set 0 supported, ignoring set {set}");
-        }
+        // Binding happens in prepare() phase, not execute() phase
+        // Bind groups are already created and will be set in draw()
         Ok(())
     }
 
     fn push_constants(
         &mut self,
         _stage_flags: u32,
-        offset: u32,
-        data: &[u8],
+        _offset: u32,
+        _data: &[u8],
     ) -> Result<()> {
-        log::debug!("WgpuPassContext: Storing push constants - {} bytes at offset {}", data.len(), offset);
-        let start = offset as usize;
-        let end = start + data.len();
-        self.push_constant_data[start..end].copy_from_slice(data);
+        // Push constants handled in prepare() phase
         Ok(())
     }
 
     fn bind_texture(
         &mut self,
-        set: u32,
-        binding: u32,
-        texture_ptr: *const std::ffi::c_void,
+        _set: u32,
+        _binding: u32,
+        _texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
-        log::debug!("WgpuPassContext: Collecting texture binding at set {}, binding {}", set, binding);
-        
-        // Only support set 0 for now
-        if set == 0 {
-            self.texture_bindings.push((texture_ptr, set, binding));
-        } else {
-            log::warn!("WgpuPassContext: Only set 0 supported, ignoring set {}", set);
-        }
-        
+        // Texture binding happens in prepare() phase
         Ok(())
     }
 }

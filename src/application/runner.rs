@@ -99,10 +99,14 @@ impl ApplicationRunner {
                 let scene_path = scene_dir.join(format!("{scene_name}.toml"));
 
                 // Try to load and get metadata
-                if let Ok(scene) = SceneLoader::load_from_file(&scene_path) {
-                    println!("  • {} - {}", scene_name, scene.metadata.name);
-                    if !scene.metadata.description.is_empty() {
-                        println!("    {}", scene.metadata.description);
+                if let Ok(loader) = SceneLoader::new() {
+                    if let Ok(scene) = loader.load_from_file(&scene_path) {
+                        println!("  • {} - {}", scene_name, scene.metadata.name);
+                        if !scene.metadata.description.is_empty() {
+                            println!("    {}", scene.metadata.description);
+                        }
+                    } else {
+                        println!("  • {scene_name} (failed to load)");
                     }
                 } else {
                     println!("  • {scene_name} (failed to load)");
@@ -142,7 +146,9 @@ impl ApplicationRunner {
 
         log::info!("Loading scene from: {}", scene_path.display());
 
-        let scene = SceneLoader::load_from_file(scene_path)
+        let loader = SceneLoader::new()
+            .context("Failed to create scene loader")?;
+        let scene = loader.load_from_file(scene_path)
             .with_context(|| format!("Failed to load scene: {}", scene_path.display()))?;
 
         log::info!("Scene loaded: {}", scene.metadata.name);

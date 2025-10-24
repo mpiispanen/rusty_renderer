@@ -124,12 +124,88 @@ impl ResourceAccess {
 ///
 /// This trait is implemented by passes to define their execution behavior.
 /// The callback receives a command buffer-like interface and resource map.
+///
+/// Execution happens in two phases:
+/// 1. `prepare()` - Called before render pass begins, for resource setup (bind groups, etc.)
+/// 2. `execute()` - Called during render pass, for recording draw commands
 pub trait PassCallback: Send + Sync {
+    /// Prepare resources before pass execution (optional)
+    ///
+    /// This method is called before the render pass begins, allowing backends
+    /// to create resources that must exist outside the render pass (e.g., wgpu bind groups).
+    ///
+    /// Default implementation does nothing (for backends that don't need preparation).
+    ///
+    /// # Arguments
+    /// * `context` - Preparation context for resource setup
+    fn prepare(&self, _context: &mut dyn PassPreparationContext) {
+        // Default: no preparation needed
+    }
+
     /// Execute the pass
     ///
     /// # Arguments
     /// * `context` - Execution context with access to backend and resources
     fn execute(&self, context: &mut dyn PassExecutionContext);
+}
+
+/// Preparation context for resource setup before pass execution
+///
+/// This trait allows passes to set up resources that need to exist before
+/// the render pass begins (e.g., bind groups in wgpu).
+///
+/// Backends that don't need preparation can provide a no-op implementation.
+pub trait PassPreparationContext {
+    /// Get the backend type as Any for downcasting
+    fn as_any(&self) -> &dyn std::any::Any;
+
+    /// Get the backend type as Any for mutable downcasting
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any;
+
+    /// Prepare a uniform buffer binding
+    ///
+    /// Allows backends to create bind groups or descriptor sets before the pass begins.
+    ///
+    /// # Arguments
+    /// * `set` - Descriptor set index
+    /// * `binding` - Binding index within the set
+    /// * `buffer_ptr` - Pointer to the buffer implementation
+    /// * `offset` - Offset in bytes into the buffer
+    /// * `size` - Size in bytes of the uniform data
+    fn prepare_uniform_buffer(
+        &mut self,
+        set: u32,
+        binding: u32,
+        buffer_ptr: *const std::ffi::c_void,
+        offset: u64,
+        size: u64,
+    ) -> anyhow::Result<()>;
+
+    /// Prepare a texture binding
+    ///
+    /// # Arguments
+    /// * `set` - Descriptor set index
+    /// * `binding` - Binding index within the set
+    /// * `texture_ptr` - Pointer to the texture implementation
+    fn prepare_texture(
+        &mut self,
+        set: u32,
+        binding: u32,
+        texture_ptr: *const std::ffi::c_void,
+    ) -> anyhow::Result<()>;
+
+    /// Prepare push constants
+    ///
+    /// # Arguments
+    /// * `stage_flags` - Shader stages that will access the constants
+    /// * `offset` - Offset in bytes into the push constant block
+    /// * `size` - Size of the push constant data
+    fn prepare_push_constants(
+        &mut self,
+        stage_flags: u32,
+        offset: u32,
+        size: u32,
+    ) -> anyhow::Result<()>;
 }
 
 /// Execution context provided to pass callbacks

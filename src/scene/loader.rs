@@ -1,29 +1,121 @@
 //! Scene loading from TOML files
 
 use super::*;
+use crate::resources::{AssetPathResolver, GltfLoader};
 use anyhow::{Context, Result};
 use std::path::Path;
 
 /// Scene loader for loading scenes from files
-pub struct SceneLoader;
+pub struct SceneLoader {
+    asset_resolver: AssetPathResolver,
+}
 
 impl SceneLoader {
+    /// Create a new scene loader
+    pub fn new() -> Result<Self> {
+        Ok(Self {
+            asset_resolver: AssetPathResolver::new()?,
+        })
+    }
+    
+    /// Create with explicit project root
+    pub fn with_root<P: AsRef<Path>>(root: P) -> Self {
+        Self {
+            asset_resolver: AssetPathResolver::with_root(root.as_ref()),
+        }
+    }
+    
     /// Load a scene from a TOML file
-    pub fn load_from_file<P: AsRef<Path>>(path: P) -> Result<Scene> {
+    pub fn load_from_file<P: AsRef<Path>>(&self, path: P) -> Result<Scene> {
         let path = path.as_ref();
         let content = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read scene file: {}", path.display()))?;
 
-        Self::load_from_string(&content)
+        let scene_dir = path.parent();
+        self.load_from_string(&content, scene_dir)
+    }
+    
+    /// Load a scene from a TOML file (static method for backward compatibility)
+    pub fn load_from_file_static<P: AsRef<Path>>(path: P) -> Result<Scene> {
+        let loader = Self::new()?;
+        loader.load_from_file(path)
     }
 
     /// Load a scene from a TOML string
-    pub fn load_from_string(content: &str) -> Result<Scene> {
-        let scene: Scene = toml::from_str(content).context("Failed to parse scene TOML")?;
+    pub fn load_from_string(&self, content: &str, scene_dir: Option<&Path>) -> Result<Scene> {
+        let mut scene: Scene = toml::from_str(content).context("Failed to parse scene TOML")?;
 
+        // Expand GLTF model references
+        scene = self.expand_gltf_models(scene, scene_dir)?;
+        
+        // Resolve asset paths in materials
+        for material in &mut scene.materials {
+            if let Some(ref texture_path) = material.diffuse_texture {
+                let resolved = self.asset_resolver.resolve(texture_path, scene_dir);
+                material.diffuse_texture = Some(
+                    resolved
+                        .to_str()
+                        .context("Invalid texture path")?
+                        .to_string(),
+                );
+            }
+        }
+        
         // Validate the scene
         scene.validate()?;
 
+        Ok(scene)
+    }
+    
+    /// Load a scene from a TOML string (static method for backward compatibility)
+    pub fn load_from_string_static(content: &str) -> Result<Scene> {
+        let loader = Self::new()?;
+        loader.load_from_string(content, None)
+    }
+    
+    /// Expand GLTF model references into inline meshes
+    fn expand_gltf_models(&self, mut scene: Scene, scene_dir: Option<&Path>) -> Result<Scene> {
+        let mut expanded_objects = Vec::new();
+        let mut gltf_materials_offset = scene.materials.len();
+        
+        for object in scene.objects {
+            match object {
+                SceneObject::GltfModel { name, path, transform } => {
+                    log::info!("Loading GLTF model: {} from {}", name, path);
+                    
+                    // Resolve path
+                    let gltf_path = self.asset_resolver.resolve_and_verify(&path, scene_dir)
+                        .with_context(|| format!("Failed to resolve GLTF path: {}", path))?;
+                    
+                    // Load GLTF
+                    let (mut objects, materials, _metadata) = GltfLoader::load(&gltf_path)?;
+                    
+                    // Add materials to scene (with offset)
+                    scene.materials.extend(materials);
+                    
+                    // Update material indices and apply transform
+                    for obj in &mut objects {
+                        if let SceneObject::Mesh { material, transform: obj_transform, .. } = obj {
+                            // Offset material index
+                            if let Some(mat_idx) = material {
+                                *material = Some(*mat_idx + gltf_materials_offset);
+                            }
+                            
+                            // Apply GLTF model transform
+                            *obj_transform = transform;
+                        }
+                    }
+                    
+                    gltf_materials_offset = scene.materials.len();
+                    expanded_objects.extend(objects);
+                }
+                other => {
+                    expanded_objects.push(other);
+                }
+            }
+        }
+        
+        scene.objects = expanded_objects;
         Ok(scene)
     }
 
@@ -70,7 +162,8 @@ mod tests {
             fov = 45.0
         "#;
 
-        let scene = SceneLoader::load_from_string(toml).unwrap();
+        let loader = SceneLoader::with_root("/tmp");
+        let scene = loader.load_from_string(toml, None).unwrap();
         assert_eq!(scene.metadata.name, "Test Scene");
         assert_eq!(scene.metadata.description, "A test scene");
     }
@@ -99,7 +192,8 @@ mod tests {
             target = [0.0, 0.0, 0.0]
         "#;
 
-        let scene = SceneLoader::load_from_string(toml).unwrap();
+        let loader = SceneLoader::with_root("/tmp");
+        let scene = loader.load_from_string(toml, None).unwrap();
         assert_eq!(scene.objects.len(), 1);
 
         match &scene.objects[0] {
@@ -128,6 +222,7 @@ mod tests {
             target = [0.0, 0.0, 0.0]
         "#;
 
-        assert!(SceneLoader::load_from_string(toml).is_err());
+        let loader = SceneLoader::with_root("/tmp");
+        assert!(loader.load_from_string(toml, None).is_err());
     }
 }

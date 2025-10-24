@@ -1,0 +1,34 @@
+[metadata]
+name = "Textured GLTF Cube"
+description = "Test GLTF loading with embedded texture"
+author = "Rusty Renderer"
+
+[[objects]]
+type = "gltf"
+name = "textured_cube"
+path = "assets/models/textured_cube.gltf"
+transform = { position = [0.0, 0.0, 0.0], rotation = [0.0, 0.0, 0.0], scale = [1.0, 1.0, 1.0] }
+
+[camera]
+type = "perspective"
+position = [2.0, 2.0, 3.0]
+target = [0.0, 0.0, 0.0]
+up = [0.0, 1.0, 0.0]
+fov = 45.0
+near = 0.1
+far = 100.0
+
+[lighting]
+ambient = [0.2, 0.2, 0.2]
+
+[[lighting.lights]]
+type = "directional"
+direction = [-0.3, -1.0, -0.5]
+color = [1.0, 1.0, 1.0]
+intensity = 0.8
+
+[[lighting.lights]]
+type = "point"
+position = [1.5, 1.0, 2.0]
+color = [1.0, 0.7, 0.3]
+intensity = 1.2

@@ -103,6 +103,78 @@ struct ForwardPassCallback {
 }
 
 impl PassCallback for ForwardPassCallback {
+    fn prepare(&self, context: &mut dyn crate::render_graph::PassPreparationContext) {
+        log::info!("Preparing forward rendering pass");
+
+        // Prepare camera uniforms (set 0, binding 0)
+        let camera_ptr = self.camera_buffer.as_ref().as_ref() as *const dyn Buffer
+            as *const std::ffi::c_void;
+        let camera_size = std::mem::size_of::<CameraUniforms>() as u64;
+        
+        if let Err(e) = context.prepare_uniform_buffer(0, 0, camera_ptr, 0, camera_size) {
+            log::error!("Failed to prepare camera uniforms: {e}");
+            return;
+        }
+
+        // Prepare lighting uniforms (set 0, binding 1)
+        let lighting_ptr = self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer
+            as *const std::ffi::c_void;
+        let lighting_size = std::mem::size_of::<LightingUniforms>() as u64;
+        
+        if let Err(e) = context.prepare_uniform_buffer(0, 1, lighting_ptr, 0, lighting_size) {
+            log::error!("Failed to prepare lighting uniforms: {e}");
+            return;
+        }
+
+        // Prepare material uniforms (set 0, binding 3) if available
+        if let Some(ref material_buffer) = self.material_buffer {
+            let material_ptr = material_buffer.as_ref().as_ref() as *const dyn Buffer
+                as *const std::ffi::c_void;
+            let material_size = 32u64; // GpuMaterial size
+            
+            if let Err(e) = context.prepare_uniform_buffer(0, 3, material_ptr, 0, material_size) {
+                log::error!("Failed to prepare material uniforms: {e}");
+                return;
+            }
+        }
+
+        // Prepare texture (set 0, binding 2) if available
+        if let Some(ref texture) = self.texture {
+            let texture_ptr = texture.as_ref().as_ref() as *const dyn crate::backends::Texture
+                as *const std::ffi::c_void;
+            
+            if let Err(e) = context.prepare_texture(0, 2, texture_ptr) {
+                log::error!("Failed to prepare texture: {e}");
+                return;
+            }
+        }
+
+        // Compute push constant data (model + normal matrices)
+        let model_matrix = self.transform.matrix();
+        let normal_matrix = self.transform.normal_matrix();
+        
+        let mut push_data = Vec::with_capacity(128);
+        for row in &model_matrix {
+            for &val in row {
+                push_data.extend_from_slice(&val.to_ne_bytes());
+            }
+        }
+        for row in &normal_matrix {
+            for &val in row {
+                push_data.extend_from_slice(&val.to_ne_bytes());
+            }
+        }
+
+        // Check if this is wgpu backend - if so, store push constant data
+        use crate::backends::wgpu_backend::WgpuPrepContext;
+        if let Some(wgpu_ctx) = context.as_any_mut().downcast_mut::<WgpuPrepContext>() {
+            wgpu_ctx.push_constant_data.copy_from_slice(&push_data);
+            log::info!("Stored push constant data in wgpu prep context");
+        }
+
+        log::info!("Forward pass preparation complete");
+    }
+
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::info!("Executing forward rendering pass with {} vertices", self.vertex_count);
 

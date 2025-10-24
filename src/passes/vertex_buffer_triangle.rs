@@ -86,6 +86,13 @@ struct VertexBufferTriangleCallback {
 }
 
 impl PassCallback for VertexBufferTriangleCallback {
+    fn prepare(&self, _context: &mut dyn crate::render_graph::PassPreparationContext) {
+        // For now, just call the default preparation which should set up minimal bind groups
+        log::info!("VertexBufferTriangleCallback::prepare called");
+        // Suboptimal: We need to ensure bind groups are created even if we have no uniforms/textures
+        // The wgpu backend should create empty/default bind groups
+    }
+
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::debug!("Executing vertex buffer triangle pass");
 
