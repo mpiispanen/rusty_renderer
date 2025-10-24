@@ -4,10 +4,8 @@
 
 use anyhow::Result;
 use rusty_renderer::{
-    application::run_headless_frame,
     backends::{create_backend, BackendType},
-    pipelines::ForwardPipeline,
-    render_graph::RenderGraph,
+    pipelines::{ForwardPipeline, RenderPipeline},
     scene::SceneLoader,
 };
 
@@ -47,31 +45,38 @@ fn main() -> Result<()> {
 
     // Create backend
     println!("\nInitializing {} backend...", backend_type);
-    let mut backend = create_backend(backend_type, 800, 600, true)?;
-    println!("✓ Backend initialized");
+    let mut backend = create_backend(backend_type, false)?;
+    backend.initialize_headless(800, 600)?;
+    println!("✓ Backend initialized (800x600)");
 
     // Create pipeline and build render graph
     println!("\nBuilding render graph...");
     let mut pipeline = ForwardPipeline::new();
-    let graph = pipeline.build_graph(&scene, &mut *backend)?;
+    let mut graph = pipeline.build_graph(&scene, &mut *backend)?;
     println!("✓ Render graph built");
 
-    // Create and compile render graph
+    // Compile render graph
     println!("\nCompiling render graph...");
-    let mut render_graph = RenderGraph::new();
-    render_graph.compile(graph)?;
-    println!("✓ Render graph compiled: {} passes", render_graph.pass_count());
+    let compiled = graph.compile()?;
+    println!("✓ Render graph compiled: {} passes", compiled.execution_order.len());
 
     // Execute one frame
     println!("\nExecuting render frame...");
-    run_headless_frame(&mut *backend, &mut render_graph)?;
+    backend.begin_frame()?;
+    backend.execute_graph(&graph, &compiled)?;
+    backend.end_frame()?;
     println!("✓ Frame rendered successfully");
 
-    // Save screenshot
+    // Capture output
+    println!("\nCapturing frame...");
+    let (width, height, pixels) = backend.capture_frame()?;
+    println!("Captured frame: {}x{}", width, height);
+
     let output_path = "gltf_test.png";
-    println!("\nSaving screenshot to {}...", output_path);
-    backend.save_screenshot(output_path)?;
-    println!("✓ Screenshot saved");
+    image::save_buffer(output_path, &pixels, width, height, image::ColorType::Rgba8)?;
+    println!("Saved to: {}", output_path);
+
+    backend.cleanup();
 
     println!("\n=== GLTF Rendering Test Complete ===");
     println!("✓ All tests passed!");
