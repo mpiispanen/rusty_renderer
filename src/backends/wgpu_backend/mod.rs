@@ -54,6 +54,9 @@ pub struct WgpuBackend {
     persistent_bind_group_0: Option<wgpu::BindGroup>, // Camera + lighting + textures
     persistent_bind_group_1: Option<wgpu::BindGroup>, // Transform (push constants)
     
+    // Frame synchronization
+    last_submission_index: Option<wgpu::SubmissionIndex>,
+    
     // Default resources (M10 Phase 4)
     default_sampler: Option<wgpu::Sampler>,
     default_texture: Option<(wgpu::Texture, wgpu::TextureView)>,
@@ -92,6 +95,7 @@ impl WgpuBackend {
             transform_buffer: None,
             persistent_bind_group_0: None,
             persistent_bind_group_1: None,
+            last_submission_index: None,
             default_sampler: None,
             default_texture: None,
             frame_count: 0,
@@ -934,23 +938,22 @@ impl GraphicsBackend for WgpuBackend {
             log::info!("All passes executed, render pass about to end");
         }
 
-        // Submit commands
+        // Submit commands and save submission index for next frame
         log::info!("Submitting command buffer");
-        queue.submit(Some(encoder.finish()));
+        let submission_index = queue.submit(Some(encoder.finish()));
         log::info!("Commands submitted");
+        
+        // Poll multiple times to encourage GPU to process work
+        for _ in 0..10 {
+            device.poll(wgpu::Maintain::Poll);
+        }
 
         // Present if not headless
         if let Some(texture) = surface_texture {
             log::info!("Presenting surface texture");
             texture.present();
             log::info!("Texture presented");
-            // Texture is dropped here, returned to swapchain
         }
-        
-        // Poll to process completed work - do this AFTER dropping the texture
-        log::info!("Polling device");
-        device.poll(wgpu::Maintain::Poll);
-        log::info!("Device polled");
 
         log::debug!("Render graph execution complete");
         Ok(())
