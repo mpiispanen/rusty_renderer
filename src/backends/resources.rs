@@ -86,11 +86,11 @@ impl BufferUsage {
 /// Memory location preference
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MemoryLocation {
-    /// GPU-only memory (fast, not CPU-accessible)
+    /// GPU-only memory (fast, not CPU-accessible) - D3D12_HEAP_TYPE_DEFAULT
     GpuOnly,
-    /// CPU-visible memory (slower, CPU-accessible)
+    /// CPU-writable, GPU-readable (upload heap) - D3D12_HEAP_TYPE_UPLOAD
     CpuToGpu,
-    /// GPU-readable, CPU-writable (for dynamic updates)
+    /// GPU-writable, CPU-readable (readback heap) - D3D12_HEAP_TYPE_READBACK
     GpuToCpu,
 }
 

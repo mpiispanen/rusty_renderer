@@ -6,6 +6,7 @@
 use super::*;
 use crate::render_graph::{PassExecutionContext, PassPreparationContext};
 use anyhow::{Context, Result};
+use std::io::Write;
 use windows::{
     core::*, Win32::Foundation::*, Win32::Graphics::Direct3D::Fxc::*, Win32::Graphics::Direct3D::*,
     Win32::Graphics::Direct3D12::*, Win32::Graphics::Dxgi::Common::*, Win32::Graphics::Dxgi::*,
@@ -152,14 +153,30 @@ impl DirectXBackendImpl {
     }
 
     pub fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
+        // Debug logging - write to file immediately
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).create(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX initialize() ENTERED");
+            let _ = f.flush();
+        }
+        
         log::info!("Initializing DirectX 12 backend");
 
         let size = window.inner_size();
         self.width = size.width;
         self.height = size.height;
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX window size: {}x{}", self.width, self.height);
+            let _ = f.flush();
+        }
 
         // Enable debug layer if requested
         if self.enable_validation {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "DirectX enabling validation");
+                let _ = f.flush();
+            }
+            
             unsafe {
                 let mut debug: Option<ID3D12Debug> = None;
                 if D3D12GetDebugInterface(&mut debug).is_ok() {
@@ -173,31 +190,77 @@ impl DirectXBackendImpl {
             }
         }
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_factory");
+            let _ = f.flush();
+        }
+
         // Create DXGI factory
         self.create_factory()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_device");
+            let _ = f.flush();
+        }
 
         // Create device
         self.create_device()?;
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_command_queue");
+            let _ = f.flush();
+        }
+
         // Create command queue
         self.create_command_queue()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_swap_chain");
+            let _ = f.flush();
+        }
 
         // Create swap chain
         self.create_swap_chain(window)?;
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_render_targets");
+            let _ = f.flush();
+        }
+
         // Create render target views
         self.create_render_targets()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_command_objects");
+            let _ = f.flush();
+        }
 
         // Create command objects
         self.create_command_objects()?;
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_fence");
+            let _ = f.flush();
+        }
+
         // Create fence
         self.create_fence()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_pipeline");
+            let _ = f.flush();
+        }
 
         // Create pipeline with shaders
         self.create_pipeline()?;
 
         log::info!("DirectX 12 backend initialized successfully");
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX initialized successfully!");
+            let _ = f.flush();
+        }
+        
         Ok(())
     }
 
@@ -571,8 +634,8 @@ impl DirectXBackendImpl {
                 SampleMask: u32::MAX,
                 RasterizerState: D3D12_RASTERIZER_DESC {
                     FillMode: D3D12_FILL_MODE_SOLID,
-                    CullMode: D3D12_CULL_MODE_NONE,
-                    FrontCounterClockwise: FALSE,
+                    CullMode: D3D12_CULL_MODE_BACK, // Enable backface culling
+                    FrontCounterClockwise: FALSE, // Clockwise winding = front face
                     DepthBias: 0,
                     DepthBiasClamp: 0.0,
                     SlopeScaledDepthBias: 0.0,
@@ -632,12 +695,12 @@ impl DirectXBackendImpl {
     }
 
     fn load_shader_source(&self) -> Result<String> {
-        // Try to load forward.hlsl first, fall back to embedded triangle shader
-        if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward.hlsl") {
-            log::info!("Loaded forward.hlsl shader");
+        // Try to load forward_simple.hlsl first (no textures), fall back to embedded triangle shader
+        if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward_simple.hlsl") {
+            log::info!("Loaded forward_simple.hlsl shader");
             Ok(source)
         } else {
-            log::warn!("Could not load forward.hlsl, using embedded triangle shader");
+            log::warn!("Could not load forward_simple.hlsl, using embedded triangle shader");
             Ok(HLSL_SHADER_SOURCE.to_string())
         }
     }
@@ -714,117 +777,9 @@ impl DirectXBackendImpl {
 
     pub fn end_frame(&mut self) -> Result<()> {
         unsafe {
-            // Record rendering commands
-            if let (
-                Some(command_list),
-                Some(rtv_heap),
-                Some(root_signature),
-                Some(pipeline_state),
-            ) = (
-                &self.command_list,
-                &self.rtv_heap,
-                &self.root_signature,
-                &self.pipeline_state,
-            ) {
-                // Get current render target (offscreen for headless, swapchain for windowed)
-                let rtv_handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
-                let rtv_handle = if self.headless {
-                    // Headless: use single offscreen target
-                    rtv_handle
-                } else {
-                    // Windowed: use current swapchain target
-                    D3D12_CPU_DESCRIPTOR_HANDLE {
-                        ptr: rtv_handle.ptr
-                            + (self.frame_index * self.rtv_descriptor_size) as usize,
-                    }
-                };
-
-                // Get render target resource
-                let frame_idx = if self.headless {
-                    0
-                } else {
-                    self.frame_index as usize
-                };
-                if let Some(render_target) = self.render_targets.get(frame_idx) {
-                    // Transition to render target (only for windowed mode from PRESENT state)
-                    if !self.headless {
-                        let transition_to_rt = D3D12_RESOURCE_TRANSITION_BARRIER {
-                            pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
-                            Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                            StateBefore: D3D12_RESOURCE_STATE_PRESENT,
-                            StateAfter: D3D12_RESOURCE_STATE_RENDER_TARGET,
-                        };
-
-                        let barrier = D3D12_RESOURCE_BARRIER {
-                            Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                            Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                            Anonymous: D3D12_RESOURCE_BARRIER_0 {
-                                Transition: std::mem::ManuallyDrop::new(transition_to_rt),
-                            },
-                        };
-
-                        command_list.ResourceBarrier(&[barrier]);
-                    }
-
-                    // Clear to black
-                    let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
-                    command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
-
-                    // Set pipeline and draw triangle
-                    command_list.SetGraphicsRootSignature(root_signature);
-                    command_list.SetPipelineState(pipeline_state);
-                    command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, None);
-
-                    // Set viewport and scissor
-                    let viewport = D3D12_VIEWPORT {
-                        TopLeftX: 0.0,
-                        TopLeftY: 0.0,
-                        Width: self.width as f32,
-                        Height: self.height as f32,
-                        MinDepth: 0.0,
-                        MaxDepth: 1.0,
-                    };
-                    command_list.RSSetViewports(&[viewport]);
-
-                    let scissor = RECT {
-                        left: 0,
-                        top: 0,
-                        right: self.width as i32,
-                        bottom: self.height as i32,
-                    };
-                    command_list.RSSetScissorRects(&[scissor]);
-
-                    // Set primitive topology
-                    command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-                    // Draw the triangle (3 vertices)
-                    command_list.DrawInstanced(3, 1, 0, 0);
-
-                    // Transition back to present (only for windowed mode)
-                    if !self.headless {
-                        let transition_to_present = D3D12_RESOURCE_TRANSITION_BARRIER {
-                            pResource: std::mem::ManuallyDrop::new(Some(render_target.clone())),
-                            Subresource: D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-                            StateBefore: D3D12_RESOURCE_STATE_RENDER_TARGET,
-                            StateAfter: D3D12_RESOURCE_STATE_PRESENT,
-                        };
-
-                        let barrier = D3D12_RESOURCE_BARRIER {
-                            Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-                            Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
-                            Anonymous: D3D12_RESOURCE_BARRIER_0 {
-                                Transition: std::mem::ManuallyDrop::new(transition_to_present),
-                            },
-                        };
-
-                        command_list.ResourceBarrier(&[barrier]);
-                    }
-                }
-
-                // Close command list
-                command_list.Close()?;
-            }
-
+            // The render graph has already recorded all commands and closed the command list
+            // We just need to execute and present
+            
             // Execute commands
             if let (Some(command_queue), Some(command_list)) =
                 (&self.command_queue, &self.command_list)
@@ -1222,7 +1177,7 @@ impl DirectXBackendImpl {
             }
 
             // Clear render target
-            let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
+            let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background
             command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
 
             // Set render target
@@ -1305,6 +1260,9 @@ impl DirectXBackendImpl {
                 command_list.ResourceBarrier(&[barrier]);
             }
 
+            // Close the command list
+            command_list.Close()?;
+
             log::debug!("Render graph execution complete");
             Ok(())
         }
@@ -1335,6 +1293,12 @@ impl DirectXBackendImpl {
         &mut self,
         desc: &crate::backends::BufferDescriptor,
     ) -> Result<Box<dyn crate::backends::Buffer>> {
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "create_buffer called: {} bytes, usage: {:?}, memory: {:?}", 
+                desc.size, desc.usage, desc.memory_location);
+            let _ = f.flush();
+        }
+
         log::debug!(
             "Creating DirectX 12 buffer: {} bytes, usage: {:?}",
             desc.size,
@@ -1343,7 +1307,17 @@ impl DirectXBackendImpl {
 
         use windows::Win32::Graphics::Direct3D12::*;
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Checking if device is initialized: {}", self.device.is_some());
+            let _ = f.flush();
+        }
+
         let device = self.device.as_ref().context("Device not initialized")?;
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Device is initialized, creating buffer");
+            let _ = f.flush();
+        }
 
         // Map heap properties based on memory location
         let heap_props = match desc.memory_location {
@@ -1362,14 +1336,31 @@ impl DirectXBackendImpl {
         };
 
         // Map buffer usage to resource state
-        let initial_state = if desc.usage.vertex {
-            D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
-        } else if desc.usage.index {
-            D3D12_RESOURCE_STATE_INDEX_BUFFER
-        } else if desc.usage.uniform {
-            D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
-        } else {
-            D3D12_RESOURCE_STATE_COMMON
+        // IMPORTANT: DirectX 12 requires specific initial states based on heap type:
+        // - UPLOAD heap (CpuToGpu) must be GENERIC_READ
+        // - READBACK heap (GpuToCpu) must be COPY_DEST
+        // - DEFAULT heap (GpuOnly) can be any appropriate state
+        let initial_state = match desc.memory_location {
+            crate::backends::MemoryLocation::CpuToGpu => {
+                // Upload heaps must start in GENERIC_READ state
+                D3D12_RESOURCE_STATE_GENERIC_READ
+            }
+            crate::backends::MemoryLocation::GpuToCpu => {
+                // Readback heaps must start in COPY_DEST state
+                D3D12_RESOURCE_STATE_COPY_DEST
+            }
+            crate::backends::MemoryLocation::GpuOnly => {
+                // Default heaps can use appropriate state based on usage
+                if desc.usage.vertex {
+                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+                } else if desc.usage.index {
+                    D3D12_RESOURCE_STATE_INDEX_BUFFER
+                } else if desc.usage.uniform {
+                    D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER
+                } else {
+                    D3D12_RESOURCE_STATE_COMMON
+                }
+            }
         };
 
         let buffer_desc = D3D12_RESOURCE_DESC {
@@ -1388,8 +1379,14 @@ impl DirectXBackendImpl {
             Flags: D3D12_RESOURCE_FLAG_NONE,
         };
 
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "About to call CreateCommittedResource with size {} bytes, heap type {:?}", 
+                desc.size, heap_props.Type);
+            let _ = f.flush();
+        }
+
         let mut resource: Option<ID3D12Resource> = None;
-        unsafe {
+        let create_result = unsafe {
             device.CreateCommittedResource(
                 &heap_props,
                 D3D12_HEAP_FLAG_NONE,
@@ -1397,10 +1394,38 @@ impl DirectXBackendImpl {
                 initial_state,
                 None,
                 &mut resource,
-            )?;
+            )
+        };
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "CreateCommittedResource returned: {:?}", create_result);
+            let _ = writeln!(f, "Resource is_some: {}", resource.is_some());
+            let _ = f.flush();
+        }
+
+        if let Err(e) = create_result {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "ERROR creating buffer: {}", e);
+                let _ = f.flush();
+            }
+            log::error!(
+                "Failed to create D3D12 buffer: size={}, usage={:?}, memory={:?}, error={}",
+                desc.size, desc.usage, desc.memory_location, e
+            );
+            return Err(e.into());
+        }
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Checking if resource is Some before context");
+            let _ = f.flush();
         }
 
         let resource = resource.context("Failed to create D3D12 buffer resource")?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Buffer created successfully!");
+            let _ = f.flush();
+        }
 
         Ok(Box::new(DirectXBuffer {
             resource,
@@ -1416,6 +1441,8 @@ impl DirectXBackendImpl {
         data: &[u8],
         offset: u64,
     ) -> Result<()> {
+        use windows::Win32::Graphics::Direct3D12::*;
+
         let dx_buffer = buffer
             .as_any()
             .downcast_ref::<DirectXBuffer>()
@@ -1431,18 +1458,81 @@ impl DirectXBackendImpl {
             );
         }
 
-        // Map and copy data
-        unsafe {
-            let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-            dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
+        // GPU-only buffers need a staging buffer and GPU copy
+        // CPU-accessible buffers can be mapped directly
+        match buffer.memory_location() {
+            crate::backends::MemoryLocation::GpuOnly => {
+                // Create a temporary upload (staging) buffer
+                let staging_buffer = self.create_buffer(&crate::backends::BufferDescriptor {
+                    size: data.len() as u64,
+                    usage: crate::backends::BufferUsage::staging(),
+                    memory_location: crate::backends::MemoryLocation::CpuToGpu,
+                    label: Some("Staging buffer".to_string()),
+                })?;
 
-            let dst = (mapped_ptr as *mut u8).add(offset as usize);
-            std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+                // Map staging buffer and copy data
+                let staging_dx = staging_buffer
+                    .as_any()
+                    .downcast_ref::<DirectXBuffer>()
+                    .context("Staging buffer is not a DirectXBuffer")?;
 
-            dx_buffer.resource.Unmap(0, None);
+                unsafe {
+                    let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+                    staging_dx.resource.Map(0, None, Some(&mut mapped_ptr))?;
+                    std::ptr::copy_nonoverlapping(data.as_ptr(), mapped_ptr as *mut u8, data.len());
+                    staging_dx.resource.Unmap(0, None);
+                }
+
+                // Copy from staging to GPU buffer using command list
+                let cmd_allocator = self.command_allocator.as_ref().context("Command allocator not initialized")?;
+                let cmd_list = self.command_list.as_ref().context("Command list not initialized")?;
+
+                unsafe {
+                    cmd_allocator.Reset()?;
+                    cmd_list.Reset(cmd_allocator, None)?;
+
+                    cmd_list.CopyBufferRegion(
+                        &dx_buffer.resource,
+                        offset,
+                        &staging_dx.resource,
+                        0,
+                        data.len() as u64,
+                    );
+
+                    cmd_list.Close()?;
+
+                    // Execute command list
+                    let command_queue = self.command_queue.as_ref().context("Command queue not initialized")?;
+                    command_queue.ExecuteCommandLists(&[Some(cmd_list.cast()?)]);
+
+                    // Wait for copy to complete
+                    let fence = self.fence.as_ref().context("Fence not initialized")?;
+                    let fence_value = self.fence_value;
+                    command_queue.Signal(fence, fence_value)?;
+                    self.fence_value += 1;
+
+                    if fence.GetCompletedValue() < fence_value {
+                        fence.SetEventOnCompletion(fence_value, self.fence_event)?;
+                        WaitForSingleObject(self.fence_event, INFINITE);
+                    }
+                }
+
+                Ok(())
+            }
+            crate::backends::MemoryLocation::CpuToGpu | crate::backends::MemoryLocation::GpuToCpu => {
+                // CPU-accessible buffers can be mapped directly
+                unsafe {
+                    let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+                    dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
+
+                    let dst = (mapped_ptr as *mut u8).add(offset as usize);
+                    std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());
+
+                    dx_buffer.resource.Unmap(0, None);
+                }
+                Ok(())
+            }
         }
-
-        Ok(())
     }
 
     pub fn create_texture(

@@ -20,6 +20,8 @@ TEST_DIR="windows_test_directx"
 VKD3D_DEBUG_LEVEL="warn"
 APP_ARGS=()
 DEFAULT_SCENE="scenes/gltf_textured.toml"
+DEFAULT_MAX_FRAMES="60"
+DEFAULT_PIPELINE="forward"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -39,6 +41,16 @@ done
 # If no --scene argument was provided, add the default
 if [[ ! " ${APP_ARGS[@]} " =~ " --scene " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -s " ]]; then
     APP_ARGS+=("--scene" "$DEFAULT_SCENE")
+fi
+
+# If no --max-frames argument was provided, add the default
+if [[ ! " ${APP_ARGS[@]} " =~ " --max-frames " ]]; then
+    APP_ARGS+=("--max-frames" "$DEFAULT_MAX_FRAMES")
+fi
+
+# If no --pipeline argument was provided, add the default
+if [[ ! " ${APP_ARGS[@]} " =~ " --pipeline " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -p " ]]; then
+    APP_ARGS+=("--pipeline" "$DEFAULT_PIPELINE")
 fi
 
 # Check if Proton exists
@@ -73,6 +85,9 @@ echo ""
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 STEAM_COMPAT_DATA_PATH="$COMPAT_DATA" \
 VKD3D_DEBUG="$VKD3D_DEBUG_LEVEL" \
+RUST_LOG="${RUST_LOG:-info}" \
+RUST_BACKTRACE="${RUST_BACKTRACE:-1}" \
+WINEDEBUG=-all \
 "$PROTON_DIR/proton" run rusty_renderer.exe --backend directx "${APP_ARGS[@]}"
 
 EXIT_CODE=$?

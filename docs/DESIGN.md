@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.5.0  
-**Last Updated:** 2025-10-21  
-**Status:** Forward Rendering with Lighting Complete - Multi-Backend Production Ready
+**Version:** 0.6.0  
+**Last Updated:** 2025-10-25  
+**Status:** Architecture Refactor - Moving to Data-Driven System
 
 ## Project Vision
 
@@ -18,10 +18,17 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 
 ## Current State
 
-**Phase:** Foundation Complete - Building Production Renderer  
-**Status:** Forward rendering with lighting working on Vulkan (0 validation errors)
+**Phase:** Architecture Refactor - Data-Driven Rendering  
+**Status:** DirectX/Vulkan backends functional, removing hardcoded rendering
 
-### Completed (Production Ready on Vulkan)
+### Recent Achievements (Oct 25, 2025)
+- ✅ **DirectX Memory Management Fixed**: Proper heap types, staging buffers, resource states
+- ✅ **DirectX Render Graph Working**: Full cube rendering with lighting
+- ✅ **Backface Culling**: Enabled in DirectX pipeline
+- ✅ **Legacy Code Removed**: No more hardcoded triangle in end_frame()
+- ✅ **Normal-Based Debug Visualization**: Helps verify geometry without textures
+
+### Completed (Production Ready on Vulkan + DirectX)
 - ✅ Repository setup with CI/CD pipeline
 - ✅ Project structure with proper module organization
 - ✅ Backend abstraction layer with trait definitions
@@ -53,21 +60,28 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - Proper resource cleanup (0 validation errors)
 - Headless and windowed modes
 
-### Known Limitations
-- ❌ **wgpu: Push constants not implemented** (needs dynamic uniforms)
-- ❌ **DirectX: Push constants not implemented** (needs root constants)
-- ❌ **No texture loading or sampling**
-- ❌ **No model loading (glTF)**
-- ❌ **No material system**
-- ❌ **Shaders hardcoded in backends** (should be defined by passes)
-- ❌ **No shadow mapping**
-- ❌ **No post-processing**
-- ❌ **No UI for debugging**
+### Known Limitations & Roadmap
 
-### In Progress
-- **Multi-Backend Completion**: wgpu and DirectX push constants
-- **Resource Management**: Automatic shader loading and pipeline creation
-- See `docs/ROADMAP_2025.md` for detailed plan
+**Current Issues:**
+- ❌ **DirectX: No depth testing** (requires depth buffer implementation)
+- ❌ **DirectX: No texture support** (requires descriptor tables)
+- ❌ **Hardcoded shaders**: Embedded HLSL triangle shader as fallback
+- ❌ **Hardcoded vertex data**: Old triangle passes still exist
+- ❌ **Pipeline state hardcoded**: Not driven by templates
+- ❌ **wgpu: Broken** (bind group validation errors - deferred)
+
+**Architecture Goals (See `ARCHITECTURE_CLEANUP_ROADMAP.md`):**
+1. **Phase 1: Backend Parity** - Vulkan/DirectX identical output
+2. **Phase 2: Remove Hardcoding** - All data from files
+3. **Phase 3: Pipeline Templates** - Rendering defined by TOML
+4. **Phase 4: Scene-Driven** - Everything from glTF + scene files
+5. **Phase 5: CI/CD** - Automated visual regression testing
+6. **Phase 6: Validation** - Complete data-driven architecture
+
+### In Progress (Current Focus)
+- **Phase 1: Backend Parity** - DirectX depth testing, coordinate fixes
+- **CI Setup**: Automated rendering comparisons between backends
+- See `ARCHITECTURE_CLEANUP_ROADMAP.md` for complete plan
 
 ### Coordinate System Handling
 All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
