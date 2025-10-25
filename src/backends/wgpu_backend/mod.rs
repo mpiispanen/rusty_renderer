@@ -427,7 +427,7 @@ impl GraphicsBackend for WgpuBackend {
             present_mode: wgpu::PresentMode::AutoVsync, // Let wgpu choose
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: 3, // Triple buffering like Vulkan
         };
 
         surface.configure(&device, &config);
@@ -576,7 +576,7 @@ impl GraphicsBackend for WgpuBackend {
             present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: 3, // Triple buffering
         });
 
         // Create default resources
