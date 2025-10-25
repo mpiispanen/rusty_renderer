@@ -424,7 +424,7 @@ impl GraphicsBackend for WgpuBackend {
             format: surface_format,
             width: self.width,
             height: self.height,
-            present_mode: wgpu::PresentMode::Fifo, // VSync
+            present_mode: wgpu::PresentMode::AutoVsync, // Let wgpu choose
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -573,7 +573,7 @@ impl GraphicsBackend for WgpuBackend {
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             width: self.width,
             height: self.height,
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -744,11 +744,43 @@ impl GraphicsBackend for WgpuBackend {
         let surface_texture = if !self.headless {
             // Get surface texture
             let surface = self.surface.as_ref().context("Surface not initialized")?;
-            Some(
-                surface
-                    .get_current_texture()
-                    .context("Failed to get current surface texture")?,
-            )
+            
+            match surface.get_current_texture() {
+                Ok(texture) => Some(texture),
+                Err(wgpu::SurfaceError::Timeout) => {
+                    // Timeout usually means we're rendering too fast or surface needs reconfiguration
+                    log::warn!("Surface texture acquisition timeout - reconfiguring surface");
+                    if let Some(ref config) = self.surface_config {
+                        surface.configure(self.device.as_ref().unwrap(), config);
+                    }
+                    // Try one more time after reconfiguration
+                    match surface.get_current_texture() {
+                        Ok(texture) => Some(texture),
+                        Err(e) => {
+                            log::error!("Surface texture failed even after reconfiguration: {e:?}");
+                            return Ok(()); // Skip frame
+                        }
+                    }
+                }
+                Err(wgpu::SurfaceError::Outdated) => {
+                    log::warn!("Surface outdated, reconfiguring...");
+                    if let Some(ref config) = self.surface_config {
+                        surface.configure(self.device.as_ref().unwrap(), config);
+                    }
+                    return Ok(()); // Skip this frame
+                }
+                Err(wgpu::SurfaceError::Lost) => {
+                    log::warn!("Surface lost, reconfiguring...");
+                    // Reconfigure the surface
+                    if let Some(ref config) = self.surface_config {
+                        surface.configure(self.device.as_ref().unwrap(), config);
+                    }
+                    return Ok(()); // Skip this frame
+                }
+                Err(wgpu::SurfaceError::OutOfMemory) => {
+                    return Err(anyhow::anyhow!("Out of GPU memory"));
+                }
+            }
         } else {
             None
         };
