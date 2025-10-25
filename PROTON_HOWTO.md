@@ -29,16 +29,36 @@ cp -r assets scenes windows_test_directx/
 
 ### 3. Run with the Helper Script
 
+The `run_with_proton.sh` script accepts all the same arguments as rusty_renderer plus `--vkd3d-debug`:
+
 ```bash
-# Run with textured cube (default)
+# Run with default settings (windowed mode, GLTF textured cube)
 ./run_with_proton.sh
 
-# Run with triangle scene
-./run_with_proton.sh scenes/triangle.toml
+# Run with specific scene
+./run_with_proton.sh --scene scenes/textured_cube.toml
 
-# Run with more verbose VKD3D debug output
-./run_with_proton.sh scenes/textured_cube.toml info
+# Run with custom window size
+./run_with_proton.sh --width 1920 --height 1080
+
+# Run for limited frames
+./run_with_proton.sh --max-frames 100
+
+# Combine multiple arguments
+./run_with_proton.sh --scene scenes/cube.toml --width 1280 --height 720 --max-frames 1
+
+# Use VKD3D debug output
+./run_with_proton.sh --vkd3d-debug debug
+./run_with_proton.sh --scene scenes/triangle.toml --vkd3d-debug info
 ```
+
+**Supported Arguments:**
+- All rusty_renderer arguments (see `--help`)
+- `--scene <FILE>` - Scene to load (default: scenes/gltf_textured.toml)
+- `--width <WIDTH>` - Window width (default: 800)
+- `--height <HEIGHT>` - Window height (default: 600)
+- `--max-frames <N>` - Maximum frames (default: unlimited)
+- `--vkd3d-debug <LEVEL>` - VKD3D debug level: warn, info, debug (default: warn)
 
 ## Manual Proton Commands
 
