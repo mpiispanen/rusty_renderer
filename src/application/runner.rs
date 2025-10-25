@@ -603,11 +603,9 @@ impl ApplicationHandler for WindowedApp {
     fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
         // Request redraw for continuous rendering
         // This is the proper place to request redraws in wgpu applications
-        log::debug!("about_to_wait: frame_count={}", self.frame_count);
         if let Some(window) = &self.window {
             // Only request if we haven't hit the frame limit
             if self.max_frames == 0 || self.frame_count < self.max_frames as u64 {
-                log::debug!("Requesting redraw from about_to_wait");
                 window.request_redraw();
             }
         }
