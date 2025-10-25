@@ -432,7 +432,7 @@ impl GraphicsBackend for WgpuBackend {
             format: surface_format,
             width: self.width,
             height: self.height,
-            present_mode: wgpu::PresentMode::AutoVsync, // Let wgpu choose
+            present_mode: wgpu::PresentMode::Fifo, // Let wgpu choose
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 3, // Triple buffering like Vulkan
@@ -581,7 +581,7 @@ impl GraphicsBackend for WgpuBackend {
             format: wgpu::TextureFormat::Rgba8UnormSrgb,
             width: self.width,
             height: self.height,
-            present_mode: wgpu::PresentMode::AutoVsync,
+            present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
             desired_maximum_frame_latency: 3, // Triple buffering
@@ -767,7 +767,7 @@ impl GraphicsBackend for WgpuBackend {
                             format,
                             width: self.width,
                             height: self.height,
-                            present_mode: wgpu::PresentMode::AutoVsync,
+                            present_mode: wgpu::PresentMode::Fifo,
                             alpha_mode: caps.alpha_modes[0],
                             view_formats: vec![],
                             desired_maximum_frame_latency: 3,
@@ -925,15 +925,22 @@ impl GraphicsBackend for WgpuBackend {
         }
 
         // Submit commands
+        log::info!("Submitting command buffer");
         queue.submit(Some(encoder.finish()));
+        log::info!("Commands submitted");
 
         // Present if not headless
         if let Some(texture) = surface_texture {
+            log::info!("Presenting surface texture");
             texture.present();
+            log::info!("Texture presented");
+            // Texture is dropped here, returned to swapchain
         }
         
-        // Poll to process completed work
+        // Poll to process completed work - do this AFTER dropping the texture
+        log::info!("Polling device");
         device.poll(wgpu::Maintain::Poll);
+        log::info!("Device polled");
 
         log::debug!("Render graph execution complete");
         Ok(())
