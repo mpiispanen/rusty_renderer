@@ -73,20 +73,13 @@ PSInput VSMain(VSInput input) {
     return output;
 }
 
-// Pixel Shader with simple lighting and normal-based coloring for debugging
+// Pixel Shader with simple lighting
 float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize interpolated normal
     float3 normal = normalize(input.normal);
     
-    // Debug: Use normal direction as color (helps visualize faces)
-    // Convert from [-1,1] to [0,1] range for color
-    float3 debugColor = normal * 0.5 + 0.5;
-    
-    // Combine with material and vertex color
+    // Use vertex color and material base color
     float3 surfaceColor = input.color.rgb * baseColor.rgb;
-    
-    // Mix debug normal color with surface color (70% surface, 30% normal debug)
-    surfaceColor = lerp(surfaceColor, debugColor, 0.3);
     
     // Start with ambient light
     float3 ambient = ambientLightCount.xyz;

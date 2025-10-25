@@ -1,0 +1,29 @@
+DirectX Rendering - Current State (Oct 25, 2025)
+
+FIXES APPLIED:
+✅ Removed debug normal coloring from shader
+✅ Fixed winding order: COUNTER_CLOCKWISE (glTF standard)  
+✅ Vulkan also updated to COUNTER_CLOCKWISE for consistency
+
+EXPECTED BEHAVIOR:
+The glTF textured cube will appear WHITE/GRAY with lighting because:
+- glTF model has NO vertex colors (defaults to white)
+- glTF material baseColor is white [1.0, 1.0, 1.0, 1.0]
+- DirectX has NO texture support yet (requires descriptor tables)
+
+What you should see:
+- White/light gray cube
+- Lighting variations (brighter/darker faces from directional + point lights)
+- Backface culling working correctly (back faces hidden)
+- All 36 vertices rendering (full cube, not just triangle)
+
+To get actual colors/textures:
+- Need to implement Issue #71: DirectX texture support via descriptor tables
+- OR use a model with actual vertex colors
+- OR use Vulkan backend which has full texture support
+
+Compare:
+- Vulkan: Full textured cube with checkerboard pattern ✅
+- DirectX: White cube with lighting only (expected) ✅
+- wgpu: Should match Vulkan (textured)
+

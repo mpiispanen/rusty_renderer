@@ -635,7 +635,7 @@ impl DirectXBackendImpl {
                 RasterizerState: D3D12_RASTERIZER_DESC {
                     FillMode: D3D12_FILL_MODE_SOLID,
                     CullMode: D3D12_CULL_MODE_BACK, // Enable backface culling
-                    FrontCounterClockwise: FALSE, // Clockwise winding = front face
+                    FrontCounterClockwise: TRUE, // Counter-clockwise winding = front face (glTF standard)
                     DepthBias: 0,
                     DepthBiasClamp: 0.0,
                     SlopeScaledDepthBias: 0.0,
