@@ -569,6 +569,9 @@ impl ApplicationHandler for WindowedApp {
                         return;
                     }
 
+                    // Frame pacing: only request next frame after a successful present
+                    // This avoids acquiring a new surface texture while previous frames
+                    // are still in-flight (prevents swapchain starvation on wgpu).
                     self.frame_count += 1;
                     
                     // Check if we've reached max frames

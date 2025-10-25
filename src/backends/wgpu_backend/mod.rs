@@ -52,6 +52,9 @@ pub struct WgpuBackend {
     default_sampler: Option<wgpu::Sampler>,
     default_texture: Option<(wgpu::Texture, wgpu::TextureView)>,
 
+    // Frame pacing
+    frame_count: u64,
+
     // Stub trait implementations (will be replaced)
     device_wrapper: WgpuDevice,
     swapchain_wrapper: WgpuSwapchain,
@@ -81,8 +84,13 @@ impl WgpuBackend {
             temp_buffers: vec![],
             default_sampler: None,
             default_texture: None,
-            device_wrapper: WgpuDevice,
-            swapchain_wrapper: WgpuSwapchain::new(),
+            frame_count: 0,
+            device_wrapper: WgpuDevice {},
+            swapchain_wrapper: WgpuSwapchain {
+                width: 800,
+                height: 600,
+                current_frame: 0,
+            },
         })
     }
 
@@ -750,8 +758,22 @@ impl GraphicsBackend for WgpuBackend {
                 Err(wgpu::SurfaceError::Timeout) => {
                     // Timeout usually means we're rendering too fast or surface needs reconfiguration
                     log::warn!("Surface texture acquisition timeout - reconfiguring surface");
-                    if let Some(ref config) = self.surface_config {
-                        surface.configure(self.device.as_ref().unwrap(), config);
+                    // Rebuild configuration from current capabilities to be safe
+                    if let (Some(adapter), Some(device)) = (&self.adapter, &self.device) {
+                        let caps = surface.get_capabilities(adapter);
+                        let format = caps.formats.iter().copied().find(|f| f.is_srgb()).unwrap_or(caps.formats[0]);
+                        let config = wgpu::SurfaceConfiguration {
+                            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                            format,
+                            width: self.width,
+                            height: self.height,
+                            present_mode: wgpu::PresentMode::AutoVsync,
+                            alpha_mode: caps.alpha_modes[0],
+                            view_formats: vec![],
+                            desired_maximum_frame_latency: 3,
+                        };
+                        surface.configure(device, &config);
+                        self.surface_config = Some(config);
                     }
                     // Try one more time after reconfiguration
                     match surface.get_current_texture() {
@@ -909,6 +931,9 @@ impl GraphicsBackend for WgpuBackend {
         if let Some(texture) = surface_texture {
             texture.present();
         }
+        
+        // Poll to process completed work
+        device.poll(wgpu::Maintain::Poll);
 
         log::debug!("Render graph execution complete");
         Ok(())
