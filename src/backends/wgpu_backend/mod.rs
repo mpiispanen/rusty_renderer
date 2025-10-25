@@ -48,6 +48,12 @@ pub struct WgpuBackend {
     bind_groups: Vec<wgpu::BindGroup>,
     temp_buffers: Vec<wgpu::Buffer>, // Temporary buffers for bind groups (e.g., push constants)
     
+    // Persistent uniform buffers and bind groups (reused every frame)
+    camera_lighting_buffer: Option<wgpu::Buffer>, // For bind group 0
+    transform_buffer: Option<wgpu::Buffer>,       // For bind group 1 (push constants)
+    persistent_bind_group_0: Option<wgpu::BindGroup>, // Camera + lighting + textures
+    persistent_bind_group_1: Option<wgpu::BindGroup>, // Transform (push constants)
+    
     // Default resources (M10 Phase 4)
     default_sampler: Option<wgpu::Sampler>,
     default_texture: Option<(wgpu::Texture, wgpu::TextureView)>,
@@ -82,6 +88,10 @@ impl WgpuBackend {
             bind_group_layouts: vec![],
             bind_groups: vec![],
             temp_buffers: vec![],
+            camera_lighting_buffer: None,
+            transform_buffer: None,
+            persistent_bind_group_0: None,
+            persistent_bind_group_1: None,
             default_sampler: None,
             default_texture: None,
             frame_count: 0,
@@ -1671,6 +1681,8 @@ impl WgpuPrepContext {
         
         log::info!("WgpuPrepContext::finalize - Creating bind groups");
         if let Some(device) = &backend.device {
+            let queue = backend.queue.as_ref().context("Queue not initialized")?;
+            
             if !backend.bind_group_layouts.is_empty() {
                 let layout = &backend.bind_group_layouts[0];
                 
@@ -1731,30 +1743,66 @@ impl WgpuPrepContext {
                 
                 backend.bind_groups.push(bind_group_0);
                 
-                // Create bind group 1 for transform (emulating push constants)
+                // Create or update bind group 1 for transform (emulating push constants)
                 log::info!("Finalize: push_data.len() = {}", push_data.len());
                 if !push_data.is_empty() && push_data.len() == 128 {
-                    log::info!("Finalize: Creating bind group 1 for transform");
-                    let transform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                        label: Some("Transform Buffer (Push Constants)"),
-                        contents: &push_data,
-                        usage: wgpu::BufferUsages::UNIFORM,
-                    });
+                    log::info!("Finalize: Creating/updating bind group 1 for transform");
                     
-                    if backend.bind_group_layouts.len() > 1 {
-                        let transform_layout = &backend.bind_group_layouts[1];
-                        let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                            label: Some("Set 1: Transform"),
-                            layout: transform_layout,
-                            entries: &[wgpu::BindGroupEntry {
-                                binding: 0,
-                                resource: transform_buffer.as_entire_binding(),
-                            }],
-                        });
+                    // Create buffer once, reuse every frame
+                    if backend.transform_buffer.is_none() {
+                        log::info!("Finalize: Creating NEW transform buffer (first time)");
+                        backend.transform_buffer = Some(device.create_buffer(&wgpu::BufferDescriptor {
+                            label: Some("Transform Buffer (Push Constants)"),
+                            size: 128,
+                            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                            mapped_at_creation: false,
+                        }));
+                    } else {
+                        log::info!("Finalize: Reusing existing transform buffer");
+                    }
+                    
+                    // Update buffer contents
+                    if let Some(ref transform_buffer) = backend.transform_buffer {
+                        queue.write_buffer(transform_buffer, 0, &push_data);
                         
-                        backend.temp_buffers.push(transform_buffer);
-                        backend.bind_groups.push(bind_group_1);
-                        log::info!("Finalize: Bind group 1 created");
+                        // Create bind group 1 once, reuse it
+                        if backend.persistent_bind_group_1.is_none() && backend.bind_group_layouts.len() > 1 {
+                            log::info!("Finalize: Creating persistent bind group 1 (first time)");
+                            let transform_layout = &backend.bind_group_layouts[1];
+                            let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("Set 1: Transform"),
+                                layout: transform_layout,
+                                entries: &[wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: transform_buffer.as_entire_binding(),
+                                }],
+                            });
+                            backend.persistent_bind_group_1 = Some(bind_group_1);
+                        } else {
+                            log::info!("Finalize: Reusing persistent bind group 1");
+                        }
+                        
+                        // Add to bind_groups for this frame
+                        if let Some(ref bg1) = backend.persistent_bind_group_1 {
+                            // We need to clone the bind group reference for the Vec
+                            // Actually, we can't clone bind groups! We need to just push a reference
+                            // But bind_groups is a Vec<BindGroup>, not Vec<&BindGroup>
+                            // This is a problem - we can't reuse bind groups this way!
+                            
+                            // For now, just create a new bind group each frame
+                            // TODO: Redesign to avoid per-frame bind group creation
+                            let transform_layout = &backend.bind_group_layouts[1];
+                            let bind_group_1 = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                                label: Some("Set 1: Transform"),
+                                layout: transform_layout,
+                                entries: &[wgpu::BindGroupEntry {
+                                    binding: 0,
+                                    resource: transform_buffer.as_entire_binding(),
+                                }],
+                            });
+                            backend.bind_groups.push(bind_group_1);
+                            log::info!("Finalize: Bind group 1 created (buffer reused)");
+                        }
                     }
                 } else {
                     log::warn!("Finalize: NOT creating bind group 1 - push_data.len() = {}", push_data.len());
