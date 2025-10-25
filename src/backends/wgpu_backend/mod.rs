@@ -462,73 +462,8 @@ impl GraphicsBackend for WgpuBackend {
     }
 
     fn end_frame(&mut self) -> Result<()> {
-        let device = self.device.as_ref().context("Device not initialized")?;
-        let queue = self.queue.as_ref().context("Queue not initialized")?;
-        let pipeline = self
-            .render_pipeline
-            .as_ref()
-            .context("Pipeline not initialized")?;
-
-        // Get render target (surface or offscreen)
-        let (view, output) = if self.headless {
-            // Headless mode: render to offscreen texture
-            let view = self
-                .offscreen_view
-                .as_ref()
-                .context("Offscreen view not initialized")?;
-            (view, None)
-        } else {
-            // Window mode: render to surface
-            let surface = self.surface.as_ref().context("Surface not initialized")?;
-            let output = surface.get_current_texture()?;
-            let view = output
-                .texture
-                .create_view(&wgpu::TextureViewDescriptor::default());
-            // Store view in a temporary to ensure it lives long enough
-            self.offscreen_view = Some(view);
-            let view_ref = self.offscreen_view.as_ref().unwrap();
-            (view_ref, Some(output))
-        };
-
-        // Create command encoder
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
-
-        // Render pass
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.0,
-                            g: 0.0,
-                            b: 0.0,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: None,
-                timestamp_writes: None,
-                occlusion_query_set: None,
-            });
-
-            render_pass.set_pipeline(pipeline);
-            render_pass.draw(0..3, 0..1); // Draw 3 vertices, 1 instance
-        }
-
-        // Submit commands
-        queue.submit(std::iter::once(encoder.finish()));
-
-        // Present if not headless
-        if let Some(output) = output {
-            output.present();
-        }
-
+        // The render graph has already handled all rendering in execute_graph()
+        // No additional work needed here
         Ok(())
     }
 
