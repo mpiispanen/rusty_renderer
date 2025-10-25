@@ -6,7 +6,7 @@ Running application
 initialize_and_run called
 Backend type: Wgpu, headless: false
 Entering windowed mode branch
-Event loop created, max_frames: 100
+Event loop created, max_frames: 10
 About to call run_app
 WindowedApp::resumed called
 Window is none: true
@@ -18,8 +18,8 @@ Render graph built successfully
 Graph compiled successfully
 Requesting initial redraw
 Window setup complete, redraw requested
-RedrawRequested: frame_count=0, max_frames=100
-RedrawRequested: frame_count=1, max_frames=100
-RedrawRequested: frame_count=2, max_frames=100
-RedrawRequested: frame_count=3, max_frames=100
-RedrawRequested: frame_count=4, max_frames=100
+RedrawRequested: frame_count=0, max_frames=10
+RedrawRequested: frame_count=1, max_frames=10
+RedrawRequested: frame_count=2, max_frames=10
+RedrawRequested: frame_count=3, max_frames=10
+RedrawRequested: frame_count=4, max_frames=10

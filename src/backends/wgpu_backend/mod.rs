@@ -942,11 +942,6 @@ impl GraphicsBackend for WgpuBackend {
         log::info!("Submitting command buffer");
         let submission_index = queue.submit(Some(encoder.finish()));
         log::info!("Commands submitted");
-        
-        // Poll multiple times to encourage GPU to process work
-        for _ in 0..10 {
-            device.poll(wgpu::Maintain::Poll);
-        }
 
         // Present if not headless
         if let Some(texture) = surface_texture {
