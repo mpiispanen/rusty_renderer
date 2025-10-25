@@ -1,0 +1,22 @@
+Starting Rusty Renderer v0.1.0
+Initializing logging
+Parsing arguments
+Arguments parsed successfully
+Running application
+initialize_and_run called
+Backend type: Wgpu, headless: false
+Entering windowed mode branch
+Event loop created, max_frames: 1
+About to call run_app
+WindowedApp::resumed called
+Window is none: true
+Attempting to create window
+Window created successfully
+Initializing backend with window
+Building render graph
+Render graph built successfully
+Graph compiled successfully
+Requesting initial redraw
+Window setup complete, redraw requested
+RedrawRequested: frame_count=0, max_frames=1
+run_app returned

@@ -76,7 +76,7 @@ impl ForwardPipeline {
         let vertex_desc = BufferDescriptor {
             size: vertex_buffer_size,
             usage: BufferUsage::vertex(),
-            memory_location: MemoryLocation::GpuOnly,
+            memory_location: MemoryLocation::CpuToGpu,
             label: Some(label.to_string()),
         };
 

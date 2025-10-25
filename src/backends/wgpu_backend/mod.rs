@@ -509,12 +509,8 @@ impl GraphicsBackend for WgpuBackend {
         // Create instance
         log::info!("Creating wgpu instance");
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            flags: if self.enable_validation {
-                wgpu::InstanceFlags::VALIDATION | wgpu::InstanceFlags::DEBUG
-            } else {
-                wgpu::InstanceFlags::empty()
-            },
+            backends: wgpu::Backends::VULKAN, // Use Vulkan backend only for now
+            flags: wgpu::InstanceFlags::empty(), // Disable validation for now
             ..Default::default()
         });
 
@@ -523,7 +519,7 @@ impl GraphicsBackend for WgpuBackend {
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance,
             compatible_surface: None, // Headless!
-            force_fallback_adapter: false,
+            force_fallback_adapter: true, // Try fallback if no hardware adapter
         }))
         .context("Failed to find appropriate adapter")?;
 

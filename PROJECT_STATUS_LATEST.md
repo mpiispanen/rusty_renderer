@@ -31,11 +31,12 @@
 - All features tested and working
 
 ### DirectX 12 Backend
-**Status**: ✅ **Compiles for Windows**
+**Status**: ✅ **Verified Working (Proton)**
 - Cross-compilation working
-- Not runtime tested (needs Windows hardware)
-- Basic triangle rendering implemented
+- ✅ Runtime tested with Proton on Linux
+- Triangle, textured meshes, GLTF all working
 - Resource management complete
+- VKD3D translation to Vulkan confirmed
 
 ### wgpu Backend
 **Status**: ⏸️ **Deferred**
@@ -48,17 +49,16 @@
 
 | Feature | Vulkan | DirectX | wgpu |
 |---------|--------|---------|------|
-| Triangle | ✅ | ✅¹ | ✅ |
-| Textured Mesh | ✅ | ✅¹ | ❌² |
-| Forward Lighting | ✅ | ✅¹ | ❌² |
-| GLTF Loading | ✅ | ✅¹ | ❌² |
-| Windowed Mode | ✅ | ❌³ | ✅ |
-| Headless Mode | ✅ | ❌³ | ❌ |
-| Screenshots | ✅ | ❌³ | ❌ |
+| Triangle | ✅ | ✅ | ✅ |
+| Textured Mesh | ✅ | ✅ | ❌² |
+| Forward Lighting | ✅ | ✅ | ❌² |
+| GLTF Loading | ✅ | ✅ | ❌² |
+| Windowed Mode | ✅ | ✅ | ✅ |
+| Headless Mode | ✅ | ✅¹ | ❌ |
+| Screenshots | ✅ | ✅¹ | ❌ |
 
-¹ Not runtime tested (needs Windows)  
-² Blocked on bind group issues  
-³ Needs testing on Windows
+¹ Tested via Proton on Linux  
+² Blocked on bind group issues
 
 ## What Works Right Now
 

@@ -1,0 +1,134 @@
+Starting Rusty Renderer v0.1.0
+Initializing logging
+Parsing arguments
+Arguments parsed successfully
+Running application
+Shutdown complete
+ called
+Backend type: DirectX12, headless: false
+Entering windowed mode branch
+Event loop created, max_frames: 60
+About to call run_app
+WindowedApp::resumed called
+Window is none: true
+Attempting to create window
+Window created successfully
+Initializing backend with window
+DirectX initialize() ENTERED
+DirectX window size: 800x600
+DirectX enabling validation
+DirectX calling create_factory
+DirectX calling create_device
+DirectX calling create_command_queue
+DirectX calling create_swap_chain
+DirectX calling create_render_targets
+DirectX calling create_command_objects
+DirectX calling create_fence
+DirectX calling create_pipeline
+DirectX initialized successfully!
+Building render graph
+create_buffer called: 64 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 64 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 400 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 400 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 32 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 32 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 1728 bytes, usage: BufferUsage { vertex: true, index: false, uniform: false, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 1728 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 32 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 32 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+Render graph built successfully
+Graph compiled successfully
+Requesting initial redraw
+Window setup complete, redraw requested
+RedrawRequested: frame_count=0, max_frames=60
+RedrawRequested: frame_count=1, max_frames=60
+RedrawRequested: frame_count=2, max_frames=60
+RedrawRequested: frame_count=3, max_frames=60
+RedrawRequested: frame_count=4, max_frames=60
+RedrawRequested: frame_count=5, max_frames=60
+RedrawRequested: frame_count=6, max_frames=60
+RedrawRequested: frame_count=7, max_frames=60
+RedrawRequested: frame_count=8, max_frames=60
+RedrawRequested: frame_count=9, max_frames=60
+RedrawRequested: frame_count=10, max_frames=60
+RedrawRequested: frame_count=11, max_frames=60
+RedrawRequested: frame_count=12, max_frames=60
+RedrawRequested: frame_count=13, max_frames=60
+RedrawRequested: frame_count=14, max_frames=60
+RedrawRequested: frame_count=15, max_frames=60
+RedrawRequested: frame_count=16, max_frames=60
+RedrawRequested: frame_count=17, max_frames=60
+RedrawRequested: frame_count=18, max_frames=60
+RedrawRequested: frame_count=19, max_frames=60
+RedrawRequested: frame_count=20, max_frames=60
+RedrawRequested: frame_count=21, max_frames=60
+RedrawRequested: frame_count=22, max_frames=60
+RedrawRequested: frame_count=23, max_frames=60
+RedrawRequested: frame_count=24, max_frames=60
+RedrawRequested: frame_count=25, max_frames=60
+RedrawRequested: frame_count=26, max_frames=60
+RedrawRequested: frame_count=27, max_frames=60
+RedrawRequested: frame_count=28, max_frames=60
+RedrawRequested: frame_count=29, max_frames=60
+RedrawRequested: frame_count=30, max_frames=60
+RedrawRequested: frame_count=31, max_frames=60
+RedrawRequested: frame_count=32, max_frames=60
+RedrawRequested: frame_count=33, max_frames=60
+RedrawRequested: frame_count=34, max_frames=60
+RedrawRequested: frame_count=35, max_frames=60
+RedrawRequested: frame_count=36, max_frames=60
+RedrawRequested: frame_count=37, max_frames=60
+RedrawRequested: frame_count=38, max_frames=60
+RedrawRequested: frame_count=39, max_frames=60
+RedrawRequested: frame_count=40, max_frames=60
+RedrawRequested: frame_count=41, max_frames=60
+RedrawRequested: frame_count=42, max_frames=60
+RedrawRequested: frame_count=43, max_frames=60
+RedrawRequested: frame_count=44, max_frames=60
+RedrawRequested: frame_count=45, max_frames=60
+RedrawRequested: frame_count=46, max_frames=60
+RedrawRequested: frame_count=47, max_frames=60
+RedrawRequested: frame_count=48, max_frames=60
+RedrawRequested: frame_count=49, max_frames=60
+RedrawRequested: frame_count=50, max_frames=60
+RedrawRequested: frame_count=51, max_frames=60
+RedrawRequested: frame_count=52, max_frames=60
+RedrawRequested: frame_count=53, max_frames=60
+RedrawRequested: frame_count=54, max_frames=60
+RedrawRequested: frame_count=55, max_frames=60
+RedrawRequested: frame_count=56, max_frames=60
+RedrawRequested: frame_count=57, max_frames=60
+RedrawRequested: frame_count=58, max_frames=60
+RedrawRequested: frame_count=59, max_frames=60
+run_app returned

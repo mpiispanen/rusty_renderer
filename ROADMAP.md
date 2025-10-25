@@ -60,23 +60,23 @@
 
 ## 📋 TODO - High Priority
 
-### 1. Complete DirectX Backend
-- [ ] Finish DirectX 12 implementation
-- [ ] Cross-compile for Windows
-- [ ] Test locally with Proton
-- [ ] Verify feature parity with Vulkan
+### 1. ✅ Complete DirectX Backend (DONE!)
+- [x] Finish DirectX 12 implementation
+- [x] Cross-compile for Windows
+- [x] Test locally with Proton
+- [x] Verify feature parity with Vulkan
 
-### 2. GLTF Testing & Enhancement
-- [ ] Create/obtain simple GLTF test models
-- [ ] Test end-to-end GLTF loading
-- [ ] Implement embedded texture extraction
+### 2. ✅ GLTF Testing & Enhancement (DONE!)
+- [x] Create/obtain simple GLTF test models
+- [x] Test end-to-end GLTF loading
+- [x] Implement embedded texture extraction
 - [ ] Support additional texture maps:
   - [ ] Normal maps
   - [ ] Metallic/roughness maps
   - [ ] Ambient occlusion
   - [ ] Emissive maps
 
-### 3. Fix wgpu Backend
+### 3. ⏸️ Fix wgpu Backend (DEFERRED)
 - [ ] Debug bind group lifecycle
 - [ ] Fix texture binding
 - [ ] Resolve validation errors

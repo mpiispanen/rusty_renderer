@@ -8,17 +8,24 @@ name = "RGB Triangle"
 description = "Simple colored triangle for testing"
 author = "Rusty Renderer"
 
+[[materials]]
+name = "default"
+base_color = [1.0, 1.0, 1.0]
+metallic = 0.0
+roughness = 0.5
+
 # Triangle object with inline geometry
 [[objects]]
 type = "mesh"
 name = "triangle"
+material = 0  # Use default material
 
 [objects.geometry]
 source = "inline"
 vertices = [
-    { position = [0.0, -0.5, 0.0], color = [1.0, 0.0, 0.0] },  # Bottom: Red
-    { position = [0.5, 0.5, 0.0], color = [0.0, 1.0, 0.0] },   # Top-right: Green
-    { position = [-0.5, 0.5, 0.0], color = [0.0, 0.0, 1.0] },  # Top-left: Blue
+    { position = [0.0, -0.5, 0.0], normal = [0.0, 0.0, 1.0], uv = [0.5, 0.0], color = [1.0, 0.0, 0.0] },  # Bottom: Red
+    { position = [0.5, 0.5, 0.0], normal = [0.0, 0.0, 1.0], uv = [1.0, 1.0], color = [0.0, 1.0, 0.0] },   # Top-right: Green
+    { position = [-0.5, 0.5, 0.0], normal = [0.0, 0.0, 1.0], uv = [0.0, 1.0], color = [0.0, 0.0, 1.0] },  # Top-left: Blue
 ]
 
 # Camera looking at the triangle
@@ -30,3 +37,12 @@ up = [0.0, 1.0, 0.0]
 fov = 45.0
 near = 0.1
 far = 1000.0
+
+[lighting]
+ambient = [0.3, 0.3, 0.3]
+
+[[lighting.lights]]
+type = "directional"
+direction = [0.0, 0.0, -1.0]
+color = [1.0, 1.0, 1.0]
+intensity = 0.8
