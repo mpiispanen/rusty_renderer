@@ -1,80 +1,40 @@
 # Implementation Plan - Next Steps
 
 **Created:** 2025-10-21  
+**Updated:** 2025-10-26  
 **Status:** Active Plan
 
 This document outlines concrete implementation tasks for the short-term roadmap.
 
 ---
 
-## Phase 1: Multi-Backend Completion (1 Week)
+## Phase 1: Backend Parity (1 Week)
 
-### Task 1.1: wgpu Push Constants (~2-3 hours)
+### Task 1.1: DirectX Rendering Fixes (~3-4 hours)
 
-**Goal:** Implement push constant emulation via dynamic uniforms
-
-**Steps:**
-1. Add transform buffer to WgpuBackend
-   ```rust
-   transform_buffer: Option<wgpu::Buffer>
-   transform_bind_group: Option<wgpu::BindGroup>
-   transform_bind_group_layout: Option<wgpu::BindGroupLayout>
-   ```
-
-2. Create buffer during initialization
-   - 128 bytes for model + normal matrices
-   - UNIFORM | COPY_DST usage flags
-
-3. Update WgpuPassContext
-   - Add `pending_transform_data: Option<Vec<u8>>`
-   - Buffer data in `push_constants()`
-   - Upload and bind in `draw()`
-
-4. Create WGSL shaders
-   - Port forward.vert to WGSL
-   - Port forward.frag to WGSL
-   - Test rendering
-
-**Acceptance Criteria:**
-- [ ] wgpu backend renders cube with lighting
-- [ ] Transforms working (rotation, scale, position)
-- [ ] No validation errors
-- [ ] Headless screenshot matches Vulkan output
-
-**Files to Modify:**
-- `src/backends/wgpu_backend/mod.rs`
-- `shaders/forward.wgsl` (new)
-- Update pipeline creation for WGSL
-
----
-
-### Task 1.2: DirectX Push Constants (~2-3 hours)
-
-**Goal:** Implement root constants for transforms
+**Goal:** Fix DirectX rendering to match Vulkan output
 
 **Steps:**
-1. Update root signature
-   - Add D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS
-   - 32 x 32-bit values (128 bytes)
-   - Vertex shader visibility
+1. Implement depth testing
+   - Create depth/stencil buffer
+   - Configure depth state in pipeline
+   - Clear depth buffer each frame
 
-2. Implement push_constants()
-   - Convert bytes to u32 array
-   - Call SetGraphicsRoot32BitConstants()
-   - Store root parameter index
+2. Fix backface culling
+   - Verify cull mode settings
+   - Check winding order consistency
+   - Test with textured cube
 
-3. Create HLSL shaders
-   - Port forward.vert to HLSL
-   - Port forward.frag to HLSL
-   - Compile to bytecode
-
-4. Test on Windows or via Proton
+3. Add texture support
+   - Implement descriptor tables
+   - Upload textures to GPU
+   - Bind textures in render pass
 
 **Acceptance Criteria:**
-- [ ] DirectX backend compiles on Windows
-- [ ] Root constants implemented
-- [ ] HLSL shaders working
-- [ ] Renders correctly on Windows (or Proton)
+- [ ] DirectX renders identical to Vulkan
+- [ ] Depth testing working
+- [ ] Backface culling correct
+- [ ] Textures display properly
 
 **Files to Modify:**
 - `src/backends/directx/dx12_impl.rs`

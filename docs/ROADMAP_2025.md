@@ -14,8 +14,7 @@ After successfully implementing the render graph foundation and achieving a work
 - ✅ Render Graph: Automatic resource management and scheduling
 - ✅ Scene System: TOML-based scene definitions with transforms
 - ✅ Push Constants: Per-object transforms working
-- ❌ wgpu: Needs push constant emulation (~2 hours)
-- ❌ DirectX: Needs root constants implementation (~2 hours)
+- ✅ DirectX: Functional with lighting (some rendering issues remain)
 
 ---
 
@@ -39,7 +38,7 @@ The goal is to create an **interactive rendering laboratory** where developers c
    - Support rasterization, ray tracing, hybrid approaches
    - Easy to add new rendering techniques
    - Automatic shader compilation and hot-reload
-   - Multi-backend support (Vulkan, wgpu, DirectX)
+   - Multi-backend support (Vulkan, DirectX)
 
 ---
 
@@ -49,11 +48,11 @@ The goal is to create an **interactive rendering laboratory** where developers c
 
 **What We Built:**
 - Render graph architecture with automatic resource management
-- Three backend implementations (Vulkan, wgpu, DirectX)
+- Two backend implementations (Vulkan, DirectX)
 - Forward renderer with Blinn-Phong lighting
 - Scene system with transforms and lighting
 - Per-frame descriptor sets (proper synchronization)
-- Push constants for transforms (Vulkan)
+- Push constants for transforms
 - Headless rendering and screenshot capture
 - Visual testing infrastructure (FLIP)
 
@@ -65,29 +64,24 @@ The goal is to create an **interactive rendering laboratory** where developers c
 
 ---
 
-### Phase 2: Multi-Backend Completion (Nov 2025)
+### Phase 2: Backend Parity (Nov 2025)
 **Duration:** 1 week  
 **Priority:** High
 
 #### Goals
-1. **Complete wgpu Backend** (~2 hours)
-   - Implement push constant emulation via dynamic uniforms
-   - Create WGSL shader variants
-   - Test on Linux, macOS, Windows
+1. **Fix DirectX Rendering** (~2-3 hours)
+   - Implement depth testing
+   - Fix backface culling
+   - Add texture support
+   - Ensure identical output to Vulkan
 
-2. **Complete DirectX Backend** (~2 hours)
-   - Implement root constants
-   - Create HLSL shader variants
-   - Test on Windows (via Proton on Linux is OK)
-
-3. **Shader Pipeline** (~3-4 hours)
+2. **Shader Pipeline** (~3-4 hours)
    - HLSL as ground truth
-   - Auto-convert to WGSL for wgpu
    - Compile to SPIR-V for Vulkan
    - Shader hot-reload support
 
 #### Success Criteria
-- All three backends render identical output
+- Both backends render identical output
 - Shader changes work across all backends
 - Cross-platform testing confirmed
 
@@ -353,10 +347,11 @@ Users can:
 
 ## Short-Term Plan (Next 4 Weeks)
 
-### Week 1: Complete Multi-Backend Support
-- [ ] Implement wgpu push constants
-- [ ] Implement DirectX root constants
-- [ ] Create HLSL shaders
+### Week 1: Complete Backend Parity
+- [x] Implement DirectX root constants
+- [x] Create HLSL shaders
+- [ ] Fix DirectX depth testing
+- [ ] Fix DirectX backface culling
 - [ ] Set up shader conversion pipeline
 - [ ] Cross-platform testing
 
@@ -404,9 +399,8 @@ cargo test --lib
    - Cross-backend comparison
 
 3. **Cross-Platform Matrix**
-   - Linux (Vulkan, wgpu)
-   - Windows (DirectX, Vulkan, wgpu)
-   - macOS (wgpu/Metal)
+   - Linux (Vulkan)
+   - Windows (DirectX, Vulkan)
 
 ---
 

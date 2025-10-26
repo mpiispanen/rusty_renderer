@@ -11,7 +11,7 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 ## Core Principles
 
 1. **Experimentation First**: Easy to test new rendering algorithms and techniques
-2. **Multi-Backend Support**: First-class support for Vulkan and DirectX, with wgpu for broader compatibility
+2. **Multi-Backend Support**: First-class support for Vulkan and DirectX 12
 3. **Interactive Development**: Live scene exploration, runtime shader compilation, debug visualization
 4. **Render Graph Architecture**: Automatic dependency resolution and resource management
 5. **Developer-Friendly**: Comprehensive debugging tools, profiling views, and hot-reloading
@@ -32,7 +32,7 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ✅ Repository setup with CI/CD pipeline
 - ✅ Project structure with proper module organization
 - ✅ Backend abstraction layer with trait definitions
-- ✅ Three backend implementations: Vulkan (complete), wgpu (partial), DirectX 12 (partial)
+- ✅ Two backend implementations: Vulkan (complete), DirectX 12 (functional)
 - ✅ Command-line argument parsing for backend selection
 - ✅ Validation layer support (zero errors on Vulkan)
 - ✅ Render graph architecture with automatic dependency resolution
@@ -68,7 +68,6 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ❌ **Hardcoded shaders**: Embedded HLSL triangle shader as fallback
 - ❌ **Hardcoded vertex data**: Old triangle passes still exist
 - ❌ **Pipeline state hardcoded**: Not driven by templates
-- ❌ **wgpu: Broken** (bind group validation errors - deferred)
 
 **Architecture Goals (See `ARCHITECTURE_CLEANUP_ROADMAP.md`):**
 1. **Phase 1: Backend Parity** - Vulkan/DirectX identical output
@@ -84,7 +83,7 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - See `ARCHITECTURE_CLEANUP_ROADMAP.md` for complete plan
 
 ### Coordinate System Handling
-All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while wgpu and DirectX require Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
+All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while DirectX requires Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
 
 ## Architecture Overview
 
@@ -99,7 +98,6 @@ All backends now properly handle coordinate system differences. Vulkan uses stan
     - **mod.rs** - Backend trait definitions
     - **vulkan.rs** - Vulkan implementation (vulkanalia)
     - **directx.rs** - DirectX 12 implementation
-    - **wgpu.rs** - wgpu implementation
   - **render_graph/** - Render graph system
     - **mod.rs** - Core render graph
     - **pass.rs** - Render pass abstraction
@@ -128,7 +126,7 @@ All backends now properly handle coordinate system differences. Vulkan uses stan
 
 #### 1. Backend Abstraction Layer
 
-**Design Goal**: Provide a unified trait-based interface that abstracts over Vulkan, DirectX 12, and wgpu.
+**Design Goal**: Provide a unified trait-based interface that abstracts over Vulkan and DirectX 12.
 
 **Key Traits**:
 - `GraphicsBackend`: Main backend interface
@@ -139,7 +137,7 @@ All backends now properly handle coordinate system differences. Vulkan uses stan
 - `Swapchain`: Presentation surface management
 
 **Implementation Strategy**:
-- Vulkan (primary) → DirectX 12 → wgpu
+- Vulkan (primary) → DirectX 12
 - Each backend as a module within the same crate
 - Shared validation and error handling
 - Backend-specific optimizations isolated within implementations

@@ -152,7 +152,7 @@ Usage: rusty_renderer [OPTIONS]
 Options:
   -s, --scene <SCENE>          Scene file to render (required, or use --list-scenes)
   -p, --pipeline <PIPELINE>    Rendering pipeline [default: simple] [possible values: simple, forward]
-  -b, --backend <BACKEND>      Graphics backend [default: vulkan] [possible values: vulkan, wgpu, directx]
+  -b, --backend <BACKEND>      Graphics backend [default: vulkan] [possible values: vulkan, directx]
       --headless               Run in headless mode (no window)
       --width <WIDTH>          Window/render width [default: 800]
       --height <HEIGHT>        Window/render height [default: 600]
@@ -173,7 +173,7 @@ cargo run --release -- --list-pipelines
 
 # Basic rendering
 cargo run --release -- --scene scenes/triangle.toml
-cargo run --release -- --scene scenes/quad.toml --backend wgpu
+cargo run --release -- --scene scenes/cube.toml --backend vulkan
 
 # Headless mode for CI/testing
 cargo run --release -- --scene scenes/triangle.toml --headless --screenshot test.png
@@ -211,7 +211,7 @@ Visual tests compare rendering outputs across backends using perceptual metrics:
 cargo test --test visual_tests -- --ignored --nocapture
 
 # Test specific backend comparison
-cargo test --test visual_tests test_vulkan_vs_wgpu -- --ignored --nocapture
+cargo test --test visual_tests test_vulkan_vs_directx -- --ignored --nocapture
 
 # FLIP perceptual comparison tests
 cargo test --test visual_tests flip -- --ignored --nocapture
@@ -296,22 +296,18 @@ rusty_renderer/
 ## Milestones
 
 - [x] **M1: Project Foundation** - Basic structure, CLI, CI/CD
-- [ ] **M2: Backend Abstraction** - Stub implementations for all backends
-- [ ] **M3: Vulkan Triangle** - First graphics output
-- [ ] **M4: Multi-Backend Triangle** - DirectX and wgpu support
-- [ ] **M5: Render Graph** - Advanced rendering pipeline
+- [x] **M2: Backend Abstraction** - Stub implementations for backends
+- [x] **M3: Vulkan Triangle** - First graphics output
+- [x] **M4: Multi-Backend Triangle** - DirectX support
+- [x] **M5: Render Graph** - Advanced rendering pipeline
 
 See [docs/MILESTONES.md](docs/MILESTONES.md) for detailed milestone plans.
 
 ## Acknowledgments
 
-- [x] **M1: Project Foundation** - Basic structure, CLI, CI/CD
-- [ ] **M2: Backend Abstraction** - Stub implementations for all backends
-- [ ] **M3: Vulkan Triangle** - First graphics output
-- [ ] **M4: Multi-Backend Triangle** - DirectX and wgpu support
-- [ ] **M5: Render Graph** - Advanced rendering pipeline
-
-See [docs/MILESTONES.md](docs/MILESTONES.md) for detailed milestone plans.
+- Built as a learning project for Rust and modern graphics programming
+- Inspired by production renderers like Frostbite, Unreal Engine, and Unity
+- Developed with AI assistance for accelerated learning
 
 ## License
 

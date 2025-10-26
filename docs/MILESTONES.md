@@ -23,9 +23,8 @@ See [GITHUB_SETUP.md](GITHUB_SETUP.md) for detailed instructions on creating the
 1. Define core backend traits
 2. Create Vulkan backend stub
 3. Create DirectX backend stub
-4. Create wgpu backend stub
-5. Implement backend selection logic
-6. Add backend trait unit tests
+4. Implement backend selection logic
+5. Add backend trait unit tests
 
 ---
 
@@ -43,14 +42,13 @@ See [GITHUB_SETUP.md](GITHUB_SETUP.md) for detailed instructions on creating the
 ---
 
 ## Milestone 4: Multi-Backend Triangle (7-10 days)
-**Goal:** Implement DirectX and wgpu backends for triangle rendering
+**Goal:** Implement DirectX backend for triangle rendering
 
 **Issues:**
 1. Implement DirectX 12 backend
 2. Test DirectX on Linux via Proton
-3. Implement wgpu backend
-4. Validate backend abstraction
-5. Add cross-backend tests
+3. Validate backend abstraction
+4. Add cross-backend tests
 
 ---
 
