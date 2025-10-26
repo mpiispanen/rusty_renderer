@@ -17,7 +17,6 @@ This directory contains all design documents, planning materials, and technical 
 ### For Active Development
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) - Concrete tasks (next 8 weeks)
 - [WORKFLOW.md](WORKFLOW.md) - Best practices and debugging
-- [wgpu_push_constants.md](wgpu_push_constants.md) - wgpu implementation guide
 
 ### For Understanding Current State
 - [../LIGHTING_WORKING.md](../LIGHTING_WORKING.md) - Latest achievement
@@ -68,14 +67,6 @@ This directory contains all design documents, planning materials, and technical 
 - Code style guidelines
 - PR process
 - **Read this:** Before submitting a PR
-
-### Implementation Guides
-
-**[wgpu_push_constants.md](wgpu_push_constants.md)**
-- Complete guide for implementing wgpu push constants
-- Dynamic uniform buffer approach
-- WGSL shader requirements
-- **Read this:** When implementing wgpu backend
 
 ### Status Documents (Root Directory)
 
@@ -177,7 +168,7 @@ A: `cargo test --lib` for unit tests, see [WORKFLOW.md](WORKFLOW.md) for complet
 
 - [GitHub Repository](https://github.com/mpiispanen/rusty_renderer)
 - [Vulkan Specification](https://www.khronos.org/registry/vulkan/specs/1.3/)
-- [wgpu Documentation](https://wgpu.rs/)
+- [DirectX 12 Documentation](https://docs.microsoft.com/en-us/windows/win32/direct3d12/)
 - [GLSL Specification](https://www.khronos.org/registry/OpenGL/specs/gl/GLSLangSpec.4.60.pdf)
 
 ---
