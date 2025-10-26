@@ -7,7 +7,7 @@ Shutdown complete
  called
 Backend type: DirectX12, headless: false
 Entering windowed mode branch
-Event loop created, max_frames: 10
+Event loop created, max_frames: 5
 About to call run_app
 WindowedApp::resumed called
 Window is none: true
@@ -22,6 +22,7 @@ DirectX calling create_device
 DirectX calling create_command_queue
 DirectX calling create_swap_chain
 DirectX calling create_render_targets
+DirectX calling create_depth_stencil
 DirectX calling create_command_objects
 DirectX calling create_fence
 DirectX calling create_pipeline
@@ -71,14 +72,9 @@ Render graph built successfully
 Graph compiled successfully
 Requesting initial redraw
 Window setup complete, redraw requested
-RedrawRequested: frame_count=0, max_frames=10
-RedrawRequested: frame_count=1, max_frames=10
-RedrawRequested: frame_count=2, max_frames=10
-RedrawRequested: frame_count=3, max_frames=10
-RedrawRequested: frame_count=4, max_frames=10
-RedrawRequested: frame_count=5, max_frames=10
-RedrawRequested: frame_count=6, max_frames=10
-RedrawRequested: frame_count=7, max_frames=10
-RedrawRequested: frame_count=8, max_frames=10
-RedrawRequested: frame_count=9, max_frames=10
+RedrawRequested: frame_count=0, max_frames=5
+RedrawRequested: frame_count=1, max_frames=5
+RedrawRequested: frame_count=2, max_frames=5
+RedrawRequested: frame_count=3, max_frames=5
+RedrawRequested: frame_count=4, max_frames=5
 run_app returned
