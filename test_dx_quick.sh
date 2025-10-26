@@ -1,5 +1,5 @@
 #!/bin/bash
-# Quick DirectX test script
+# Quick DirectX test script - runs headless mode by default
 
 echo "Building DirectX backend..."
 BACKEND=directx cargo build --release --target x86_64-pc-windows-gnu -q
@@ -12,5 +12,5 @@ fi
 echo "Copying binary..."
 cp target/x86_64-pc-windows-gnu/release/rusty_renderer.exe windows_test_directx/
 
-echo "Running with Proton..."
-./run_with_proton.sh --max-frames 3 "$@"
+echo "Running with Proton (headless mode)..."
+./run_with_proton.sh --max-frames 3 --headless --scene scenes/gltf_textured.toml --pipeline forward "$@"
