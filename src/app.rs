@@ -48,7 +48,6 @@ impl App {
             Backend::Vulkan => BackendType::Vulkan,
             #[cfg(target_os = "windows")]
             Backend::DirectX => BackendType::DirectX12,
-            Backend::Wgpu => BackendType::Wgpu,
         };
 
         let mut backend = backends::create_backend(backend_type, config.debug)

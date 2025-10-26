@@ -165,13 +165,6 @@ impl PassCallback for ForwardPassCallback {
             }
         }
 
-        // Check if this is wgpu backend - if so, store push constant data
-        use crate::backends::wgpu_backend::WgpuPrepContext;
-        if let Some(wgpu_ctx) = context.as_any_mut().downcast_mut::<WgpuPrepContext>() {
-            wgpu_ctx.push_constant_data.copy_from_slice(&push_data);
-            log::info!("Stored push constant data in wgpu prep context");
-        }
-
         log::info!("Forward pass preparation complete");
     }
 

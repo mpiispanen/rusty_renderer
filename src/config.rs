@@ -12,8 +12,6 @@ pub enum Backend {
     /// DirectX 12 backend (Windows only)
     #[cfg(target_os = "windows")]
     DirectX,
-    /// wgpu backend (cross-platform)
-    Wgpu,
 }
 
 impl std::fmt::Display for Backend {
@@ -22,7 +20,6 @@ impl std::fmt::Display for Backend {
             Backend::Vulkan => write!(f, "Vulkan"),
             #[cfg(target_os = "windows")]
             Backend::DirectX => write!(f, "DirectX 12"),
-            Backend::Wgpu => write!(f, "wgpu"),
         }
     }
 }
@@ -99,8 +96,8 @@ impl Config {
         // Warn about platform-specific backend issues
         #[cfg(not(target_os = "windows"))]
         {
-            if matches!(self.backend, Backend::Vulkan | Backend::Wgpu) {
-                // Valid backends on non-Windows platforms
+            if matches!(self.backend, Backend::Vulkan) {
+                // Valid backend on non-Windows platforms
             }
         }
 

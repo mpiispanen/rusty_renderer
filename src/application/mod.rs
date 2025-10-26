@@ -96,7 +96,6 @@ impl ApplicationArgs {
             match backend.to_lowercase().as_str() {
                 "vulkan" | "vk" => BackendType::Vulkan,
                 "directx" | "dx12" | "directx12" => BackendType::DirectX12,
-                "wgpu" => BackendType::Wgpu,
                 _ => {
                     log::warn!("Unknown backend '{backend}', defaulting to Vulkan");
                     BackendType::Vulkan

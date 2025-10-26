@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/mpiispanen/rusty_renderer/actions/workflows/ci.yml/badge.svg)](https://github.com/mpiispanen/rusty_renderer/actions/workflows/ci.yml)
 
-A multi-backend 3D renderer in Rust supporting Vulkan, DirectX 12, and wgpu.
+A multi-backend 3D renderer in Rust supporting Vulkan and DirectX 12.
 
 This is a cross-platform graphics rendering sandbox developed in Rust to aid learning Rust and AI-driven development.
 
@@ -31,11 +31,11 @@ You should see a colorful RGB triangle! Press Escape to exit windowed mode. 🎨
 
 ## Features
 
-- **Multi-backend support**: Vulkan (via vulkanalia), DirectX 12 (Windows), and wgpu
+- **Multi-backend support**: Vulkan (via vulkanalia) and DirectX 12 (Windows)
 - **Scene-driven rendering**: TOML-based scene files with geometry, cameras, and lighting
 - **Dual-mode operation**: Windowed (interactive) and headless (CI/testing) modes
 - **Render graph system**: Automatic dependency management and execution
-- **Cross-platform**: Linux, Windows, and macOS support
+- **Cross-platform**: Linux and Windows support
 - **Well-tested**: Comprehensive unit and integration tests (122+ tests)
 - **CI/CD**: Automated builds, tests, and GPU validation
 - **Validation layers**: Debug mode with validation on all backends (see [docs/VALIDATION_LAYERS.md](docs/VALIDATION_LAYERS.md))
@@ -47,8 +47,7 @@ You should see a colorful RGB triangle! Press Escape to exit windowed mode. 🎨
 - Rust 1.70+ (install from [rustup.rs](https://rustup.rs))
 - Platform-specific graphics drivers:
   - **Linux**: Vulkan drivers (usually included with GPU drivers)
-  - **Windows**: DirectX 12 compatible GPU
-  - **All platforms**: wgpu fallback available
+  - **Windows**: DirectX 12 compatible GPU or Vulkan drivers
 
 ### Build Instructions
 
@@ -73,7 +72,6 @@ cargo run --release -- --scene scenes/triangle.toml
 cargo run --release -- --scene scenes/triangle.toml --headless --screenshot output.png
 
 # Try different backends
-cargo run --release -- --scene scenes/triangle.toml --backend wgpu
 cargo run --release -- --scene scenes/triangle.toml --backend vulkan
 cargo run --release -- --scene scenes/triangle.toml --backend directx  # Windows only
 

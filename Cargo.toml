@@ -3,11 +3,11 @@ name = "rusty_renderer"
 version = "0.1.0"
 edition = "2021"
 authors = ["Matias Piispanen <matias.piispanen@gmail.com>"]
-description = "A multi-backend 3D renderer supporting Vulkan, DirectX 12, and wgpu"
+description = "A multi-backend 3D renderer supporting Vulkan and DirectX 12"
 repository = "https://github.com/mpiispanen/rusty_renderer"
 license = "MIT"
 readme = "README.md"
-keywords = ["graphics", "rendering", "vulkan", "directx", "wgpu"]
+keywords = ["graphics", "rendering", "vulkan", "directx"]
 categories = ["graphics", "rendering"]
 
 [dependencies]
@@ -38,16 +38,16 @@ toml = "0.8"
 # JSON parsing for FLIP Python API
 serde_json = "1.0"
 
-# Vulkan bindings (M3)
+# Vulkan bindings
 vulkanalia = { version = "0.31", features = ["libloading", "window"] }
 
-# wgpu for cross-platform rendering (M4)
-wgpu = "23.0"
-pollster = "0.3"  # For blocking on async operations
+# Math library
 glam = { version = "0.30.8", features = ["bytemuck"] }
+
+# glTF loading
 gltf = { version = "1.4.1", features = ["utils"] }
 
-# DirectX 12 bindings (M4, Windows only)
+# DirectX 12 bindings (Windows only)
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.58", features = [
     "Win32_Foundation",

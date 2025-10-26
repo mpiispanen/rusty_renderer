@@ -1,7 +1,7 @@
 //! Graphics backend abstraction layer
 //!
 //! This module provides a common interface for different graphics APIs
-//! (Vulkan, DirectX 12, and wgpu), allowing the renderer to work with
+//! (Vulkan and DirectX 12), allowing the renderer to work with
 //! any supported backend through a unified trait-based API.
 //!
 //! # Architecture
@@ -67,7 +67,6 @@ pub use binding::{
 // Backend module declarations (implementations in M2+)
 pub mod directx;
 pub mod vulkan;
-pub mod wgpu_backend;
 
 /// Supported graphics backend types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -76,8 +75,6 @@ pub enum BackendType {
     Vulkan,
     /// DirectX 12 backend (Windows, Proton testing)
     DirectX12,
-    /// wgpu backend (portability layer)
-    Wgpu,
 }
 
 impl BackendType {
@@ -86,7 +83,6 @@ impl BackendType {
         match self {
             BackendType::Vulkan => "vulkan",
             BackendType::DirectX12 => "directx12",
-            BackendType::Wgpu => "wgpu",
         }
     }
 }
@@ -448,7 +444,6 @@ pub fn create_backend(
     match backend_type {
         BackendType::Vulkan => Ok(Box::new(vulkan::VulkanBackend::new(enable_validation)?)),
         BackendType::DirectX12 => Ok(Box::new(directx::DirectXBackend::new(enable_validation)?)),
-        BackendType::Wgpu => Ok(Box::new(wgpu_backend::WgpuBackend::new(enable_validation)?)),
     }
 }
 
@@ -460,22 +455,18 @@ mod tests {
     fn test_backend_type_equality() {
         assert_eq!(BackendType::Vulkan, BackendType::Vulkan);
         assert_ne!(BackendType::Vulkan, BackendType::DirectX12);
-        assert_ne!(BackendType::Vulkan, BackendType::Wgpu);
-        assert_ne!(BackendType::DirectX12, BackendType::Wgpu);
     }
 
     #[test]
     fn test_backend_type_display() {
         assert_eq!(BackendType::Vulkan.to_string(), "vulkan");
         assert_eq!(BackendType::DirectX12.to_string(), "directx12");
-        assert_eq!(BackendType::Wgpu.to_string(), "wgpu");
     }
 
     #[test]
     fn test_backend_type_as_str() {
         assert_eq!(BackendType::Vulkan.as_str(), "vulkan");
         assert_eq!(BackendType::DirectX12.as_str(), "directx12");
-        assert_eq!(BackendType::Wgpu.as_str(), "wgpu");
     }
 
     #[test]
@@ -484,21 +475,17 @@ mod tests {
         let mut set = HashSet::new();
         set.insert(BackendType::Vulkan);
         set.insert(BackendType::DirectX12);
-        set.insert(BackendType::Wgpu);
-        assert_eq!(set.len(), 3);
+        assert_eq!(set.len(), 2);
     }
 
     #[test]
     fn test_backend_creation() {
-        // All backends should be creatable (even if stubs)
+        // All backends should be creatable
         let vulkan = create_backend(BackendType::Vulkan, false);
         assert!(vulkan.is_ok(), "Failed to create Vulkan backend");
 
         let directx = create_backend(BackendType::DirectX12, false);
         assert!(directx.is_ok(), "Failed to create DirectX backend");
-
-        let wgpu = create_backend(BackendType::Wgpu, false);
-        assert!(wgpu.is_ok(), "Failed to create wgpu backend");
     }
 
     #[test]
@@ -508,8 +495,5 @@ mod tests {
 
         let directx = create_backend(BackendType::DirectX12, false).unwrap();
         assert_eq!(directx.backend_type(), BackendType::DirectX12);
-
-        let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
-        assert_eq!(wgpu.backend_type(), BackendType::Wgpu);
     }
 }
