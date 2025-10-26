@@ -573,17 +573,35 @@ impl ApplicationHandler for WindowedApp {
                 if let (Some(backend), Some(graph), Some(compiled)) = 
                     (&mut self.backend, &self.graph, &self.compiled) {
                     
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "About to begin_frame");
+                    }
                     if let Err(e) = backend.begin_frame() {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                            let _ = writeln!(f, "Failed to begin frame: {e}");
+                        }
                         log::error!("Failed to begin frame: {e}");
                         return;
                     }
 
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "About to execute_graph");
+                    }
                     if let Err(e) = backend.execute_graph(graph, compiled) {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                            let _ = writeln!(f, "Failed to execute render graph: {e}");
+                        }
                         log::error!("Failed to execute render graph: {e}");
                         return;
                     }
 
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "About to end_frame");
+                    }
                     if let Err(e) = backend.end_frame() {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                            let _ = writeln!(f, "Failed to end frame: {e}");
+                        }
                         log::error!("Failed to end frame: {e}");
                         return;
                     }

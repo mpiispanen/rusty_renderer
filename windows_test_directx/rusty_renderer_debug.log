@@ -6,6 +6,15 @@ Running application
 Shutdown complete
  called
 Backend type: DirectX12, headless: true
+Shader compilation SUCCESS for VSMain (vs_5_0)
+Shader compilation SUCCESS for PSMain (ps_5_0)
+ForwardPipeline::build_graph ENTERED for scene 'Textured GLTF Cube'
+About to create camera uniform buffer
+Camera view_proj matrix:
+  row0: [-1.5066, -0.6496, -0.4856, -0.4851]
+  row1: [0.0000, 2.1112, -0.4856, -0.4851]
+  row2: [1.0044, -0.9744, -0.7283, -0.7276]
+  row3: [-0.0000, 0.0000, 4.0271, 4.1231]
 create_buffer called: 64 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
 Checking if device is initialized: true
 Device is initialized, creating buffer
@@ -14,6 +23,7 @@ CreateCommittedResource returned: Ok(())
 Resource is_some: true
 Checking if resource is Some before context
 Buffer created successfully!
+Camera uniform buffer created
 create_buffer called: 400 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
 Checking if device is initialized: true
 Device is initialized, creating buffer
@@ -46,3 +56,24 @@ CreateCommittedResource returned: Ok(())
 Resource is_some: true
 Checking if resource is Some before context
 Buffer created successfully!
+Push constants: 32 DWORDs (128 bytes) at offset 0
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102400000, size=64
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102410000, size=400
+Binding uniform: set=0, binding=3, root_param=3, gpu_addr=0xffff800102440000, size=32
+bind_texture called: set=0, binding=2
+Binding texture with GPU handle
+DirectX Draw: 36 vertices, 1 instances
+Push constants: 32 DWORDs (128 bytes) at offset 0
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102400000, size=64
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102410000, size=400
+Binding uniform: set=0, binding=3, root_param=3, gpu_addr=0xffff800102440000, size=32
+bind_texture called: set=0, binding=2
+Binding texture with GPU handle
+DirectX Draw: 36 vertices, 1 instances
+Push constants: 32 DWORDs (128 bytes) at offset 0
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102400000, size=64
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102410000, size=400
+Binding uniform: set=0, binding=3, root_param=3, gpu_addr=0xffff800102440000, size=32
+bind_texture called: set=0, binding=2
+Binding texture with GPU handle
+DirectX Draw: 36 vertices, 1 instances

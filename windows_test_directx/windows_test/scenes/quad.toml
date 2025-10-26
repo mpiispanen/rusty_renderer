@@ -1,0 +1,30 @@
+# Colored Quad Scene
+#
+# This scene demonstrates a quad (two triangles) with indexed geometry.
+
+[metadata]
+name = "Colored Quad"
+description = "Square quad with vertex colors"
+author = "Rusty Renderer"
+
+# Quad object with indexed geometry
+[[objects]]
+type = "mesh"
+name = "quad"
+
+[objects.geometry]
+source = "inline"
+vertices = [
+    { position = [-0.5, -0.5, 0.0], color = [1.0, 0.0, 0.0] },  # Bottom-left: Red
+    { position = [0.5, -0.5, 0.0], color = [0.0, 1.0, 0.0] },   # Bottom-right: Green
+    { position = [0.5, 0.5, 0.0], color = [0.0, 0.0, 1.0] },    # Top-right: Blue
+    { position = [-0.5, 0.5, 0.0], color = [1.0, 1.0, 0.0] },   # Top-left: Yellow
+]
+indices = [0, 1, 2, 2, 3, 0]  # Two triangles
+
+# Camera
+[camera]
+type = "perspective"
+position = [0.0, 0.0, 3.0]
+target = [0.0, 0.0, 0.0]
+fov = 45.0

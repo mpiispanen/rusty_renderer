@@ -18,6 +18,7 @@ use crate::passes::ForwardPass;
 use crate::render_graph::{
     Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
+use std::io::Write;
 use crate::resources::TextureLoader;
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
@@ -279,6 +280,11 @@ impl RenderPipeline for ForwardPipeline {
         backend: &mut dyn crate::backends::GraphicsBackend,
     ) -> Result<RenderGraph> {
         log::debug!("Building forward render graph for scene: {}", scene.metadata.name);
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "ForwardPipeline::build_graph ENTERED for scene '{}'", scene.metadata.name);
+            let _ = f.flush();
+        }
 
         let mut graph = RenderGraph::new();
 
@@ -293,9 +299,22 @@ impl RenderPipeline for ForwardPipeline {
         self.camera = Some(camera);
 
         // Create camera uniform buffer
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "About to create camera uniform buffer");
+            let _ = writeln!(f, "Camera view_proj matrix:");
+            for (i, row) in camera_uniforms.view_proj.iter().enumerate() {
+                let _ = writeln!(f, "  row{}: [{:.4}, {:.4}, {:.4}, {:.4}]", i, row[0], row[1], row[2], row[3]);
+            }
+            let _ = f.flush();
+        }
         let camera_buffer = Self::create_camera_buffer(backend, &camera_uniforms, "camera_uniforms")
             .context("Failed to create camera uniform buffer")?;
         let camera_buffer = Arc::new(camera_buffer);
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Camera uniform buffer created");
+            let _ = f.flush();
+        }
 
         log::info!("Created camera uniform buffer");
 

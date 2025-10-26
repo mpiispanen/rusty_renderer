@@ -14,41 +14,8 @@ use windows::{
 };
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
-// HLSL shader source code - matches triangle.hlsl
-const HLSL_SHADER_SOURCE: &str = r#"
-struct VSOutput {
-    float4 position : SV_POSITION;
-    float3 color : COLOR0;
-};
-
-VSOutput VSMain(uint vertexID : SV_VertexID) {
-    VSOutput output;
-    
-    // Hardcoded triangle vertices (NDC coordinates)
-    // DirectX uses Y-down, so we flip Y coordinates from Vulkan's Y-up
-    float2 positions[3] = {
-        float2(0.0, 0.5),    // Bottom center (flipped from -0.5)
-        float2(0.5, -0.5),   // Top right (flipped from 0.5)
-        float2(-0.5, -0.5)   // Top left (flipped from 0.5)
-    };
-    
-    // Hardcoded vertex colors
-    float3 colors[3] = {
-        float3(1.0, 0.0, 0.0),  // Red - bottom center (vertex 0)
-        float3(0.0, 1.0, 0.0),  // Green - top right (vertex 1)
-        float3(0.0, 0.0, 1.0)   // Blue - top left (vertex 2)
-    };
-    
-    output.position = float4(positions[vertexID], 0.0, 1.0);
-    output.color = colors[vertexID];
-    
-    return output;
-}
-
-float4 PSMain(VSOutput input) : SV_TARGET {
-    return float4(input.color, 1.0);
-}
-"#;
+// HLSL shader source code - embedded forward rendering shader
+const HLSL_SHADER_SOURCE: &str = include_str!("../../../shaders/hlsl/forward.hlsl");
 
 /// DirectX 12 backend implementation
 pub struct DirectXBackendImpl {
@@ -880,21 +847,12 @@ impl DirectXBackendImpl {
     fn load_shader_source(&self) -> Result<String> {
         // Try to load forward.hlsl (full forward rendering with textures)
         if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward.hlsl") {
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                let _ = writeln!(f, "Loaded forward.hlsl shader (with textures)");
-            }
             log::info!("Loaded forward.hlsl shader (with textures)");
             Ok(source)
         } else if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward_simple.hlsl") {
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                let _ = writeln!(f, "Loaded forward_simple.hlsl shader (no textures)");
-            }
             log::info!("Loaded forward_simple.hlsl shader (no textures)");
             Ok(source)
         } else {
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                let _ = writeln!(f, "Could not load forward shaders, using embedded triangle shader");
-            }
             log::warn!("Could not load forward shaders, using embedded triangle shader");
             Ok(HLSL_SHADER_SOURCE.to_string())
         }

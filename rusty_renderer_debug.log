@@ -1,8 +1,0 @@
-Starting Rusty Renderer v0.1.0
-Initializing logging
-Parsing arguments
-Arguments parsed successfully
-Running application
-Shutdown complete
- called
-Backend type: Vulkan, headless: true

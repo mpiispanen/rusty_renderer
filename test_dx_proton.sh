@@ -23,8 +23,9 @@ echo "Running gltf_viewer with DirectX backend..."
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 STEAM_COMPAT_DATA_PATH="$COMPAT_DATA" \
 VKD3D_DEBUG="warn" \
-RUST_LOG="info" \
-"$PROTON_DIR/proton" run gltf_viewer.exe directx scenes/gltf_textured.toml
+RUST_LOG="debug" \
+WINEDEBUG=-all \
+"$PROTON_DIR/proton" run gltf_viewer.exe --backend directx --pipeline forward --scene scenes/gltf_textured.toml
 
 EXIT_CODE=$?
 

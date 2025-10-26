@@ -1,0 +1,97 @@
+# Lit Cube Scene
+# 
+# A simple cube with normals, lit by directional and point lights.
+# Demonstrates forward rendering with lighting.
+
+[metadata]
+name = "Lit Cube"
+description = "3D cube with forward rendering and lighting"
+author = "Rusty Renderer"
+
+# Cube object with normals
+# Simple cube with 6 faces (2 triangles per face = 36 vertices)
+[[objects]]
+type = "mesh"
+name = "cube"
+
+[objects.geometry]
+source = "inline"
+
+# Cube vertices with normals (positions in world space)
+vertices = [
+    # Front face (facing +Z, normal = [0, 0, 1])
+    { position = [-0.5, -0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5,  0.5], normal = [0.0, 0.0, 1.0], color = [0.8, 0.8, 0.8] },
+    
+    # Back face (facing -Z, normal = [0, 0, -1])
+    { position = [ 0.5, -0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5, -0.5], normal = [0.0, 0.0, -1.0], color = [0.8, 0.8, 0.8] },
+    
+    # Top face (facing +Y, normal = [0, 1, 0])
+    { position = [-0.5,  0.5,  0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5,  0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5, -0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5,  0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5, -0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5, -0.5], normal = [0.0, 1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    
+    # Bottom face (facing -Y, normal = [0, -1, 0])
+    { position = [-0.5, -0.5, -0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5, -0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5,  0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5, -0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5,  0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5,  0.5], normal = [0.0, -1.0, 0.0], color = [0.8, 0.8, 0.8] },
+    
+    # Right face (facing +X, normal = [1, 0, 0])
+    { position = [ 0.5, -0.5,  0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5, -0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5, -0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5, -0.5,  0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5, -0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [ 0.5,  0.5,  0.5], normal = [1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    
+    # Left face (facing -X, normal = [-1, 0, 0])
+    { position = [-0.5, -0.5, -0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5,  0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5,  0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5, -0.5, -0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5,  0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+    { position = [-0.5,  0.5, -0.5], normal = [-1.0, 0.0, 0.0], color = [0.8, 0.8, 0.8] },
+]
+
+# Camera positioned to view the cube
+[camera]
+type = "perspective"
+position = [2.0, 2.0, 3.0]
+target = [0.0, 0.0, 0.0]
+up = [0.0, 1.0, 0.0]
+fov = 60.0
+near = 0.1
+far = 100.0
+
+# Lighting configuration
+[lighting]
+ambient = [0.2, 0.2, 0.2]  # Ambient light (dark gray)
+
+# Main directional light (sun-like, from above-right)
+[[lighting.lights]]
+type = "directional"
+direction = [-0.3, -1.0, -0.5]
+color = [1.0, 1.0, 1.0]
+intensity = 0.8
+
+# Point light (colored, near the cube)
+[[lighting.lights]]
+type = "point"
+position = [1.5, 1.0, 2.0]
+color = [1.0, 0.7, 0.3]  # Warm orange
+intensity = 1.2

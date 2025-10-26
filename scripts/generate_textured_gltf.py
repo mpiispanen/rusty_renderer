@@ -38,53 +38,53 @@ def create_textured_cube_gltf():
     uvs = []
     indices = []
     
-    # Front face (Z+)
+    # Front face (Z+) - counter-clockwise when viewed from outside
     vertices.extend([
         [-0.5, -0.5,  0.5], [ 0.5, -0.5,  0.5], [ 0.5,  0.5,  0.5], [-0.5,  0.5,  0.5],
     ])
     normals.extend([[0.0, 0.0, 1.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([0, 1, 2, 0, 2, 3])
+    indices.extend([0, 2, 1, 0, 3, 2])  # Reversed winding
     
-    # Back face (Z-)
+    # Back face (Z-) - counter-clockwise when viewed from outside
     vertices.extend([
         [ 0.5, -0.5, -0.5], [-0.5, -0.5, -0.5], [-0.5,  0.5, -0.5], [ 0.5,  0.5, -0.5],
     ])
     normals.extend([[0.0, 0.0, -1.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([4, 5, 6, 4, 6, 7])
+    indices.extend([4, 6, 5, 4, 7, 6])  # Reversed winding
     
-    # Right face (X+)
+    # Right face (X+) - counter-clockwise when viewed from outside
     vertices.extend([
         [ 0.5, -0.5,  0.5], [ 0.5, -0.5, -0.5], [ 0.5,  0.5, -0.5], [ 0.5,  0.5,  0.5],
     ])
     normals.extend([[1.0, 0.0, 0.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([8, 9, 10, 8, 10, 11])
+    indices.extend([8, 10, 9, 8, 11, 10])  # Reversed winding
     
-    # Left face (X-)
+    # Left face (X-) - counter-clockwise when viewed from outside
     vertices.extend([
         [-0.5, -0.5, -0.5], [-0.5, -0.5,  0.5], [-0.5,  0.5,  0.5], [-0.5,  0.5, -0.5],
     ])
     normals.extend([[-1.0, 0.0, 0.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([12, 13, 14, 12, 14, 15])
+    indices.extend([12, 14, 13, 12, 15, 14])  # Reversed winding
     
-    # Top face (Y+)
+    # Top face (Y+) - counter-clockwise when viewed from outside
     vertices.extend([
         [-0.5,  0.5,  0.5], [ 0.5,  0.5,  0.5], [ 0.5,  0.5, -0.5], [-0.5,  0.5, -0.5],
     ])
     normals.extend([[0.0, 1.0, 0.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([16, 17, 18, 16, 18, 19])
+    indices.extend([16, 18, 17, 16, 19, 18])  # Reversed winding
     
-    # Bottom face (Y-)
+    # Bottom face (Y-) - counter-clockwise when viewed from outside
     vertices.extend([
         [-0.5, -0.5, -0.5], [ 0.5, -0.5, -0.5], [ 0.5, -0.5,  0.5], [-0.5, -0.5,  0.5],
     ])
     normals.extend([[0.0, -1.0, 0.0]] * 4)
     uvs.extend([[0.0, 0.0], [1.0, 0.0], [1.0, 1.0], [0.0, 1.0]])
-    indices.extend([20, 21, 22, 20, 22, 23])
+    indices.extend([20, 22, 21, 20, 23, 22])  # Reversed winding
     
     # Pack geometry data
     vertex_data = b''.join(struct.pack('fff', *v) for v in vertices)

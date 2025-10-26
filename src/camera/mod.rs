@@ -46,7 +46,10 @@ pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, fa
 
 /// Calculate view matrix from position and target
 pub fn look_at_view(position: Vec3, target: Vec3, up: Vec3) -> Mat4 {
-    Mat4::look_at_rh(position, target, up)
+    match get_camera_backend() {
+        CameraBackend::Vulkan => Mat4::look_at_rh(position, target, up),
+        CameraBackend::DirectX => Mat4::look_at_lh(position, target, up),
+    }
 }
 
 /// Calculate view matrix from position, yaw, and pitch (free-fly camera)
@@ -65,7 +68,10 @@ pub fn free_fly_view(position: Vec3, yaw: f32, pitch: f32) -> Mat4 {
     let target = position + forward;
     let up = Vec3::Y;
 
-    Mat4::look_at_rh(position, target, up)
+    match get_camera_backend() {
+        CameraBackend::Vulkan => Mat4::look_at_rh(position, target, up),
+        CameraBackend::DirectX => Mat4::look_at_lh(position, target, up),
+    }
 }
 
 #[cfg(test)]
