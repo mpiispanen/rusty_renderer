@@ -248,6 +248,14 @@ impl DirectXBackendImpl {
         self.create_depth_stencil()?;
 
         if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_srv_heap");
+            let _ = f.flush();
+        }
+
+        // Create SRV descriptor heap for textures
+        self.create_srv_heap()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
             let _ = writeln!(f, "DirectX calling create_command_objects");
             let _ = f.flush();
         }
@@ -516,6 +524,36 @@ impl DirectXBackendImpl {
         Ok(())
     }
 
+    fn create_srv_heap(&mut self) -> Result<()> {
+        log::info!("Creating SRV/CBV/UAV descriptor heap for textures");
+
+        unsafe {
+            let device = self.device.as_ref().context("Device not created")?;
+
+            // Create descriptor heap for shader resource views (textures)
+            // Start with 256 descriptors - should be enough for most scenes
+            let heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
+                Type: D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+                NumDescriptors: 256,
+                Flags: D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+                NodeMask: 0,
+            };
+
+            let heap: ID3D12DescriptorHeap = device.CreateDescriptorHeap(&heap_desc)?;
+            
+            // Get descriptor size for this heap type
+            let descriptor_size = device.GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+            
+            self.cbv_srv_uav_heap = Some(heap);
+            self.cbv_srv_uav_descriptor_size = descriptor_size;
+            self.descriptor_heap_offset = 0; // Start at beginning
+
+            log::info!("Created SRV descriptor heap with 256 descriptors (size: {} bytes each)", descriptor_size);
+        }
+
+        Ok(())
+    }
+
     fn create_command_objects(&mut self) -> Result<()> {
         log::info!("Creating command allocator and list");
 
@@ -779,8 +817,8 @@ impl DirectXBackendImpl {
                 SampleMask: u32::MAX,
                 RasterizerState: D3D12_RASTERIZER_DESC {
                     FillMode: D3D12_FILL_MODE_SOLID,
-                    CullMode: D3D12_CULL_MODE_BACK, // Enable backface culling
-                    FrontCounterClockwise: TRUE, // Counter-clockwise winding = front face (glTF standard)
+                    CullMode: D3D12_CULL_MODE_BACK,
+                    FrontCounterClockwise: TRUE,
                     DepthBias: 0,
                     DepthBiasClamp: 0.0,
                     SlopeScaledDepthBias: 0.0,
@@ -842,12 +880,21 @@ impl DirectXBackendImpl {
     fn load_shader_source(&self) -> Result<String> {
         // Try to load forward.hlsl (full forward rendering with textures)
         if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward.hlsl") {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Loaded forward.hlsl shader (with textures)");
+            }
             log::info!("Loaded forward.hlsl shader (with textures)");
             Ok(source)
         } else if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward_simple.hlsl") {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Loaded forward_simple.hlsl shader (no textures)");
+            }
             log::info!("Loaded forward_simple.hlsl shader (no textures)");
             Ok(source)
         } else {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Could not load forward shaders, using embedded triangle shader");
+            }
             log::warn!("Could not load forward shaders, using embedded triangle shader");
             Ok(HLSL_SHADER_SOURCE.to_string())
         }
@@ -889,6 +936,9 @@ impl DirectXBackendImpl {
                         error.GetBufferSize(),
                     );
                     let error_str = String::from_utf8_lossy(error_msg);
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "Shader compilation FAILED for {} ({}): {}", entry_point, target, error_str);
+                    }
                     anyhow::bail!(
                         "Shader compilation failed for {} ({}): {}",
                         entry_point,
@@ -897,6 +947,10 @@ impl DirectXBackendImpl {
                     );
                 }
                 result?;
+            }
+
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Shader compilation SUCCESS for {} ({})", entry_point, target);
             }
 
             shader_blob.context(format!(
@@ -1024,6 +1078,9 @@ impl DirectXBackendImpl {
 
             // Create depth stencil buffer (includes DSV heap creation)
             self.create_depth_stencil()?;
+
+            // Create SRV descriptor heap for textures
+            self.create_srv_heap()?;
 
             // Create command objects
             self.create_command_objects()?;
@@ -1770,19 +1827,68 @@ impl DirectXBackendImpl {
                 desc.mip_levels
             );
 
-            let texture = DirectXTexture {
+            // Create SRV for the texture
+            let (srv_descriptor, srv_gpu_handle) = if desc.usage.sampled {
+                let heap = self.cbv_srv_uav_heap.as_ref().context("SRV heap not created")?;
+                let offset = self.descriptor_heap_offset;
+                
+                // Get CPU and GPU handles
+                let cpu_handle = unsafe {
+                    let mut handle = heap.GetCPUDescriptorHandleForHeapStart();
+                    handle.ptr += (offset * self.cbv_srv_uav_descriptor_size) as usize;
+                    handle
+                };
+                
+                let gpu_handle = unsafe {
+                    let mut handle = heap.GetGPUDescriptorHandleForHeapStart();
+                    handle.ptr += (offset * self.cbv_srv_uav_descriptor_size) as u64;
+                    handle
+                };
+                
+                // Create SRV
+                let srv_desc = D3D12_SHADER_RESOURCE_VIEW_DESC {
+                    Format: dxgi_format,
+                    ViewDimension: D3D12_SRV_DIMENSION_TEXTURE2D,
+                    Shader4ComponentMapping: D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+                    Anonymous: D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
+                        Texture2D: D3D12_TEX2D_SRV {
+                            MostDetailedMip: 0,
+                            MipLevels: desc.mip_levels,
+                            PlaneSlice: 0,
+                            ResourceMinLODClamp: 0.0,
+                        },
+                    },
+                };
+                
+                unsafe {
+                    device.CreateShaderResourceView(&resource, Some(&srv_desc), cpu_handle);
+                }
+                
+                // Increment descriptor offset for next texture
+                self.descriptor_heap_offset += 1;
+                
+                log::debug!("Created SRV for texture at heap offset {}", offset);
+                
+                (Some(cpu_handle), Some(gpu_handle))
+            } else {
+                (None, None)
+            };
+
+            let mut texture = DirectXTexture {
                 resource,
                 width: desc.width,
                 height: desc.height,
                 format: desc.format,
                 usage: desc.usage,
                 mip_levels: desc.mip_levels,
+                srv_descriptor,
+                srv_gpu_handle,
             };
 
             // Upload initial data if provided
             if let Some(data) = desc.initial_data {
                 log::debug!("Uploading initial data to DirectX texture");
-                self.upload_to_texture(&texture, data, 0)?;
+                self.upload_to_texture(&mut texture, data, 0)?;
             }
 
             Ok(Box::new(texture))
@@ -2324,6 +2430,8 @@ struct DirectXTexture {
     format: crate::backends::TextureFormat,
     usage: crate::backends::TextureUsage,
     mip_levels: u32,
+    srv_descriptor: Option<D3D12_CPU_DESCRIPTOR_HANDLE>, // SRV descriptor handle
+    srv_gpu_handle: Option<D3D12_GPU_DESCRIPTOR_HANDLE>, // GPU handle for binding
 }
 
 impl crate::backends::Texture for DirectXTexture {
@@ -2542,6 +2650,9 @@ impl PassExecutionContext for DirectXPassContext {
             let command_list = self.command_list();
             command_list.DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
 
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "DirectX Draw: {} vertices, {} instances", vertex_count, instance_count);
+            }
             log::trace!(
                 "Draw: {} vertices, {} instances",
                 vertex_count,
@@ -2613,6 +2724,12 @@ impl PassExecutionContext for DirectXPassContext {
 
             // Get GPU virtual address
             let gpu_address = dx_buffer.GetGPUVirtualAddress() + offset;
+            
+            // Validate GPU address
+            if gpu_address == 0 {
+                log::error!("Invalid GPU address (0) for buffer at set {}, binding {}", set, binding);
+                anyhow::bail!("Invalid GPU address for uniform buffer");
+            }
 
             // DirectX uses root parameter indices directly
             // binding 0 -> root parameter 0 (camera)
@@ -2624,6 +2741,16 @@ impl PassExecutionContext for DirectXPassContext {
             } else {
                 binding // binding 0, 1 map directly
             };
+
+            log::debug!(
+                "DirectXPassContext: Binding uniform buffer at root parameter {}, GPU address: 0x{:X}, buffer size: {}",
+                root_parameter_index, gpu_address, buffer.size
+            );
+
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Binding uniform: set={}, binding={}, root_param={}, gpu_addr={:#x}, size={}", 
+                    set, binding, root_parameter_index, gpu_address, buffer.size);
+            }
 
             // Set the constant buffer view (CBV) for this root parameter
             command_list.SetGraphicsRootConstantBufferView(root_parameter_index, gpu_address);
@@ -2664,6 +2791,11 @@ impl PassExecutionContext for DirectXPassContext {
                 offset_in_dwords,
             );
             
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Push constants: {} DWORDs ({} bytes) at offset {}", 
+                    num_values, data.len(), offset);
+            }
+            
             log::debug!(
                 "DirectXPassContext: Push constants set - {} DWORDs ({} bytes) at offset {}",
                 num_values,
@@ -2679,10 +2811,53 @@ impl PassExecutionContext for DirectXPassContext {
         &mut self,
         set: u32,
         binding: u32,
-        _texture_ptr: *const std::ffi::c_void,
+        texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
-        log::debug!("DirectXPassContext: bind_texture stub - set {}, binding {} (not implemented)", set, binding);
-        // TODO: Implement texture binding for DirectX
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "bind_texture called: set={}, binding={}", set, binding);
+        }
+        log::debug!("DirectXPassContext: Binding texture at set {}, binding {}", set, binding);
+        
+        // For MVP, we only support set 0, binding 2 (texture)
+        if set != 0 || binding != 2 {
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Texture binding SKIPPED (not set 0, binding 2)");
+            }
+            log::warn!("Only set 0, binding 2 is currently supported for textures, ignoring set {}, binding {}", set, binding);
+            return Ok(());
+        }
+
+        unsafe {
+            // Get texture first
+            let texture = &*(texture_ptr as *const DirectXTexture);
+            
+            // Get GPU descriptor handle for the texture's SRV
+            if let Some(gpu_handle) = texture.srv_gpu_handle {
+                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                    let _ = writeln!(f, "Binding texture with GPU handle");
+                }
+                // Get pointers
+                let cmd_list_ptr = self.command_list;
+                let backend_ptr = self.backend;
+                
+                // Access command list and backend through raw pointers  
+                let command_list = &*(cmd_list_ptr as *const ID3D12GraphicsCommandList);
+                let backend = &*(backend_ptr as *const DirectXBackendImpl);
+                
+                // Set SRV descriptor heap
+                if let Some(heap) = &backend.cbv_srv_uav_heap {
+                    command_list.SetDescriptorHeaps(&[Some(heap.clone())]);
+                }
+                
+                // Root parameter 4 is the descriptor table for textures (t0)
+                command_list.SetGraphicsRootDescriptorTable(4, gpu_handle);
+                
+                log::debug!("DirectXPassContext: Texture bound to root parameter 4 (descriptor table)");
+            } else {
+                log::warn!("DirectXPassContext: Texture has no SRV, cannot bind");
+            }
+        }
+
         Ok(())
     }
 }
