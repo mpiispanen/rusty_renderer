@@ -156,9 +156,8 @@ Based on user direction: **"continue implementing"** from asset/GLTF work
 3. **Proton testing** - Cross-compile and test with Proton
 
 ### After Sprint:
-4. Fix wgpu backend issues
-5. Implement shadow mapping
-6. Add deferred rendering pipeline
+4. Implement shadow mapping
+5. Add deferred rendering pipeline
 
 ## 📊 Progress Metrics
 

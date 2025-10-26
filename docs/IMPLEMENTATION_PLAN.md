@@ -72,8 +72,7 @@ forward.hlsl (source of truth)
    ```
 
 3. Update backends to load appropriate format
-   - Vulkan: Load .spv
-   - wgpu: Load .wgsl
+   - Vulkan: Load .spv (SPIR-V)
    - DirectX: Load .hlsl or compiled bytecode
 
 **Acceptance Criteria:**
@@ -369,7 +368,7 @@ RT3: RGB = Emission,   A = Unused
 
 | Week | Phase | Tasks |
 |------|-------|-------|
-| 1 | Multi-Backend | wgpu, DirectX, shader pipeline |
+| 1 | Backend Parity | DirectX fixes, shader pipeline |
 | 2-3 | Resource Mgmt | Requirements, allocation, hot-reload |
 | 4-5 | Shadows | Basic, PCF, CSM |
 | 6-8 | Forward+/Deferred | Light culling, G-buffer, lighting |

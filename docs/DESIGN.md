@@ -275,7 +275,7 @@ graph.compile_and_execute(backend);
 
 **Milestone 2: Backend Abstraction - Stub Implementation** ✅ COMPLETED
 - [x] Define core backend traits (`GraphicsBackend`, `Device`, `CommandBuffer`, etc.)
-- [x] Create stub implementations for all three backends (Vulkan, DirectX, wgpu)
+- [x] Create stub implementations for backends (Vulkan, DirectX)
 - [x] Implement backend selection and initialization
 - [x] Unit tests for backend trait contracts
 
@@ -290,9 +290,8 @@ graph.compile_and_execute(backend);
 **Milestone 4: Multi-Backend Triangle** ✅ COMPLETED
 - [x] Implement DirectX 12 backend for triangle rendering
 - [x] Test DirectX implementation on Linux via Proton
-- [x] Implement wgpu backend for triangle rendering
 - [x] Handle coordinate system differences across backends
-- [x] Integration tests for all backends
+- [x] Integration tests for both backends
 - [x] Cross-compilation setup for Windows
 
 **Milestone 5: Infrastructure and Testing** (IN PROGRESS)
@@ -394,7 +393,6 @@ graph.compile_and_execute(backend);
 - **Graphics APIs**:
   - `vulkanalia` - Vulkan bindings
   - `windows-rs` - DirectX 12 bindings
-  - `wgpu` - Portable graphics abstraction
 - **Windowing**: `winit`
 - **UI**: `egui` with appropriate backend integration
 - **Math**: `glam` (or `nalgebra`)
@@ -424,7 +422,7 @@ graph.compile_and_execute(backend);
 4. **Backend Implementation Order**
    - Implement feature in Vulkan first (primary development platform)
    - Validate design works for DirectX (test on Linux via Proton)
-   - Implement in wgpu (ensure portability)
+   - Ensure both backends achieve feature parity
    - Avoid over-investing in single backend before validating across APIs
 
 5. **Documentation Maintenance**
@@ -460,7 +458,7 @@ graph.compile_and_execute(backend);
 ## Success Criteria
 
 ### Short Term Success
-- Triangle rendering on all three backends (Vulkan, DirectX, wgpu)
+- Triangle rendering on both backends (Vulkan, DirectX)
 - Basic application structure with proper error handling
 - CI/CD pipeline operational
 - Unit and integration tests passing
@@ -484,16 +482,21 @@ graph.compile_and_execute(backend);
 This design document is a living document and will evolve as the project progresses. Major architectural changes should be reflected here with version updates and change notes.
 
 ### Change Log
+- **v0.6.0** (2025-10-26): wgpu backend removed, focus on Vulkan and DirectX
+  - Removed wgpu backend to simplify development
+  - Focusing on achieving parity between Vulkan and DirectX 12
+  - DirectX functional but needs depth testing and texture support
+  - Updated all documentation to reflect two-backend architecture
 - **v0.3.0** (2025-10-18): Milestone 4 complete, planning Milestone 5
   - DirectX 12 backend complete with triangle rendering
-  - All backends tested and working (Vulkan, wgpu, DirectX)
+  - All backends tested and working (Vulkan, DirectX)
   - Y-axis coordinate handling standardized across backends
   - Cross-platform testing verified (DirectX on Linux via Proton)
   - Documentation workflow established (keep DESIGN.md updated, docs in docs/)
   - Milestone 5 scoped: offscreen rendering, visual testing infrastructure
 - **v0.2.0** (2025-10-18): Updated after completing Milestones 1-4
-  - All three backends (Vulkan, wgpu, DirectX 12) now operational
-  - Validation layer support added across all backends
+  - Multiple backends (Vulkan, DirectX 12) operational
+  - Validation layer support added across backends
   - Cross-compilation and Proton testing documented
   - Coordinate system handling documented
   - Repository organization improved (session logs moved to separate directory)
