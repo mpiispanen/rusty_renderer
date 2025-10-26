@@ -562,11 +562,13 @@ impl DirectXBackendImpl {
             let vs_bytecode = self.compile_shader("VSMain", "vs_5_0")?;
             let ps_bytecode = self.compile_shader("PSMain", "ps_5_0")?;
 
-            // Create root signature with CBV parameters and root constants
+            // Create root signature with CBV parameters, root constants, and texture
             // Root parameter 0: Camera uniforms (CBV b0)
             // Root parameter 1: Lighting uniforms (CBV b1)
             // Root parameter 2: Push constants for model/normal matrices (32 DWORDs b2)
             // Root parameter 3: Material uniforms (CBV b3)
+            // Root parameter 4: Texture descriptor table (SRV t0)
+            // Static sampler 0: Texture sampler (s0)
             let mut root_parameters = vec![
                 D3D12_ROOT_PARAMETER {
                     ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
@@ -611,11 +613,50 @@ impl DirectXBackendImpl {
                 },
             ];
 
+            // Add descriptor table for texture (t0)
+            let descriptor_range = D3D12_DESCRIPTOR_RANGE {
+                RangeType: D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+                NumDescriptors: 1,
+                BaseShaderRegister: 0, // t0
+                RegisterSpace: 0,
+                OffsetInDescriptorsFromTableStart: 0,
+            };
+            let mut descriptor_ranges = vec![descriptor_range];
+
+            root_parameters.push(D3D12_ROOT_PARAMETER {
+                ParameterType: D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+                Anonymous: D3D12_ROOT_PARAMETER_0 {
+                    DescriptorTable: D3D12_ROOT_DESCRIPTOR_TABLE {
+                        NumDescriptorRanges: 1,
+                        pDescriptorRanges: descriptor_ranges.as_ptr(),
+                    },
+                },
+                ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
+            });
+
+            // Static sampler for s0
+            let static_sampler = D3D12_STATIC_SAMPLER_DESC {
+                Filter: D3D12_FILTER_MIN_MAG_MIP_LINEAR,
+                AddressU: D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                AddressV: D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                AddressW: D3D12_TEXTURE_ADDRESS_MODE_WRAP,
+                MipLODBias: 0.0,
+                MaxAnisotropy: 0,
+                ComparisonFunc: D3D12_COMPARISON_FUNC_NEVER,
+                BorderColor: D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK,
+                MinLOD: 0.0,
+                MaxLOD: f32::MAX,
+                ShaderRegister: 0, // s0
+                RegisterSpace: 0,
+                ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
+            };
+            let static_samplers = vec![static_sampler];
+
             let root_signature_desc = D3D12_ROOT_SIGNATURE_DESC {
                 NumParameters: root_parameters.len() as u32,
                 pParameters: root_parameters.as_ptr(),
-                NumStaticSamplers: 0,
-                pStaticSamplers: std::ptr::null(),
+                NumStaticSamplers: static_samplers.len() as u32,
+                pStaticSamplers: static_samplers.as_ptr(),
                 Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
             };
 
@@ -796,12 +837,15 @@ impl DirectXBackendImpl {
     }
 
     fn load_shader_source(&self) -> Result<String> {
-        // Try to load forward_simple.hlsl first (no textures), fall back to embedded triangle shader
-        if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward_simple.hlsl") {
-            log::info!("Loaded forward_simple.hlsl shader");
+        // Try to load forward.hlsl (full forward rendering with textures)
+        if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward.hlsl") {
+            log::info!("Loaded forward.hlsl shader (with textures)");
+            Ok(source)
+        } else if let Ok(source) = std::fs::read_to_string("shaders/hlsl/forward_simple.hlsl") {
+            log::info!("Loaded forward_simple.hlsl shader (no textures)");
             Ok(source)
         } else {
-            log::warn!("Could not load forward_simple.hlsl, using embedded triangle shader");
+            log::warn!("Could not load forward shaders, using embedded triangle shader");
             Ok(HLSL_SHADER_SOURCE.to_string())
         }
     }
