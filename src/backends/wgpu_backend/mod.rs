@@ -55,7 +55,7 @@ pub struct WgpuBackend {
     persistent_bind_group_1: Option<wgpu::BindGroup>, // Transform (push constants)
     
     // Frame synchronization
-    last_submission_index: Option<wgpu::SubmissionIndex>,
+    submission_indices: Vec<wgpu::SubmissionIndex>, // Ring buffer of recent submissions
     
     // Default resources (M10 Phase 4)
     default_sampler: Option<wgpu::Sampler>,
@@ -95,7 +95,7 @@ impl WgpuBackend {
             transform_buffer: None,
             persistent_bind_group_0: None,
             persistent_bind_group_1: None,
-            last_submission_index: None,
+            submission_indices: Vec::new(),
             default_sampler: None,
             default_texture: None,
             frame_count: 0,
@@ -770,33 +770,9 @@ impl GraphicsBackend for WgpuBackend {
             match surface.get_current_texture() {
                 Ok(texture) => Some(texture),
                 Err(wgpu::SurfaceError::Timeout) => {
-                    // Timeout usually means we're rendering too fast or surface needs reconfiguration
-                    log::warn!("Surface texture acquisition timeout - reconfiguring surface");
-                    // Rebuild configuration from current capabilities to be safe
-                    if let (Some(adapter), Some(device)) = (&self.adapter, &self.device) {
-                        let caps = surface.get_capabilities(adapter);
-                        let format = caps.formats.iter().copied().find(|f| f.is_srgb()).unwrap_or(caps.formats[0]);
-                        let config = wgpu::SurfaceConfiguration {
-                            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                            format,
-                            width: self.width,
-                            height: self.height,
-                            present_mode: wgpu::PresentMode::Fifo,
-                            alpha_mode: caps.alpha_modes[0],
-                            view_formats: vec![],
-                            desired_maximum_frame_latency: 3,
-                        };
-                        surface.configure(device, &config);
-                        self.surface_config = Some(config);
-                    }
-                    // Try one more time after reconfiguration
-                    match surface.get_current_texture() {
-                        Ok(texture) => Some(texture),
-                        Err(e) => {
-                            log::error!("Surface texture failed even after reconfiguration: {e:?}");
-                            return Ok(()); // Skip frame
-                        }
-                    }
+                    // Timeout means all swapchain images are in-flight on GPU
+                    // Just skip this frame and let GPU catch up
+                    return Ok(());
                 }
                 Err(wgpu::SurfaceError::Outdated) => {
                     log::warn!("Surface outdated, reconfiguring...");
@@ -938,10 +914,8 @@ impl GraphicsBackend for WgpuBackend {
             log::info!("All passes executed, render pass about to end");
         }
 
-        // Submit commands and save submission index for next frame
-        log::info!("Submitting command buffer");
-        let submission_index = queue.submit(Some(encoder.finish()));
-        log::info!("Commands submitted");
+        // Submit commands  
+        queue.submit(Some(encoder.finish()));
 
         // Present if not headless
         if let Some(texture) = surface_texture {
