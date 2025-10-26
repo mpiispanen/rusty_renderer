@@ -945,12 +945,13 @@ impl GraphicsBackend for WgpuBackend {
 
         // Present if not headless
         if let Some(texture) = surface_texture {
-            log::info!("Presenting surface texture");
             texture.present();
-            log::info!("Texture presented");
         }
 
-        log::debug!("Render graph execution complete");
+        // Clear bind groups to release references
+        self.bind_groups.clear();
+        self.temp_buffers.clear();
+
         Ok(())
     }
 

@@ -569,9 +569,7 @@ impl ApplicationHandler for WindowedApp {
                         return;
                     }
 
-                    // Frame pacing: only request next frame after a successful present
-                    // This avoids acquiring a new surface texture while previous frames
-                    // are still in-flight (prevents swapchain starvation on wgpu).
+                    // Frame pacing: request next frame immediately
                     self.frame_count += 1;
                     
                     // Check if we've reached max frames
@@ -581,8 +579,10 @@ impl ApplicationHandler for WindowedApp {
                         return;
                     }
                     
-                    // Don't request redraw here - let about_to_wait() handle it
-                    // This gives the event loop time to process other events
+                    // Request next frame immediately (wgpu examples pattern)
+                    if let Some(window) = &self.window {
+                        window.request_redraw();
+                    }
                 }
             }
             WindowEvent::KeyboardInput { event, .. } => {
@@ -597,17 +597,6 @@ impl ApplicationHandler for WindowedApp {
                 }
             }
             _ => {}
-        }
-    }
-
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
-        // Request redraw for continuous rendering
-        // This is the proper place to request redraws in wgpu applications
-        if let Some(window) = &self.window {
-            // Only request if we haven't hit the frame limit
-            if self.max_frames == 0 || self.frame_count < self.max_frames as u64 {
-                window.request_redraw();
-            }
         }
     }
 }
