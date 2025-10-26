@@ -66,6 +66,10 @@ pub struct DirectXBackendImpl {
     rtv_heap: Option<ID3D12DescriptorHeap>,
     rtv_descriptor_size: u32,
 
+    // Depth stencil
+    depth_stencil: Option<ID3D12Resource>,
+    dsv_heap: Option<ID3D12DescriptorHeap>,
+
     // Pipeline (will be created with embedded HLSL bytecode)
     pipeline_state: Option<ID3D12PipelineState>,
     root_signature: Option<ID3D12RootSignature>,
@@ -125,6 +129,8 @@ impl DirectXBackendImpl {
             render_targets: Vec::new(),
             rtv_heap: None,
             rtv_descriptor_size: 0,
+            depth_stencil: None,
+            dsv_heap: None,
             pipeline_state: None,
             root_signature: None,
             cbv_srv_uav_heap: None,
@@ -229,6 +235,14 @@ impl DirectXBackendImpl {
 
         // Create render target views
         self.create_render_targets()?;
+
+        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "DirectX calling create_depth_stencil");
+            let _ = f.flush();
+        }
+
+        // Create depth stencil buffer
+        self.create_depth_stencil()?;
 
         if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
             let _ = writeln!(f, "DirectX calling create_command_objects");
@@ -407,6 +421,93 @@ impl DirectXBackendImpl {
 
             self.rtv_heap = Some(rtv_heap);
             log::info!("Created {} render target views", self.frame_count);
+        }
+
+        Ok(())
+    }
+
+    fn create_depth_stencil(&mut self) -> Result<()> {
+        log::info!("Creating depth stencil buffer");
+
+        unsafe {
+            let device = self.device.as_ref().context("Device not created")?;
+
+            // Create DSV descriptor heap
+            let dsv_heap_desc = D3D12_DESCRIPTOR_HEAP_DESC {
+                Type: D3D12_DESCRIPTOR_HEAP_TYPE_DSV,
+                NumDescriptors: 1,
+                Flags: D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
+                NodeMask: 0,
+            };
+
+            let dsv_heap: ID3D12DescriptorHeap = device.CreateDescriptorHeap(&dsv_heap_desc)?;
+
+            // Create depth stencil resource
+            let depth_desc = D3D12_RESOURCE_DESC {
+                Dimension: D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+                Alignment: 0,
+                Width: self.width as u64,
+                Height: self.height,
+                DepthOrArraySize: 1,
+                MipLevels: 1,
+                Format: DXGI_FORMAT_D32_FLOAT,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Layout: D3D12_TEXTURE_LAYOUT_UNKNOWN,
+                Flags: D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL,
+            };
+
+            let clear_value = D3D12_CLEAR_VALUE {
+                Format: DXGI_FORMAT_D32_FLOAT,
+                Anonymous: D3D12_CLEAR_VALUE_0 {
+                    DepthStencil: D3D12_DEPTH_STENCIL_VALUE {
+                        Depth: 1.0,
+                        Stencil: 0,
+                    },
+                },
+            };
+
+            let heap_properties = D3D12_HEAP_PROPERTIES {
+                Type: D3D12_HEAP_TYPE_DEFAULT,
+                CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+                MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
+                CreationNodeMask: 0,
+                VisibleNodeMask: 0,
+            };
+
+            let mut depth_stencil: Option<ID3D12Resource> = None;
+            device.CreateCommittedResource(
+                &heap_properties,
+                D3D12_HEAP_FLAG_NONE,
+                &depth_desc,
+                D3D12_RESOURCE_STATE_DEPTH_WRITE,
+                Some(&clear_value),
+                &mut depth_stencil,
+            )?;
+
+            let depth_stencil = depth_stencil.context("Failed to create depth stencil resource")?;
+
+            // Create DSV
+            let dsv_desc = D3D12_DEPTH_STENCIL_VIEW_DESC {
+                Format: DXGI_FORMAT_D32_FLOAT,
+                ViewDimension: D3D12_DSV_DIMENSION_TEXTURE2D,
+                Flags: D3D12_DSV_FLAG_NONE,
+                Anonymous: D3D12_DEPTH_STENCIL_VIEW_DESC_0 {
+                    Texture2D: D3D12_TEX2D_DSV {
+                        MipSlice: 0,
+                    },
+                },
+            };
+
+            let dsv_handle = dsv_heap.GetCPUDescriptorHandleForHeapStart();
+            device.CreateDepthStencilView(&depth_stencil, Some(&dsv_desc), dsv_handle);
+
+            self.depth_stencil = Some(depth_stencil);
+            self.dsv_heap = Some(dsv_heap);
+
+            log::info!("Created depth stencil buffer: {}x{}", self.width, self.height);
         }
 
         Ok(())
@@ -646,7 +747,7 @@ impl DirectXBackendImpl {
                     ConservativeRaster: D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF,
                 },
                 DepthStencilState: D3D12_DEPTH_STENCIL_DESC {
-                    DepthEnable: FALSE,
+                    DepthEnable: TRUE,
                     DepthWriteMask: D3D12_DEPTH_WRITE_MASK_ALL,
                     DepthFunc: D3D12_COMPARISON_FUNC_LESS,
                     StencilEnable: FALSE,
@@ -672,7 +773,7 @@ impl DirectXBackendImpl {
                     DXGI_FORMAT_UNKNOWN,
                     DXGI_FORMAT_UNKNOWN,
                 ],
-                DSVFormat: DXGI_FORMAT_UNKNOWN,
+                DSVFormat: DXGI_FORMAT_D32_FLOAT,
                 SampleDesc: DXGI_SAMPLE_DESC {
                     Count: 1,
                     Quality: 0,
@@ -1180,8 +1281,19 @@ impl DirectXBackendImpl {
             let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background
             command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
 
-            // Set render target
-            command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, None);
+            // Clear depth stencil
+            let dsv_heap = self.dsv_heap.as_ref().context("DSV heap not created")?;
+            let dsv_handle = dsv_heap.GetCPUDescriptorHandleForHeapStart();
+            command_list.ClearDepthStencilView(
+                dsv_handle,
+                D3D12_CLEAR_FLAG_DEPTH,
+                1.0,
+                0,
+                &[],
+            );
+
+            // Set render target with depth stencil
+            command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, Some(&dsv_handle));
 
             // Set viewport and scissor
             let viewport = D3D12_VIEWPORT {
