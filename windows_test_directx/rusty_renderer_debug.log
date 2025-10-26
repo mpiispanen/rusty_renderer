@@ -5,29 +5,7 @@ Arguments parsed successfully
 Running application
 Shutdown complete
  called
-Backend type: DirectX12, headless: false
-Entering windowed mode branch
-Event loop created, max_frames: 3
-About to call run_app
-WindowedApp::resumed called
-Window is none: true
-Attempting to create window
-Window created successfully
-Initializing backend with window
-DirectX initialize() ENTERED
-DirectX window size: 800x600
-DirectX enabling validation
-DirectX calling create_factory
-DirectX calling create_device
-DirectX calling create_command_queue
-DirectX calling create_swap_chain
-DirectX calling create_render_targets
-DirectX calling create_depth_stencil
-DirectX calling create_command_objects
-DirectX calling create_fence
-DirectX calling create_pipeline
-DirectX initialized successfully!
-Building render graph
+Backend type: DirectX12, headless: true
 create_buffer called: 64 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
 Checking if device is initialized: true
 Device is initialized, creating buffer
@@ -68,11 +46,3 @@ CreateCommittedResource returned: Ok(())
 Resource is_some: true
 Checking if resource is Some before context
 Buffer created successfully!
-Render graph built successfully
-Graph compiled successfully
-Requesting initial redraw
-Window setup complete, redraw requested
-RedrawRequested: frame_count=0, max_frames=3
-RedrawRequested: frame_count=1, max_frames=3
-RedrawRequested: frame_count=2, max_frames=3
-run_app returned

@@ -78,6 +78,11 @@ pub struct VulkanBackend {
     offscreen_image_memory: vk::DeviceMemory,
     offscreen_image_view: vk::ImageView,
 
+    // Depth buffer
+    depth_image: vk::Image,
+    depth_image_memory: vk::DeviceMemory,
+    depth_image_view: vk::ImageView,
+
     // Shader resource binding (M8.3)
     descriptor_pool_manager: Option<descriptor::DescriptorPoolManager>,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
@@ -135,6 +140,9 @@ impl VulkanBackend {
             offscreen_image: vk::Image::null(),
             offscreen_image_memory: vk::DeviceMemory::null(),
             offscreen_image_view: vk::ImageView::null(),
+            depth_image: vk::Image::null(),
+            depth_image_memory: vk::DeviceMemory::null(),
+            depth_image_view: vk::ImageView::null(),
             descriptor_pool_manager: None,
             descriptor_set_layouts: vec![],
             descriptor_sets: vec![],
@@ -612,24 +620,48 @@ impl VulkanBackend {
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .final_layout(final_layout);
 
+        let depth_attachment = vk::AttachmentDescription::builder()
+            .format(vk::Format::D32_SFLOAT)
+            .samples(vk::SampleCountFlags::_1)
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+            .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
         let color_attachment_ref = vk::AttachmentReference::builder()
             .attachment(0)
             .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
+        let depth_attachment_ref = vk::AttachmentReference::builder()
+            .attachment(1)
+            .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
         let color_attachments = &[color_attachment_ref];
         let subpass = vk::SubpassDescription::builder()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-            .color_attachments(color_attachments);
+            .color_attachments(color_attachments)
+            .depth_stencil_attachment(&depth_attachment_ref);
 
         let dependency = vk::SubpassDependency::builder()
             .src_subpass(vk::SUBPASS_EXTERNAL)
             .dst_subpass(0)
-            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_stage_mask(
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                    | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            )
             .src_access_mask(vk::AccessFlags::empty())
-            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
-            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
+            .dst_stage_mask(
+                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT
+                    | vk::PipelineStageFlags::EARLY_FRAGMENT_TESTS,
+            )
+            .dst_access_mask(
+                vk::AccessFlags::COLOR_ATTACHMENT_WRITE
+                    | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
+            );
 
-        let attachments = &[color_attachment];
+        let attachments = &[color_attachment, depth_attachment];
         let subpasses = &[subpass];
         let dependencies = &[dependency];
         let info = vk::RenderPassCreateInfo::builder()
@@ -770,6 +802,14 @@ impl VulkanBackend {
             .logic_op(vk::LogicOp::COPY)
             .attachments(color_blend_attachments);
 
+        // Depth stencil state
+        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(true)
+            .depth_write_enable(true)
+            .depth_compare_op(vk::CompareOp::LESS)
+            .depth_bounds_test_enable(false)
+            .stencil_test_enable(false);
+
         // Pipeline layout with descriptor sets and push constants
         log::info!("Creating pipeline layout");
         
@@ -799,6 +839,7 @@ impl VulkanBackend {
             .viewport_state(&viewport_info)
             .rasterization_state(&rasterization_info)
             .multisample_state(&multisample_info)
+            .depth_stencil_state(&depth_stencil_info)
             .color_blend_state(&color_blend_info)
             .layout(self.pipeline_layout)
             .render_pass(self.render_pass)
@@ -894,6 +935,70 @@ impl VulkanBackend {
         Ok(vec![layout])
     }
 
+    /// Create depth buffer resources
+    fn create_depth_resources(&mut self) -> Result<()> {
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let format = vk::Format::D32_SFLOAT;
+
+        // Create depth image
+        let image_info = vk::ImageCreateInfo::builder()
+            .image_type(vk::ImageType::_2D)
+            .extent(vk::Extent3D {
+                width: self.swapchain_extent.width,
+                height: self.swapchain_extent.height,
+                depth: 1,
+            })
+            .mip_levels(1)
+            .array_layers(1)
+            .format(format)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .samples(vk::SampleCountFlags::_1);
+
+        self.depth_image = unsafe { device.create_image(&image_info, None)? };
+
+        // Get memory requirements
+        let mem_requirements = unsafe { device.get_image_memory_requirements(self.depth_image) };
+
+        // Find suitable memory type
+        let memory_type_index = self.find_memory_type(
+            mem_requirements.memory_type_bits,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        )?;
+
+        // Allocate memory
+        let alloc_info = vk::MemoryAllocateInfo::builder()
+            .allocation_size(mem_requirements.size)
+            .memory_type_index(memory_type_index);
+
+        self.depth_image_memory = unsafe { device.allocate_memory(&alloc_info, None)? };
+
+        // Bind memory
+        unsafe {
+            device.bind_image_memory(self.depth_image, self.depth_image_memory, 0)?;
+        }
+
+        // Create image view
+        let view_info = vk::ImageViewCreateInfo::builder()
+            .image(self.depth_image)
+            .view_type(vk::ImageViewType::_2D)
+            .format(format)
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::DEPTH,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1,
+            });
+
+        self.depth_image_view = unsafe { device.create_image_view(&view_info, None)? };
+
+        log::info!("Created depth buffer: {}x{}", self.swapchain_extent.width, self.swapchain_extent.height);
+        Ok(())
+    }
+
     /// Create framebuffers
     fn create_framebuffers(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
@@ -902,7 +1007,7 @@ impl VulkanBackend {
             .swapchain_image_views
             .iter()
             .map(|&image_view| {
-                let attachments = &[image_view];
+                let attachments = &[image_view, self.depth_image_view];
                 let info = vk::FramebufferCreateInfo::builder()
                     .render_pass(self.render_pass)
                     .attachments(attachments)
@@ -929,9 +1034,23 @@ impl VulkanBackend {
                 for &framebuffer in &self.framebuffers {
                     device.destroy_framebuffer(framebuffer, None);
                 }
+
+                // Destroy depth resources
+                if self.depth_image_view != vk::ImageView::null() {
+                    device.destroy_image_view(self.depth_image_view, None);
+                }
+                if self.depth_image != vk::Image::null() {
+                    device.destroy_image(self.depth_image, None);
+                }
+                if self.depth_image_memory != vk::DeviceMemory::null() {
+                    device.free_memory(self.depth_image_memory, None);
+                }
             }
         }
         self.framebuffers.clear();
+        self.depth_image_view = vk::ImageView::null();
+        self.depth_image = vk::Image::null();
+        self.depth_image_memory = vk::DeviceMemory::null();
     }
 
     /// Create command pool
@@ -1045,11 +1164,19 @@ impl VulkanBackend {
             device.begin_command_buffer(command_buffer, &begin_info)?;
         }
 
-        let clear_values = &[vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
+        let clear_values = &[
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
             },
-        }];
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
 
         let render_pass_info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.render_pass)
@@ -1326,7 +1453,7 @@ impl VulkanBackend {
     fn create_framebuffer_offscreen(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
-        let attachments = &[self.offscreen_image_view];
+        let attachments = &[self.offscreen_image_view, self.depth_image_view];
 
         let framebuffer_info = vk::FramebufferCreateInfo::builder()
             .render_pass(self.render_pass)
@@ -1820,6 +1947,9 @@ impl GraphicsBackend for VulkanBackend {
     fn initialize(&mut self, window: &winit::window::Window) -> Result<()> {
         log::info!("Initializing Vulkan backend");
 
+        // Set camera backend for proper projection matrices
+        crate::camera::set_camera_backend(crate::camera::CameraBackend::Vulkan);
+
         // Create instance
         self.create_instance(window)
             .context("Failed to create Vulkan instance")?;
@@ -1858,6 +1988,10 @@ impl GraphicsBackend for VulkanBackend {
         self.create_pipeline()
             .context("Failed to create graphics pipeline")?;
         log::info!("Graphics pipeline creation completed");
+
+        // Create depth resources
+        self.create_depth_resources()
+            .context("Failed to create depth resources")?;
 
         // Create framebuffers
         self.create_framebuffers()
@@ -2079,6 +2213,9 @@ impl GraphicsBackend for VulkanBackend {
 
         // Create offscreen render target
         self.create_offscreen_image(width, height)?;
+
+        // Create depth resources (needed for depth testing)
+        self.create_depth_resources()?;
 
         // Create render pass (for offscreen)
         self.create_render_pass()?;
@@ -2367,11 +2504,19 @@ impl GraphicsBackend for VulkanBackend {
         }
 
         // Clear values for render pass
-        let clear_values = &[vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.0, 0.0, 0.0, 1.0],
+        let clear_values = &[
+            vk::ClearValue {
+                color: vk::ClearColorValue {
+                    float32: [0.0, 0.0, 0.0, 1.0],
+                },
             },
-        }];
+            vk::ClearValue {
+                depth_stencil: vk::ClearDepthStencilValue {
+                    depth: 1.0,
+                    stencil: 0,
+                },
+            },
+        ];
 
         // Begin render pass
         let render_pass_info = vk::RenderPassBeginInfo::builder()

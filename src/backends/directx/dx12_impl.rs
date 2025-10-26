@@ -167,6 +167,9 @@ impl DirectXBackendImpl {
         
         log::info!("Initializing DirectX 12 backend");
 
+        // Set camera backend for proper projection matrices
+        crate::camera::set_camera_backend(crate::camera::CameraBackend::DirectX);
+
         let size = window.inner_size();
         self.width = size.width;
         self.height = size.height;
@@ -996,6 +999,9 @@ impl DirectXBackendImpl {
     pub fn initialize_headless(&mut self, width: u32, height: u32) -> Result<()> {
         log::info!("Initializing DirectX 12 backend in headless mode: {width}x{height}");
 
+        // Set camera backend for proper projection matrices
+        crate::camera::set_camera_backend(crate::camera::CameraBackend::DirectX);
+
         self.headless = true;
         self.width = width;
         self.height = height;
@@ -1015,6 +1021,9 @@ impl DirectXBackendImpl {
 
             // Create RTV heap
             self.create_rtv_heap_headless()?;
+
+            // Create depth stencil buffer (includes DSV heap creation)
+            self.create_depth_stencil()?;
 
             // Create command objects
             self.create_command_objects()?;

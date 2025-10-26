@@ -201,6 +201,25 @@ impl ApplicationRunner {
             let _ = writeln!(f, "Backend type: {:?}, headless: {}", backend_type, self.args.headless);
         }
 
+        // Auto-generate screenshot path if max_frames is set but no screenshot path provided
+        let auto_screenshot = if self.args.max_frames > 0 && self.args.screenshot.is_none() {
+            if let Some(scene_path) = &self.args.scene {
+                let scene_name = scene_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("output");
+                let backend_suffix = match backend_type {
+                    crate::backends::BackendType::Vulkan => "vulkan",
+                    crate::backends::BackendType::DirectX12 => "dx12",
+                };
+                Some(std::path::PathBuf::from(format!("{}_{}.png", scene_name, backend_suffix)))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Create backend
         log::info!("Creating backend: {backend_type}");
         let mut backend = crate::backends::create_backend(backend_type, true)?;
@@ -235,7 +254,7 @@ impl ApplicationRunner {
             );
 
             // Run rendering
-            let screenshot = self.args.screenshot.clone();
+            let screenshot = self.args.screenshot.clone().or(auto_screenshot.clone());
             let max_frames = self.args.max_frames;
             Self::run_headless_static(&mut *backend, &graph, &compiled, max_frames, screenshot)?;
 
@@ -270,7 +289,7 @@ impl ApplicationRunner {
                 pipeline,
                 graph: None,
                 compiled: None,
-                screenshot_path: self.args.screenshot.clone(),
+                screenshot_path: self.args.screenshot.clone().or(auto_screenshot),
                 frame_count: 0,
                 max_frames: self.args.max_frames,
             };
@@ -575,6 +594,32 @@ impl ApplicationHandler for WindowedApp {
                     // Check if we've reached max frames
                     if self.max_frames > 0 && self.frame_count >= self.max_frames as u64 {
                         log::info!("Rendered {} frames, exiting", self.frame_count);
+                        
+                        // Capture screenshot if requested
+                        if let Some(ref path) = self.screenshot_path {
+                            log::info!("Capturing final screenshot to {}", path.display());
+                            if let Some(backend) = &mut self.backend {
+                                match backend.capture_frame() {
+                                    Ok((width, height, pixels)) => {
+                                        if let Err(e) = image::save_buffer(
+                                            path,
+                                            &pixels,
+                                            width,
+                                            height,
+                                            image::ColorType::Rgba8,
+                                        ) {
+                                            log::error!("Failed to save screenshot: {e}");
+                                        } else {
+                                            log::info!("Screenshot saved: {width}x{height} to {}", path.display());
+                                        }
+                                    }
+                                    Err(e) => {
+                                        log::error!("Failed to capture frame: {e}");
+                                    }
+                                }
+                            }
+                        }
+                        
                         event_loop.exit();
                         return;
                     }
