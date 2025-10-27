@@ -16,17 +16,17 @@ fn main() -> Result<()> {
     } else {
         "assets/models/cube.gltf"
     };
-    
-    println!("Loading: {}", gltf_path);
-    
+
+    println!("Loading: {gltf_path}");
+
     let (objects, materials, metadata) = GltfLoader::load(gltf_path)?;
-    
+
     println!("\n✓ GLTF loaded successfully!");
     println!("\nMetadata:");
     println!("  Name: {}", metadata.name);
     println!("  Description: {}", metadata.description);
     println!("  Author: {}", metadata.author);
-    
+
     println!("\nMaterials: {}", materials.len());
     for (i, mat) in materials.iter().enumerate() {
         println!("  [{}] {}", i, mat.name);
@@ -35,20 +35,25 @@ fn main() -> Result<()> {
         println!("      Roughness: {}", mat.roughness);
         println!("      Texture: {:?}", mat.diffuse_texture);
     }
-    
+
     println!("\nObjects: {}", objects.len());
     for obj in &objects {
-        if let rusty_renderer::scene::SceneObject::Mesh { name, geometry, material, .. } = obj {
+        if let rusty_renderer::scene::SceneObject::Mesh {
+            name,
+            geometry,
+            material,
+            ..
+        } = obj
+        {
             let vertex_count = match geometry {
                 rusty_renderer::scene::GeometryData::Inline { vertices, .. } => vertices.len(),
                 _ => 0,
             };
-            println!("  Mesh '{}': {} vertices, material index: {:?}", 
-                name, vertex_count, material);
+            println!("  Mesh '{name}': {vertex_count} vertices, material index: {material:?}");
         }
     }
-    
+
     println!("\n✓ All checks passed!");
-    
+
     Ok(())
 }

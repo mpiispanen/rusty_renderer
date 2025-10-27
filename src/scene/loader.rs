@@ -17,14 +17,14 @@ impl SceneLoader {
             asset_resolver: AssetPathResolver::new()?,
         })
     }
-    
+
     /// Create with explicit project root
     pub fn with_root<P: AsRef<Path>>(root: P) -> Self {
         Self {
             asset_resolver: AssetPathResolver::with_root(root.as_ref()),
         }
     }
-    
+
     /// Load a scene from a TOML file
     pub fn load_from_file<P: AsRef<Path>>(&self, path: P) -> Result<Scene> {
         let path = path.as_ref();
@@ -34,7 +34,7 @@ impl SceneLoader {
         let scene_dir = path.parent();
         self.load_from_string(&content, scene_dir)
     }
-    
+
     /// Load a scene from a TOML file (static method for backward compatibility)
     pub fn load_from_file_static<P: AsRef<Path>>(path: P) -> Result<Scene> {
         let loader = Self::new()?;
@@ -47,7 +47,7 @@ impl SceneLoader {
 
         // Expand GLTF model references
         scene = self.expand_gltf_models(scene, scene_dir)?;
-        
+
         // Resolve asset paths in materials
         for material in &mut scene.materials {
             if let Some(ref texture_path) = material.diffuse_texture {
@@ -60,52 +60,63 @@ impl SceneLoader {
                 );
             }
         }
-        
+
         // Validate the scene
         scene.validate()?;
 
         Ok(scene)
     }
-    
+
     /// Load a scene from a TOML string (static method for backward compatibility)
     pub fn load_from_string_static(content: &str) -> Result<Scene> {
         let loader = Self::new()?;
         loader.load_from_string(content, None)
     }
-    
+
     /// Expand GLTF model references into inline meshes
     fn expand_gltf_models(&self, mut scene: Scene, scene_dir: Option<&Path>) -> Result<Scene> {
         let mut expanded_objects = Vec::new();
         let mut gltf_materials_offset = scene.materials.len();
-        
+
         for object in scene.objects {
             match object {
-                SceneObject::GltfModel { name, path, transform } => {
-                    log::info!("Loading GLTF model: {} from {}", name, path);
-                    
+                SceneObject::GltfModel {
+                    name,
+                    path,
+                    transform,
+                } => {
+                    log::info!("Loading GLTF model: {name} from {path}");
+
                     // Resolve path
-                    let gltf_path = self.asset_resolver.resolve_and_verify(&path, scene_dir)
-                        .with_context(|| format!("Failed to resolve GLTF path: {}", path))?;
-                    
+                    let gltf_path = self
+                        .asset_resolver
+                        .resolve_and_verify(&path, scene_dir)
+                        .with_context(|| format!("Failed to resolve GLTF path: {path}"))?;
+
                     // Load GLTF
                     let (mut objects, materials, _metadata) = GltfLoader::load(&gltf_path)?;
-                    
+
                     // Add materials to scene (with offset)
                     scene.materials.extend(materials);
-                    
+
                     // Update material indices and apply transform
                     for obj in &mut objects {
-                        if let SceneObject::Mesh { material, transform: obj_transform, .. } = obj {
+                        if let SceneObject::Mesh {
+                            material,
+                            transform: obj_transform,
+                            ..
+                        } = obj
+                        {
                             // Offset material index
                             if let Some(mat_idx) = material {
                                 *material = Some(*mat_idx + gltf_materials_offset);
                             }
-                            
+
                             // Apply GLTF model transform
                             *obj_transform = transform;
                         }
                     }
-                    
+
                     gltf_materials_offset = scene.materials.len();
                     expanded_objects.extend(objects);
                 }
@@ -114,7 +125,7 @@ impl SceneLoader {
                 }
             }
         }
-        
+
         scene.objects = expanded_objects;
         Ok(scene)
     }

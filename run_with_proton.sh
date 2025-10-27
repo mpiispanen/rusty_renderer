@@ -69,6 +69,21 @@ if [ ! -d "$TEST_DIR" ]; then
     exit 1
 fi
 
+# Copy the latest binary and shaders automatically
+echo "Syncing binary and shaders..."
+if [ -f "target/x86_64-pc-windows-msvc/release/rusty_renderer.exe" ]; then
+    cp target/x86_64-pc-windows-msvc/release/rusty_renderer.exe "$TEST_DIR/"
+    echo "  ✓ Binary copied"
+else
+    echo "  ✗ Binary not found - build may be needed"
+fi
+
+if [ -d "shaders/hlsl" ]; then
+    mkdir -p "$TEST_DIR/shaders/hlsl"
+    cp -r shaders/hlsl/* "$TEST_DIR/shaders/hlsl/"
+    echo "  ✓ Shaders synced"
+fi
+
 # Change to test directory
 cd "$TEST_DIR"
 

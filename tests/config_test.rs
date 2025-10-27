@@ -73,8 +73,7 @@ fn test_config_validation_zero_height() {
 #[test]
 fn test_config_window_size() {
     common::setup_test_env();
-
-    let config = common::test_config(Backend::Wgpu, 1024, 768);
+    let config = common::test_config(Backend::Vulkan, 1024, 768);
     assert_eq!(config.window_size(), (1024, 768));
 }
 
@@ -83,5 +82,4 @@ fn test_backend_display() {
     common::setup_test_env();
 
     assert_eq!(Backend::Vulkan.to_string(), "Vulkan");
-    assert_eq!(Backend::Wgpu.to_string(), "wgpu");
 }

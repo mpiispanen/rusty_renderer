@@ -87,7 +87,7 @@ pub struct VulkanBackend {
     descriptor_pool_manager: Option<descriptor::DescriptorPoolManager>,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     descriptor_sets: Vec<Vec<vk::DescriptorSet>>, // [frame_in_flight][set_index]
-    
+
     // Default texture sampler (M10 Phase 4)
     default_sampler: vk::Sampler,
 
@@ -678,18 +678,18 @@ impl VulkanBackend {
     /// Create graphics pipeline
     fn create_pipeline(&mut self) -> Result<()> {
         log::info!("Creating graphics pipeline");
-        
+
         // Create descriptor set layouts first (M8.3 MVP)
         log::info!("Creating descriptor set layouts");
         let layouts = self.create_uniform_descriptor_layouts()?;
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
 
         log::info!("Creating shader modules");
         // Create shader modules - using forward rendering shaders
         let vert_spirv = shaders::bytes_to_u32_vec(shaders::FORWARD_VERTEX_SHADER);
         let frag_spirv = shaders::bytes_to_u32_vec(shaders::FORWARD_FRAGMENT_SHADER);
-        
+
         let vert_shader_module = self.create_shader_module(&vert_spirv)?;
         log::info!("Vertex shader module created");
         let frag_shader_module = self.create_shader_module(&frag_spirv)?;
@@ -812,7 +812,7 @@ impl VulkanBackend {
 
         // Pipeline layout with descriptor sets and push constants
         log::info!("Creating pipeline layout");
-        
+
         // Define push constant range for model matrices (2 x mat4 = 128 bytes)
         // Used in forward rendering for per-object transforms
         let push_constant_range = vk::PushConstantRange::builder()
@@ -820,15 +820,14 @@ impl VulkanBackend {
             .offset(0)
             .size(128) // 2 * sizeof(mat4) = 2 * 64 = 128 bytes
             .build();
-        
+
         let push_constant_ranges = &[push_constant_range];
-        
+
         let layout_info = vk::PipelineLayoutCreateInfo::builder()
             .set_layouts(&layouts)
             .push_constant_ranges(push_constant_ranges);
         self.pipeline_layout = unsafe { device.create_pipeline_layout(&layout_info, None)? };
         log::info!("Pipeline layout created with push constants");
-
 
         // Create pipeline
         log::info!("Building graphics pipeline create info");
@@ -921,11 +920,11 @@ impl VulkanBackend {
                 .build(),
         ];
 
-        let layout_info = vk::DescriptorSetLayoutCreateInfo::builder()
-            .bindings(&bindings);
+        let layout_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
         let layout = unsafe {
-            device.create_descriptor_set_layout(&layout_info, None)
+            device
+                .create_descriptor_set_layout(&layout_info, None)
                 .context("Failed to create descriptor set layout")?
         };
 
@@ -995,7 +994,11 @@ impl VulkanBackend {
 
         self.depth_image_view = unsafe { device.create_image_view(&view_info, None)? };
 
-        log::info!("Created depth buffer: {}x{}", self.swapchain_extent.width, self.swapchain_extent.height);
+        log::info!(
+            "Created depth buffer: {}x{}",
+            self.swapchain_extent.width,
+            self.swapchain_extent.height
+        );
         Ok(())
     }
 
@@ -1070,10 +1073,10 @@ impl VulkanBackend {
     /// Initialize descriptor pool manager (M8.3)
     fn initialize_descriptor_pool(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         log::info!("Creating descriptor pool manager");
         self.descriptor_pool_manager = Some(descriptor::DescriptorPoolManager::new(device.clone()));
-        
+
         log::info!("Descriptor pool manager created");
         Ok(())
     }
@@ -1081,7 +1084,7 @@ impl VulkanBackend {
     /// Create default texture sampler (M10 Phase 4)
     fn create_default_sampler(&mut self) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
-        
+
         let sampler_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -1098,9 +1101,9 @@ impl VulkanBackend {
             .mip_lod_bias(0.0)
             .min_lod(0.0)
             .max_lod(0.0);
-        
+
         self.default_sampler = unsafe { device.create_sampler(&sampler_info, None)? };
-        
+
         log::info!("Created default texture sampler");
         Ok(())
     }
@@ -2431,7 +2434,7 @@ impl GraphicsBackend for VulkanBackend {
                 if !self.default_sampler.is_null() {
                     device.destroy_sampler(self.default_sampler, None);
                 }
-                
+
                 // Destroy descriptor set layouts
                 for layout in &self.descriptor_set_layouts {
                     device.destroy_descriptor_set_layout(*layout, None);
@@ -2479,7 +2482,8 @@ impl GraphicsBackend for VulkanBackend {
         let device_ptr = self
             .device
             .as_ref()
-            .context("Device not initialized for graph execution")? as *const VkDevice;
+            .context("Device not initialized for graph execution")?
+            as *const VkDevice;
         let device = unsafe { &*device_ptr };
         let backend_ptr = self as *mut VulkanBackend;
 
@@ -3071,7 +3075,11 @@ struct VulkanPassContext {
 }
 
 impl VulkanPassContext {
-    fn new(device: &VkDevice, command_buffer: vk::CommandBuffer, backend: *mut VulkanBackend) -> Self {
+    fn new(
+        device: &VkDevice,
+        command_buffer: vk::CommandBuffer,
+        backend: *mut VulkanBackend,
+    ) -> Self {
         Self {
             device: device as *const VkDevice,
             command_buffer,
@@ -3222,7 +3230,7 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         // Use a scope to limit the borrow
         let (descriptor_set, pipeline_layout) = {
             let backend = self.backend();
-            
+
             if backend.descriptor_set_layouts.is_empty() {
                 log::warn!("No descriptor set layouts created yet");
                 return Ok(());
@@ -3240,9 +3248,11 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
             // Get or allocate descriptor set for current frame
             let frame_sets = &mut backend.descriptor_sets[current_frame];
             let descriptor_set = if frame_sets.len() <= set as usize {
-                let pool_manager = backend.descriptor_pool_manager.as_mut()
+                let pool_manager = backend
+                    .descriptor_pool_manager
+                    .as_mut()
                     .context("Descriptor pool manager not initialized")?;
-                
+
                 let desc_set = pool_manager.allocate(layout)?;
                 frame_sets.push(desc_set);
                 desc_set
@@ -3293,12 +3303,7 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         Ok(())
     }
 
-    fn push_constants(
-        &mut self,
-        stage_flags: u32,
-        offset: u32,
-        data: &[u8],
-    ) -> Result<()> {
+    fn push_constants(&mut self, stage_flags: u32, offset: u32, data: &[u8]) -> Result<()> {
         log::debug!(
             "VulkanPassContext: Pushing {} bytes of constants at offset {}",
             data.len(),
@@ -3339,11 +3344,7 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         binding: u32,
         texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
-        log::debug!(
-            "VulkanPassContext: Binding texture at set {}, binding {}",
-            set,
-            binding
-        );
+        log::debug!("VulkanPassContext: Binding texture at set {set}, binding {binding}");
 
         // Cast to Vulkan texture
         let texture = unsafe { &*(texture_ptr as *const resources::VulkanTexture) };
@@ -3351,7 +3352,7 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         // Get backend info
         let (descriptor_set, pipeline_layout, default_sampler) = {
             let backend = self.backend();
-            
+
             if backend.descriptor_set_layouts.is_empty() {
                 log::warn!("No descriptor set layouts created yet");
                 return Ok(());
@@ -3365,9 +3366,11 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
             // Get or allocate descriptor set for current frame
             let frame_sets = &mut backend.descriptor_sets[current_frame];
             let descriptor_set = if frame_sets.len() <= set as usize {
-                let pool_manager = backend.descriptor_pool_manager.as_mut()
+                let pool_manager = backend
+                    .descriptor_pool_manager
+                    .as_mut()
                     .context("Descriptor pool manager not initialized")?;
-                
+
                 let desc_set = pool_manager.allocate(layout)?;
                 frame_sets.push(desc_set);
                 desc_set

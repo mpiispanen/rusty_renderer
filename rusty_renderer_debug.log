@@ -1,0 +1,25 @@
+Starting Rusty Renderer v0.1.0
+Initializing logging
+Parsing arguments
+Arguments parsed successfully
+Running application
+Shutdown complete
+ called
+Backend type: Vulkan, headless: true
+ForwardPipeline::build_graph ENTERED for scene 'Textured GLTF Cube'
+About to create camera uniform buffer
+Camera view_proj matrix:
+  row0: [1.5066, -0.6496, -0.4856, -0.4851]
+  row1: [0.0000, 2.1112, -0.4856, -0.4851]
+  row2: [-1.0044, -0.9744, -0.7283, -0.7276]
+  row3: [0.0000, 0.0000, 4.0271, 4.1231]
+Camera uniform buffer created
+GpuMaterial created: base_color=[1.00, 1.00, 1.00], has_texture=1, texture_path=Some("/var/home/matpii01/rusty_renderer/assets/models/.gltf_cache/textured_cube_mat0_basecolor.png")
+Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.10, 0.70, 1.00, 0.00]
+Creating ForwardPass for 'TexturedCube' with material buffer at 0x555e6cd2bb20
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
+("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
+("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
+("texture.png")

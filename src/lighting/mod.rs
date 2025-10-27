@@ -183,7 +183,7 @@ mod tests {
     fn test_lighting_uniforms_size() {
         // Ensure uniform buffer size is what we expect for GPU
         let size = LightingUniforms::size();
-        
+
         // 16 bytes (ambient + count) + 8 * 48 bytes (lights)
         // Each GpuLight: 4 bytes (type) + 12 bytes (padding) + 16 bytes (pos/dir) + 16 bytes (color/intensity) = 48 bytes
         assert_eq!(size, 16 + 8 * 48);
@@ -206,7 +206,7 @@ mod tests {
         };
 
         let uniforms = LightingUniforms::from_scene(&lighting);
-        
+
         // Should only have MAX_LIGHTS (8)
         assert_eq!(uniforms.ambient_light_count[3], 10.0); // Original count stored
     }

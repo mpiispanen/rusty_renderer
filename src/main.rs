@@ -13,12 +13,15 @@ fn main() -> Result<()> {
         let _ = writeln!(f, "Starting Rusty Renderer v{}", env!("CARGO_PKG_VERSION"));
         let _ = f.flush();
     }
-    
+
     // Set up panic hook for better error messages under Wine
     std::panic::set_hook(Box::new(|panic_info| {
-        eprintln!("PANIC: {}", panic_info);
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-            let _ = writeln!(f, "PANIC: {}", panic_info);
+        eprintln!("PANIC: {panic_info}");
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(f, "PANIC: {panic_info}");
         }
     }));
 
@@ -50,26 +53,26 @@ fn main() -> Result<()> {
                 let _ = f.flush();
             }
             r
-        },
+        }
         Err(e) => {
-            eprintln!("Error creating application: {}", e);
+            eprintln!("Error creating application: {e}");
             if let Some(ref mut f) = log_file {
-                let _ = writeln!(f, "Error creating application: {}", e);
+                let _ = writeln!(f, "Error creating application: {e}");
                 let _ = f.flush();
             }
             return Err(e);
         }
     };
-    
+
     eprintln!("Running application...");
     if let Some(ref mut f) = log_file {
         let _ = writeln!(f, "Running application");
         let _ = f.flush();
     }
     if let Err(e) = runner.run() {
-        eprintln!("Error running application: {}", e);
+        eprintln!("Error running application: {e}");
         if let Some(ref mut f) = log_file {
-            let _ = writeln!(f, "Error running application: {}", e);
+            let _ = writeln!(f, "Error running application: {e}");
             let _ = f.flush();
         }
         return Err(e);

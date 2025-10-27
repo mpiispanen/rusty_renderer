@@ -42,39 +42,90 @@
 - [x] Scene file format documentation
 - [x] Implementation summaries
 
-## 🔄 In Progress
+## 🔄 In Progress (Current Focus)
 
-### DirectX 12 Backend
-- [x] Basic setup and initialization
-- [x] Device and command queue creation
-- [x] Swap chain management
-- [x] Complete resource creation
-- [x] Tested with Proton
+### Phase 1: CI Rendering & Visual Regression (CURRENT)
+- [ ] Update CI to render test scenes on Vulkan and DirectX
+- [ ] Enable headless rendering in CI
+- [ ] Automated backend parity validation with FLIP
+- [ ] Golden reference image library
+- [ ] Visual regression reports
 
-## 📋 TODO - High Priority
+**Why This First:** Prevents regressions as we refactor, ensures backends stay in sync
 
-### 1. ✅ Complete DirectX Backend (DONE!)
-- [x] Finish DirectX 12 implementation
-- [x] Cross-compile for Windows
-- [x] Test locally with Proton
-- [x] Verify feature parity with Vulkan
+## 📋 TODO - High Priority (Data-Driven Architecture)
 
-### 2. ✅ GLTF Testing & Enhancement (DONE!)
-- [x] Create/obtain simple GLTF test models
-- [x] Test end-to-end GLTF loading
-- [x] Implement embedded texture extraction
-- [ ] Support additional texture maps:
+See `ARCHITECTURE_REFACTOR_PLAN.md` for detailed plan.
+
+### Phase 2: Remove Hardcoded Shaders (Next)
+- [ ] Design pipeline template format (TOML)
+- [ ] Implement template loader
+- [ ] Dynamic shader loading from templates
+- [ ] Remove hardcoded shader paths from backends
+- [ ] Shader hot-reloading
+
+### Phase 3: Remove Hardcoded Pipeline State
+- [ ] Define state in pipeline templates (depth, culling, blending)
+- [ ] Implement state parser
+- [ ] Refactor backends to use template state
+- [ ] Remove all hardcoded pipeline state
+
+### Phase 4: Remove Hardcoded Resource Bindings
+- [ ] Define descriptor layouts in templates
+- [ ] Dynamic descriptor layout builder
+- [ ] Remove hardcoded binding numbers
+- [ ] Support flexible binding configurations
+
+### Phase 5: Flexible Vertex Formats
+- [ ] Define vertex formats in templates
+- [ ] Support multiple formats per application
+- [ ] Validate geometry against format
+- [ ] Remove single hardcoded format
+
+### Phase 6: Complete Scene-Driven Rendering
+- [ ] Link scenes to pipeline templates
+- [ ] Remove all default materials/textures from code
+- [ ] All data must come from files
+- [ ] Graceful error handling for missing data
+
+### Phase 7: Validation
+- [ ] Zero hardcoded values in backends (automated check)
+- [ ] Runtime pipeline swapping
+- [ ] Hot-reload validation
+- [ ] Complete data-driven architecture verified
+
+## 📋 Completed Features
+
+### Backend Development
+- [x] ✅ DirectX 12 Backend Complete
+- [x] ✅ Vulkan Backend Complete  
+- [x] ✅ Both backends achieve visual parity
+- [x] ✅ Backface culling fixed
+- [x] ✅ Depth testing working
+- [x] ✅ Coordinate system differences handled
+- [x] ✅ Cross-compilation for Windows
+- [x] ✅ Proton testing on Linux
+
+### Scene & Asset System
+- [x] ✅ GLTF Loading
+- [x] ✅ Texture loading and sampling
+- [x] ✅ Scene system with TOML
+- [x] ✅ Forward rendering with lighting
+- [x] ✅ Material system
+
+## 📋 TODO - Medium Priority (After Architecture Refactor)
+
+### Enhanced Rendering Features
+- [ ] Deferred rendering pipeline
+- [ ] Shadow mapping
+- [ ] Post-processing effects  
+- [ ] Multi-pass rendering
+- [ ] Render to texture
+- [ ] Additional texture maps:
   - [ ] Normal maps
   - [ ] Metallic/roughness maps
   - [ ] Ambient occlusion
   - [ ] Emissive maps
-
-### 3. Enhanced Rendering Features
-- [ ] Deferred rendering pipeline
-- [ ] Shadow mapping
-- [ ] Post-processing effects
-- [ ] Multi-pass rendering
-- [ ] Render to texture
 
 ## 📋 TODO - Medium Priority
 
@@ -148,43 +199,54 @@
 
 ## 🎯 Current Sprint Focus
 
-Based on user direction: **"continue implementing"** from asset/GLTF work
+**Data-Driven Architecture Refactor** - Remove all hardcoded rendering
 
-### Immediate Next Steps:
-1. **Create GLTF test model** - Verify end-to-end GLTF loading
-2. **DirectX completion** - Finish DirectX backend implementation
-3. **Proton testing** - Cross-compile and test with Proton
+### Immediate Next Steps (This Week):
+1. **Phase 1: CI Rendering** - Automated visual regression testing
+   - Update CI workflows for headless rendering
+   - Implement backend parity validation
+   - Create golden reference images
+   
+2. **Phase 2: Shader Templates** - Remove hardcoded shaders
+   - Design pipeline template format
+   - Implement template loader
+   - Dynamic shader loading
 
-### After Sprint:
-4. Implement shadow mapping
-5. Add deferred rendering pipeline
+### Next Month:
+3. **Phase 3-4: State & Bindings** - Complete template system
+4. **Phase 5-7: Polish & Validation** - Verify data-driven architecture
 
 ## 📊 Progress Metrics
 
 | Category | Complete | In Progress | TODO |
 |----------|----------|-------------|------|
-| Core Architecture | 95% | 5% | - |
-| Backends | 90% | 10% | - |
+| Core Architecture | 95% | 5% (Data-driven refactor) | - |
+| Backends (Vulkan/DX12) | 100% | - | - |
 | Scene System | 85% | 5% | 10% |
-| Asset Management | 80% | 10% | 10% |
+| Asset Management | 80% | 5% | 15% |
+| Data-Driven Pipeline | 0% | 10% | 90% |
 | Rendering Pipelines | 40% | 10% | 50% |
 | Advanced Features | 10% | 5% | 85% |
+| CI/CD & Testing | 60% | 20% | 20% |
 
 ## 🔍 Known Issues
 
 ### Critical
-- DirectX backend needs backface culling and depth testing fixes
+- ⚠️ **Hardcoded rendering** - Shaders, pipeline state, bindings all hardcoded
+- ⚠️ **No CI rendering** - Visual regressions not caught automatically
+- ⚠️ **Slight color differences** - Vulkan vs DirectX minor color variations
 
 ### Major
 - No embedded texture support in GLTF
-- Missing shadow support
+- No shadow support
 - No deferred rendering
 - No animation support
+- No pipeline templates
+- No hot-reloading
 
 ### Minor
 - Some unused variable warnings
 - No asset caching
-- No hot reload
 - Limited material features
 
 ## 💡 Design Decisions
@@ -226,6 +288,6 @@ Based on user direction: **"continue implementing"** from asset/GLTF work
 
 ---
 
-**Last Updated**: 2025-10-24  
-**Version**: 0.1.0  
-**Status**: Active Development
+**Last Updated**: 2025-10-27  
+**Version**: 0.2.0  
+**Status**: Active Development - Architecture Refactor Phase

@@ -86,67 +86,59 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
-  # TODO: Re-enable GPU tests once old examples are updated
-  # Currently disabled due to known buffer cleanup issues from M10 Phase 1
-  # New unified application works correctly: cargo run -- --scene scenes/triangle.toml
-  # test-gpu:
-  #   name: Test (GPU - Render Graph Examples)
-  #   runs-on: ubuntu-latest
-  #   needs: build
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     
-  #     - name: Install Rust
-  #       uses: dtolnay/rust-toolchain@stable
-  #     
-  #     - name: Install Vulkan software renderer (lavapipe)
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y mesa-vulkan-drivers libvulkan1
-  #     
-  #     - name: Cache cargo
-  #       uses: actions/cache@v4
-  #       with:
-  #         path: |
-  #           ~/.cargo/registry
-  #           ~/.cargo/git
-  #           target
-  #         key: ${{ runner.os }}-cargo-gpu-test-${{ hashFiles('**/Cargo.lock') }}
-  #         restore-keys: |
-  #           ${{ runner.os }}-cargo-gpu-test-
-  #     
-  #     - name: Build examples in release mode
-  #       run: cargo build --release --examples
-  #     
-  #     - name: Test Vulkan headless rendering
-  #       run: |
-  #         mkdir -p screenshots
-  #         RUST_LOG=info ./target/release/examples/render_graph_triangle --headless vulkan
-  #         mv render_graph_triangle.png screenshots/vulkan-triangle.png
-  #       env:
-  #         VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-  #     
-  #     - name: Test wgpu headless rendering
-  #       run: |
-  #         RUST_LOG=info ./target/release/examples/render_graph_triangle --headless wgpu
-  #         mv render_graph_triangle.png screenshots/wgpu-triangle.png
-  #     
-  #     - name: Verify screenshots were created
-  #       run: |
-  #         ls -lh screenshots/
-  #         test -f screenshots/vulkan-triangle.png
-  #         test -s screenshots/vulkan-triangle.png
-  #         test -f screenshots/wgpu-triangle.png
-  #         test -s screenshots/wgpu-triangle.png
-  #         echo "✅ All screenshots created successfully"
-  #     
-  #     - name: Upload Linux screenshots
-  #       if: always()
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: screenshots-linux
-  #         path: screenshots/
-  #         retention-days: 7
+  test-rendering-vulkan:
+    name: Test Vulkan Rendering
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Install Vulkan software renderer (lavapipe)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-gpu-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-gpu-test-
+      
+      - name: Build release binary
+        run: cargo build --release --verbose
+      
+      - name: Test Vulkan headless rendering (textured cube)
+        run: |
+          mkdir -p screenshots/vulkan
+          RUST_LOG=info ./target/release/rusty_renderer \
+            --scene scenes/gltf_textured.toml \
+            --backend vulkan \
+            --pipeline forward \
+            --headless \
+            --screenshot screenshots/vulkan/gltf_textured.png
+          
+          # Verify screenshot was created
+          test -f screenshots/vulkan/gltf_textured.png
+          test -s screenshots/vulkan/gltf_textured.png
+          echo "✅ Vulkan screenshot created successfully"
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+      
+      - name: Upload Vulkan screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-vulkan
+          path: screenshots/vulkan/
+          retention-days: 30
 
   clippy:
     name: Clippy
@@ -245,42 +237,41 @@ jobs:
       - name: Build examples
         run: cargo build --release --examples
       
-      # TODO: Re-enable once old examples are updated for M10
-      # Currently failing due to buffer cleanup issues (known from Phase 1)
-      # New unified application works fine (cargo run -- --scene ...)
-      # - name: Test DirectX 12 with WARP (headless)
-      #   run: |
-      #     Write-Host "Testing DirectX 12 backend with render_graph_triangle example"
-      #     mkdir screenshots
-      #     $env:RUST_LOG = "info"
-      #     ./target/release/examples/render_graph_triangle.exe --headless directx
-      #     Move-Item render_graph_triangle.png screenshots/directx-triangle.png
-      #   shell: powershell
+      - name: Test DirectX 12 headless rendering
+        run: |
+          Write-Host "Testing DirectX 12 backend with textured cube scene"
+          mkdir screenshots/directx -Force
+          $env:RUST_LOG = "info"
+          ./target/release/rusty_renderer.exe `
+            --scene scenes/gltf_textured.toml `
+            --backend directx `
+            --pipeline forward `
+            --headless `
+            --screenshot screenshots/directx/gltf_textured.png
+          
+          # Verify screenshot was created
+          if (Test-Path screenshots/directx/gltf_textured.png) {
+            $fileSize = (Get-Item screenshots/directx/gltf_textured.png).Length
+            Write-Host "DirectX screenshot size: $fileSize bytes"
+            if ($fileSize -gt 0) {
+              Write-Host "✅ DirectX screenshot created successfully"
+            } else {
+              Write-Host "❌ DirectX screenshot is empty"
+              exit 1
+            }
+          } else {
+            Write-Host "❌ DirectX screenshot not found"
+            exit 1
+          }
+        shell: powershell
       
-      # - name: Verify DirectX screenshot
-      #   run: |
-      #     if (Test-Path screenshots/directx-triangle.png) {
-      #       $fileSize = (Get-Item screenshots/directx-triangle.png).Length
-      #       Write-Host "DirectX screenshot size: $fileSize bytes"
-      #       if ($fileSize -gt 0) {
-      #         Write-Host "✅ DirectX screenshot created successfully"
-      #       } else {
-      #         Write-Host "❌ DirectX screenshot is empty"
-      #         exit 1
-      #       }
-      #     } else {
-      #       Write-Host "❌ DirectX screenshot not found"
-      #       exit 1
-      #     }
-      #   shell: powershell
-      
-      # - name: Upload DirectX screenshot
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: screenshots-windows
-      #     path: screenshots/
-      #     retention-days: 7
+      - name: Upload DirectX screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-directx
+          path: screenshots/directx/
+          retention-days: 30
       
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
@@ -288,13 +279,12 @@ jobs:
           name: rusty_renderer-windows
           path: target/release/rusty_renderer.exe
   
-  # Generate comprehensive visual regression report with all backends
-  # TODO: Re-enable after M9.5 when all backends have parity
-  visual-regression-report:
-    name: Visual Regression Report (All Backends)
+  # Visual regression testing - compare backends and check against golden images
+  visual-regression:
+    name: Visual Regression Testing
     runs-on: ubuntu-latest
-    needs: [build-windows]  # test-gpu commented out temporarily
-    if: false  # Temporarily disabled - needs update for M9.5
+    needs: [test-rendering-vulkan, build-windows]
+    if: always()
     steps:
       - uses: actions/checkout@v4
       
@@ -303,69 +293,140 @@ jobs:
         with:
           python-version: '3.x'
       
-      - name: Install FLIP
+      - name: Install FLIP and dependencies
         run: |
           python3 -m pip install --upgrade pip
           pip install flip-evaluator numpy pillow
       
-      - name: Download Linux screenshots
+      - name: Download Vulkan screenshots
         uses: actions/download-artifact@v4
         with:
-          name: screenshots-linux
-          path: screenshots/
+          name: screenshots-vulkan
+          path: screenshots/vulkan/
       
-      - name: Download Windows screenshots
-        continue-on-error: true
+      - name: Download DirectX screenshots
         uses: actions/download-artifact@v4
         with:
-          name: screenshots-windows
-          path: screenshots/
+          name: screenshots-directx
+          path: screenshots/directx/
+        continue-on-error: true
       
       - name: List all screenshots
         run: |
           echo "📸 Available screenshots:"
-          ls -lh screenshots/
-          echo ""
-          echo "Backends detected:"
-          ls screenshots/ | grep -E "(vulkan|wgpu|directx)" || echo "None found"
+          find screenshots -name "*.png" -exec ls -lh {} \;
       
-      - name: Validate missing baselines (if any)
+      - name: Compare Vulkan vs DirectX (Backend Parity)
+        id: backend_parity
         run: |
-          if [ -d references/triangle ] && [ -n "$(ls -A references/triangle/*.png 2>/dev/null || true)" ]; then
-            echo "📋 Checking for missing baselines..."
-            python3 scripts/validate_and_update_baselines.py \
-              references/triangle/ \
-              screenshots/ \
-              --threshold 0.10 || {
-                echo "⚠️  Some baselines missing or invalid"
-                echo "   This is acceptable - baselines may not exist yet"
-                exit 0
+          echo "🔍 Comparing backend outputs..."
+          
+          # Create comparison directory
+          mkdir -p comparisons/backend_parity
+          
+          # Compare if both screenshots exist
+          if [ -f "screenshots/vulkan/gltf_textured.png" ] && [ -f "screenshots/directx/gltf_textured.png" ]; then
+            python3 scripts/flip_compare.py \
+              screenshots/vulkan/gltf_textured.png \
+              screenshots/directx/gltf_textured.png \
+              comparisons/backend_parity/vulkan_vs_directx.png \
+              --threshold 0.05 || {
+                echo "::warning::Backend parity test failed - outputs differ significantly"
+                echo "parity_failed=true" >> $GITHUB_OUTPUT
               }
           else
-            echo "ℹ️  No baselines directory or baselines don't exist yet"
+            echo "⚠️  Missing screenshots - skipping backend comparison"
           fi
       
-      - name: Generate comprehensive visual regression report
+      - name: Compare against golden references
+        id: golden_check
         run: |
-          echo "📊 Generating comprehensive visual regression report..."
-          echo "   Comparing all available backends..."
+          echo "🏆 Comparing against golden reference images..."
           
-          # Generate report - will exit with code 1 if any comparison fails
-          python3 scripts/generate_visual_report.py \
-            screenshots/ \
-            visual-regression-report.html \
-            --temp-dir flip_results
+          mkdir -p comparisons/golden
           
-          # Script exits with code 0 if all pass, 1 if any fail
-          # CI will fail automatically if exit code is 1
+          # Check Vulkan against golden reference
+          if [ -f "references/triangle/gltf_textured_vulkan.png" ] && [ -f "screenshots/vulkan/gltf_textured.png" ]; then
+            python3 scripts/flip_compare.py \
+              references/triangle/gltf_textured_vulkan.png \
+              screenshots/vulkan/gltf_textured.png \
+              comparisons/golden/vulkan_regression.png \
+              --threshold 0.03 || {
+                echo "::warning::Vulkan regression detected - output differs from golden reference"
+                echo "vulkan_regressed=true" >> $GITHUB_OUTPUT
+              }
+          else
+            echo "ℹ️  No golden reference for Vulkan - skipping"
+          fi
+          
+          # Check DirectX against golden reference
+          if [ -f "references/triangle/gltf_textured_directx.png" ] && [ -f "screenshots/directx/gltf_textured.png" ]; then
+            python3 scripts/flip_compare.py \
+              references/triangle/gltf_textured_directx.png \
+              screenshots/directx/gltf_textured.png \
+              comparisons/golden/directx_regression.png \
+              --threshold 0.03 || {
+                echo "::warning::DirectX regression detected - output differs from golden reference"
+                echo "directx_regressed=true" >> $GITHUB_OUTPUT
+              }
+          else
+            echo "ℹ️  No golden reference for DirectX - skipping"
+          fi
+        continue-on-error: true
       
-      - name: Upload comprehensive visual regression report
+      - name: Generate comprehensive visual report
+        run: |
+          echo "📊 Generating visual regression report..."
+          
+          # Prepare all screenshots for report
+          mkdir -p report_input
+          cp -r screenshots/* report_input/ 2>/dev/null || true
+          cp -r comparisons/* report_input/ 2>/dev/null || true
+          
+          # Generate HTML report
+          python3 scripts/generate_visual_report.py \
+            report_input/ \
+            visual-regression-report.html \
+            --temp-dir flip_results || {
+              echo "⚠️  Report generation had issues but continuing..."
+            }
+        continue-on-error: true
+      
+      - name: Upload comparison results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: visual-regression-report-all-backends
+          name: visual-regression-results
           path: |
+            comparisons/
             visual-regression-report.html
             screenshots/
-            flip_results/
           retention-days: 30
+      
+      - name: Check for failures and report
+        if: always()
+        run: |
+          echo "=== Visual Regression Summary ==="
+          
+          if [ "${{ steps.backend_parity.outputs.parity_failed }}" == "true" ]; then
+            echo "❌ Backend parity check FAILED - Vulkan and DirectX outputs differ"
+          else
+            echo "✅ Backend parity check PASSED"
+          fi
+          
+          if [ "${{ steps.golden_check.outputs.vulkan_regressed }}" == "true" ]; then
+            echo "⚠️  Vulkan regression detected"
+          fi
+          
+          if [ "${{ steps.golden_check.outputs.directx_regressed }}" == "true" ]; then
+            echo "⚠️  DirectX regression detected"
+          fi
+          
+          echo ""
+          echo "📊 View detailed report in the visual-regression-results artifact"
+          
+          # Fail if backend parity is broken (critical)
+          if [ "${{ steps.backend_parity.outputs.parity_failed }}" == "true" ]; then
+            echo "::error::Backend parity check failed - backends produce different output!"
+            exit 1
+          fi

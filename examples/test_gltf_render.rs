@@ -23,7 +23,6 @@ fn main() -> Result<()> {
     while i < args.len() {
         match args[i].as_str() {
             "vulkan" => backend_type = BackendType::Vulkan,
-            "wgpu" => backend_type = BackendType::Wgpu,
             "directx" | "dx12" => backend_type = BackendType::DirectX12,
             arg if !arg.starts_with('-') => scene_file = arg,
             _ => {
@@ -34,8 +33,8 @@ fn main() -> Result<()> {
         i += 1;
     }
 
-    println!("Backend: {:?}", backend_type);
-    println!("Scene: {}\n", scene_file);
+    println!("Backend: {backend_type:?}");
+    println!("Scene: {scene_file}\n");
 
     // Load scene
     println!("Loading scene...");
@@ -44,7 +43,7 @@ fn main() -> Result<()> {
     println!("✓ Scene loaded: {} objects", scene.objects.len());
 
     // Create backend
-    println!("\nInitializing {} backend...", backend_type);
+    println!("\nInitializing {backend_type} backend...");
     let mut backend = create_backend(backend_type, false)?;
     backend.initialize_headless(800, 600)?;
     println!("✓ Backend initialized (800x600)");
@@ -58,7 +57,10 @@ fn main() -> Result<()> {
     // Compile render graph
     println!("\nCompiling render graph...");
     let compiled = graph.compile()?;
-    println!("✓ Render graph compiled: {} passes", compiled.execution_order.len());
+    println!(
+        "✓ Render graph compiled: {} passes",
+        compiled.execution_order.len()
+    );
 
     // Execute one frame
     println!("\nExecuting render frame...");
@@ -70,11 +72,11 @@ fn main() -> Result<()> {
     // Capture output
     println!("\nCapturing frame...");
     let (width, height, pixels) = backend.capture_frame()?;
-    println!("Captured frame: {}x{}", width, height);
+    println!("Captured frame: {width}x{height}");
 
     let output_path = "gltf_test.png";
     image::save_buffer(output_path, &pixels, width, height, image::ColorType::Rgba8)?;
-    println!("Saved to: {}", output_path);
+    println!("Saved to: {output_path}");
 
     backend.cleanup();
 

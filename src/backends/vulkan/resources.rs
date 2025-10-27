@@ -156,7 +156,11 @@ impl crate::backends::Buffer for VulkanBuffer {
 
 impl Drop for VulkanBuffer {
     fn drop(&mut self) {
-        log::info!("Dropping Vulkan buffer: {} bytes, handle {:?}", self.size, self.buffer);
+        log::info!(
+            "Dropping Vulkan buffer: {} bytes, handle {:?}",
+            self.size,
+            self.buffer
+        );
         unsafe {
             self.device.destroy_buffer(self.buffer, None);
             self.device.free_memory(self.memory, None);

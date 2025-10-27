@@ -17,7 +17,7 @@ pub enum CameraBackend {
 }
 
 thread_local! {
-    static CAMERA_BACKEND: std::cell::Cell<CameraBackend> = std::cell::Cell::new(CameraBackend::Vulkan);
+    static CAMERA_BACKEND: std::cell::Cell<CameraBackend> = const { std::cell::Cell::new(CameraBackend::Vulkan) };
 }
 
 /// Set the active camera backend (must be called before creating cameras)
@@ -38,18 +38,21 @@ pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, fa
             Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far)
         }
         CameraBackend::DirectX => {
-            // DirectX: left-handed, Y-up, Z depth range [0, 1]  
-            Mat4::perspective_lh(fov_degrees.to_radians(), aspect_ratio, near, far)
+            // DirectX: Use right-handed coordinate system but with Y-flip for NDC
+            // This keeps vertex winding order consistent between backends
+            let mut proj = Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far);
+            // Flip Y in NDC space for DirectX convention (Y=-1 at top, Y=+1 at bottom)
+            proj.y_axis.y *= -1.0;
+            proj
         }
     }
 }
 
 /// Calculate view matrix from position and target
 pub fn look_at_view(position: Vec3, target: Vec3, up: Vec3) -> Mat4 {
-    match get_camera_backend() {
-        CameraBackend::Vulkan => Mat4::look_at_rh(position, target, up),
-        CameraBackend::DirectX => Mat4::look_at_lh(position, target, up),
-    }
+    // Always use right-handed for consistency
+    // DirectX Y-flip is handled in projection matrix
+    Mat4::look_at_rh(position, target, up)
 }
 
 /// Calculate view matrix from position, yaw, and pitch (free-fly camera)
@@ -68,10 +71,9 @@ pub fn free_fly_view(position: Vec3, yaw: f32, pitch: f32) -> Mat4 {
     let target = position + forward;
     let up = Vec3::Y;
 
-    match get_camera_backend() {
-        CameraBackend::Vulkan => Mat4::look_at_rh(position, target, up),
-        CameraBackend::DirectX => Mat4::look_at_lh(position, target, up),
-    }
+    // Always use right-handed for consistency
+    // DirectX Y-flip is handled in projection matrix
+    Mat4::look_at_rh(position, target, up)
 }
 
 #[cfg(test)]

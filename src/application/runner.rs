@@ -147,9 +147,9 @@ impl ApplicationRunner {
 
         log::info!("Loading scene from: {}", scene_path.display());
 
-        let loader = SceneLoader::new()
-            .context("Failed to create scene loader")?;
-        let scene = loader.load_from_file(scene_path)
+        let loader = SceneLoader::new().context("Failed to create scene loader")?;
+        let scene = loader
+            .load_from_file(scene_path)
             .with_context(|| format!("Failed to load scene: {}", scene_path.display()))?;
 
         log::info!("Scene loaded: {}", scene.metadata.name);
@@ -175,10 +175,13 @@ impl ApplicationRunner {
     /// Initialize backend and run the render loop
     fn initialize_and_run(&mut self) -> Result<()> {
         // Debug logging to file
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "initialize_and_run called");
         }
-        
+
         let scene = self.scene.take().context("No scene loaded")?;
         let pipeline = self.pipeline.take().context("No pipeline created")?;
 
@@ -196,9 +199,16 @@ impl ApplicationRunner {
 
         // Determine backend type
         let backend_type = self.args.backend_type();
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-            let _ = writeln!(f, "Backend type: {:?}, headless: {}", backend_type, self.args.headless);
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(
+                f,
+                "Backend type: {:?}, headless: {}",
+                backend_type, self.args.headless
+            );
         }
 
         // Auto-generate screenshot path if max_frames is set but no screenshot path provided
@@ -212,7 +222,9 @@ impl ApplicationRunner {
                     crate::backends::BackendType::Vulkan => "vulkan",
                     crate::backends::BackendType::DirectX12 => "dx12",
                 };
-                Some(std::path::PathBuf::from(format!("{}_{}.png", scene_name, backend_suffix)))
+                Some(std::path::PathBuf::from(format!(
+                    "{scene_name}_{backend_suffix}.png"
+                )))
             } else {
                 None
             }
@@ -262,24 +274,33 @@ impl ApplicationRunner {
             backend.wait_idle()?;
             drop(compiled);
             drop(graph);
-            
+
             pipeline.cleanup(&mut *backend);
             backend.cleanup();
 
             log::info!("Application shutdown complete");
         } else {
             // Windowed mode: create event loop and window
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
                 let _ = writeln!(f, "Entering windowed mode branch");
             }
-            
+
             log::info!("Starting windowed mode...");
-            let event_loop = EventLoop::new()
-                .context("Failed to create event loop")?;
+            let event_loop = EventLoop::new().context("Failed to create event loop")?;
             event_loop.set_control_flow(ControlFlow::Poll);
 
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                let _ = writeln!(f, "Event loop created, max_frames: {}", self.args.max_frames);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "Event loop created, max_frames: {}",
+                    self.args.max_frames
+                );
             }
 
             let mut app = WindowedApp {
@@ -294,14 +315,19 @@ impl ApplicationRunner {
                 max_frames: self.args.max_frames,
             };
 
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
                 let _ = writeln!(f, "About to call run_app");
             }
 
-            event_loop.run_app(&mut app)
-                .context("Event loop error")?;
-                
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            event_loop.run_app(&mut app).context("Event loop error")?;
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
                 let _ = writeln!(f, "run_app returned");
             }
         }
@@ -371,41 +397,50 @@ impl Drop for ApplicationRunner {
 impl Drop for WindowedApp {
     fn drop(&mut self) {
         log::info!("Cleaning up windowed application");
-        
+
         // Wait for GPU to finish before destroying anything
         if let Some(backend) = &mut self.backend {
             let _ = backend.wait_idle();
         }
-        
+
         // Drop graph and compiled first to release buffer references
         self.compiled = None;
         self.graph = None;
-        
+
         // Cleanup pipeline
         if let Some(backend) = &mut self.backend {
             self.pipeline.cleanup(&mut **backend);
             backend.cleanup();
         }
-        
+
         log::info!("Windowed application cleaned up");
     }
 }
 
 impl ApplicationHandler for WindowedApp {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "WindowedApp::resumed called");
         }
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "Window is none: {}", self.window.is_none());
         }
-        
+
         if self.window.is_none() {
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
                 let _ = writeln!(f, "Attempting to create window");
             }
-            
+
             log::info!("Creating window: {}", self.scene.metadata.name);
 
             let window_attributes = Window::default_attributes()
@@ -414,10 +449,13 @@ impl ApplicationHandler for WindowedApp {
 
             match event_loop.create_window(window_attributes) {
                 Ok(window) => {
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "Window created successfully");
                     }
-                    
+
                     log::info!(
                         "Window created: {}x{}",
                         window.inner_size().width,
@@ -426,13 +464,19 @@ impl ApplicationHandler for WindowedApp {
 
                     // Initialize backend with window
                     if let Some(backend) = &mut self.backend {
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "Initializing backend with window");
                         }
-                        
+
                         if let Err(e) = backend.initialize(&window) {
-                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                let _ = writeln!(f, "Backend initialization FAILED: {}", e);
+                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                .append(true)
+                                .open("rusty_renderer_debug.log")
+                            {
+                                let _ = writeln!(f, "Backend initialization FAILED: {e}");
                             }
                             log::error!("Failed to initialize backend: {e}");
                             event_loop.exit();
@@ -448,34 +492,49 @@ impl ApplicationHandler for WindowedApp {
                         }
 
                         // Build render graph
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "Building render graph");
                         }
-                        
+
                         match self.pipeline.build_graph(&self.scene, &mut **backend) {
                             Ok(mut graph) => {
-                                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .append(true)
+                                    .open("rusty_renderer_debug.log")
+                                {
                                     let _ = writeln!(f, "Render graph built successfully");
                                 }
-                                
+
                                 log::info!("Render graph built");
-                                
+
                                 // Compile graph
                                 match graph.compile() {
                                     Ok(compiled) => {
-                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                                            .append(true)
+                                            .open("rusty_renderer_debug.log")
+                                        {
                                             let _ = writeln!(f, "Graph compiled successfully");
                                         }
-                                        
-                                        log::info!("Render graph compiled: {} passes", compiled.execution_order.len());
+
+                                        log::info!(
+                                            "Render graph compiled: {} passes",
+                                            compiled.execution_order.len()
+                                        );
                                         self.compiled = Some(compiled);
                                         self.graph = Some(graph);
                                     }
                                     Err(e) => {
-                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                            let _ = writeln!(f, "Failed to compile graph: {}", e);
+                                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                                            .append(true)
+                                            .open("rusty_renderer_debug.log")
+                                        {
+                                            let _ = writeln!(f, "Failed to compile graph: {e}");
                                         }
-                                        
+
                                         log::error!("Failed to compile render graph: {e}");
                                         event_loop.exit();
                                         return;
@@ -483,10 +542,13 @@ impl ApplicationHandler for WindowedApp {
                                 }
                             }
                             Err(e) => {
-                                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                    let _ = writeln!(f, "Failed to build graph: {}", e);
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .append(true)
+                                    .open("rusty_renderer_debug.log")
+                                {
+                                    let _ = writeln!(f, "Failed to build graph: {e}");
                                 }
-                                
+
                                 log::error!("Failed to build render graph: {e}");
                                 event_loop.exit();
                                 return;
@@ -495,14 +557,20 @@ impl ApplicationHandler for WindowedApp {
                     }
 
                     // Request initial redraw
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "Requesting initial redraw");
                     }
-                    
+
                     window.request_redraw();
                     self.window = Some(window);
-                    
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "Window setup complete, redraw requested");
                     }
                 }
@@ -523,7 +591,7 @@ impl ApplicationHandler for WindowedApp {
         match event {
             WindowEvent::CloseRequested => {
                 log::info!("Close requested, shutting down");
-                
+
                 // Capture screenshot if requested
                 if let Some(ref path) = self.screenshot_path {
                     log::info!("Capturing screenshot to {}", path.display());
@@ -565,89 +633,159 @@ impl ApplicationHandler for WindowedApp {
                 }
             }
             WindowEvent::RedrawRequested => {
-                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                    let _ = writeln!(f, "RedrawRequested: frame_count={}, max_frames={}", self.frame_count, self.max_frames);
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(
+                        f,
+                        "RedrawRequested: frame_count={}, max_frames={}",
+                        self.frame_count, self.max_frames
+                    );
                 }
-                
+
                 // Render a frame
-                if let (Some(backend), Some(graph), Some(compiled)) = 
-                    (&mut self.backend, &self.graph, &self.compiled) {
-                    
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                if let (Some(backend), Some(graph), Some(compiled)) =
+                    (&mut self.backend, &self.graph, &self.compiled)
+                {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "About to begin_frame");
                     }
                     if let Err(e) = backend.begin_frame() {
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "Failed to begin frame: {e}");
                         }
                         log::error!("Failed to begin frame: {e}");
                         return;
                     }
 
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "About to execute_graph");
                     }
                     if let Err(e) = backend.execute_graph(graph, compiled) {
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "Failed to execute render graph: {e}");
                         }
                         log::error!("Failed to execute render graph: {e}");
                         return;
                     }
 
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
                         let _ = writeln!(f, "About to end_frame");
                     }
                     if let Err(e) = backend.end_frame() {
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "Failed to end frame: {e}");
                         }
                         log::error!("Failed to end frame: {e}");
                         return;
                     }
 
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                        let _ = writeln!(f, "end_frame completed successfully, incrementing frame_count");
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(
+                            f,
+                            "end_frame completed successfully, incrementing frame_count"
+                        );
                     }
 
                     // Frame pacing: request next frame immediately
                     self.frame_count += 1;
-                    
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                        let _ = writeln!(f, "frame_count incremented to {}, max_frames={}", self.frame_count, self.max_frames);
+
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(
+                            f,
+                            "frame_count incremented to {}, max_frames={}",
+                            self.frame_count, self.max_frames
+                        );
                     }
-                    
-                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                        let _ = writeln!(f, "Checking if should exit: {} >= {} = {}", 
-                            self.frame_count, self.max_frames, 
-                            self.max_frames > 0 && self.frame_count >= self.max_frames as u64);
+
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(
+                            f,
+                            "Checking if should exit: {} >= {} = {}",
+                            self.frame_count,
+                            self.max_frames,
+                            self.max_frames > 0 && self.frame_count >= self.max_frames as u64
+                        );
                     }
-                    
+
                     // Check if we've reached max frames
                     if self.max_frames > 0 && self.frame_count >= self.max_frames as u64 {
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                            let _ = writeln!(f, "YES! Should exit now. screenshot_path = {:?}", self.screenshot_path);
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
+                            let _ = writeln!(
+                                f,
+                                "YES! Should exit now. screenshot_path = {:?}",
+                                self.screenshot_path
+                            );
                         }
                         log::info!("Rendered {} frames, exiting", self.frame_count);
-                        
-                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             let _ = writeln!(f, "About to check screenshot_path");
                         }
-                        
+
                         // Capture screenshot if requested
                         if let Some(ref path) = self.screenshot_path {
-                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                let _ = writeln!(f, "Capturing final screenshot to {:?}", path);
+                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                .append(true)
+                                .open("rusty_renderer_debug.log")
+                            {
+                                let _ = writeln!(f, "Capturing final screenshot to {path:?}");
                             }
                             log::info!("Capturing final screenshot to {}", path.display());
                             if let Some(backend) = &mut self.backend {
-                                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .append(true)
+                                    .open("rusty_renderer_debug.log")
+                                {
                                     let _ = writeln!(f, "Backend exists, calling capture_frame");
                                 }
                                 match backend.capture_frame() {
                                     Ok((width, height, pixels)) => {
-                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                            let _ = writeln!(f, "capture_frame returned: {}x{}, {} bytes", width, height, pixels.len());
+                                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                                            .append(true)
+                                            .open("rusty_renderer_debug.log")
+                                        {
+                                            let _ = writeln!(
+                                                f,
+                                                "capture_frame returned: {}x{}, {} bytes",
+                                                width,
+                                                height,
+                                                pixels.len()
+                                            );
                                         }
                                         if let Err(e) = image::save_buffer(
                                             path,
@@ -656,31 +794,47 @@ impl ApplicationHandler for WindowedApp {
                                             height,
                                             image::ColorType::Rgba8,
                                         ) {
-                                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                                let _ = writeln!(f, "Failed to save screenshot: {}", e);
+                                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                                .append(true)
+                                                .open("rusty_renderer_debug.log")
+                                            {
+                                                let _ =
+                                                    writeln!(f, "Failed to save screenshot: {e}");
                                             }
                                             log::error!("Failed to save screenshot: {e}");
                                         } else {
-                                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                                let _ = writeln!(f, "Screenshot saved successfully to {:?}", path);
+                                            if let Ok(mut f) = std::fs::OpenOptions::new()
+                                                .append(true)
+                                                .open("rusty_renderer_debug.log")
+                                            {
+                                                let _ = writeln!(
+                                                    f,
+                                                    "Screenshot saved successfully to {path:?}"
+                                                );
                                             }
-                                            log::info!("Screenshot saved: {width}x{height} to {}", path.display());
+                                            log::info!(
+                                                "Screenshot saved: {width}x{height} to {}",
+                                                path.display()
+                                            );
                                         }
                                     }
                                     Err(e) => {
-                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                                            let _ = writeln!(f, "capture_frame FAILED: {}", e);
+                                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                                            .append(true)
+                                            .open("rusty_renderer_debug.log")
+                                        {
+                                            let _ = writeln!(f, "capture_frame FAILED: {e}");
                                         }
                                         log::error!("Failed to capture frame: {e}");
                                     }
                                 }
                             }
                         }
-                        
+
                         event_loop.exit();
                         return;
                     }
-                    
+
                     // Request next frame immediately (wgpu examples pattern)
                     if let Some(window) = &self.window {
                         window.request_redraw();
@@ -691,7 +845,7 @@ impl ApplicationHandler for WindowedApp {
                 // Handle keyboard input
                 if event.state.is_pressed() {
                     use winit::keyboard::{KeyCode, PhysicalKey};
-                    
+
                     if let PhysicalKey::Code(KeyCode::Escape) = event.physical_key {
                         log::info!("Escape pressed, closing window");
                         event_loop.exit();

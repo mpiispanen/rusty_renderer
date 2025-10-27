@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.6.0  
-**Last Updated:** 2025-10-25  
-**Status:** Architecture Refactor - Moving to Data-Driven System
+**Version:** 0.7.0  
+**Last Updated:** 2025-10-27  
+**Status:** Architecture Refactor - Implementing Data-Driven System
 
 ## Project Vision
 
@@ -21,12 +21,14 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 **Phase:** Architecture Refactor - Data-Driven Rendering  
 **Status:** DirectX/Vulkan backends functional, removing hardcoded rendering
 
-### Recent Achievements (Oct 25, 2025)
-- ✅ **DirectX Memory Management Fixed**: Proper heap types, staging buffers, resource states
-- ✅ **DirectX Render Graph Working**: Full cube rendering with lighting
-- ✅ **Backface Culling**: Enabled in DirectX pipeline
-- ✅ **Legacy Code Removed**: No more hardcoded triangle in end_frame()
-- ✅ **Normal-Based Debug Visualization**: Helps verify geometry without textures
+### Recent Achievements (Oct 27, 2025)
+- ✅ **Vulkan Backend**: Renders textured cube with correct lighting and culling
+- ✅ **DirectX Backend**: Renders textured cube with correct lighting and culling
+- ✅ **Backend Parity**: Both backends produce nearly identical output
+- ✅ **Coordinate System Fixes**: Y-axis flipping handled correctly
+- ✅ **GLTF Loading**: Full texture and geometry loading working
+- ✅ **Backface Culling**: Working correctly on both backends
+- ✅ **Depth Testing**: Implemented on both backends
 
 ### Completed (Production Ready on Vulkan + DirectX)
 - ✅ Repository setup with CI/CD pipeline
@@ -51,36 +53,42 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ✅ **Camera system with view-projection matrices**
 - ✅ **Normal transformation for non-uniform scaling**
 
-### Working Features (Vulkan)
-- Forward renderer with diffuse + specular lighting
-- Multiple light types (directional, point)
-- Per-object position, rotation, scale
-- Ambient lighting
-- Material colors
-- Proper resource cleanup (0 validation errors)
-- Headless and windowed modes
+### Working Features (Both Vulkan and DirectX)
+- ✅ Forward renderer with diffuse + specular lighting
+- ✅ Multiple light types (directional, point)
+- ✅ Per-object position, rotation, scale
+- ✅ Ambient lighting
+- ✅ Material colors and textures
+- ✅ GLTF model loading
+- ✅ Texture loading and sampling
+- ✅ Depth testing
+- ✅ Backface culling
+- ✅ Proper resource cleanup (0 validation errors)
+- ✅ Headless and windowed modes
+- ✅ Cross-compilation and Proton testing
 
 ### Known Limitations & Roadmap
 
 **Current Issues:**
-- ❌ **DirectX: No depth testing** (requires depth buffer implementation)
-- ❌ **DirectX: No texture support** (requires descriptor tables)
-- ❌ **Hardcoded shaders**: Embedded HLSL triangle shader as fallback
-- ❌ **Hardcoded vertex data**: Old triangle passes still exist
-- ❌ **Pipeline state hardcoded**: Not driven by templates
+- ⚠️ **Hardcoded shaders**: Shaders compiled from fixed paths, not template-driven
+- ⚠️ **Hardcoded pipeline state**: Depth testing, culling, blending not configurable
+- ⚠️ **Hardcoded resource bindings**: Descriptor layouts fixed in backends
+- ⚠️ **No CI rendering tests**: Visual regressions not caught automatically
+- ⚠️ **Minor color differences**: Slight variations between Vulkan and DirectX output
 
-**Architecture Goals (See `ARCHITECTURE_CLEANUP_ROADMAP.md`):**
-1. **Phase 1: Backend Parity** - Vulkan/DirectX identical output
-2. **Phase 2: Remove Hardcoding** - All data from files
-3. **Phase 3: Pipeline Templates** - Rendering defined by TOML
-4. **Phase 4: Scene-Driven** - Everything from glTF + scene files
-5. **Phase 5: CI/CD** - Automated visual regression testing
-6. **Phase 6: Validation** - Complete data-driven architecture
+**Architecture Goals (See `ARCHITECTURE_REFACTOR_PLAN.md`):**
+1. **Phase 1: CI Rendering** - Automated visual regression testing (CURRENT)
+2. **Phase 2: Shader Templates** - Remove hardcoded shader paths
+3. **Phase 3: State Templates** - Pipeline state driven by templates
+4. **Phase 4: Binding Templates** - Descriptor layouts from templates
+5. **Phase 5: Vertex Formats** - Flexible vertex format support
+6. **Phase 6: Scene-Driven** - Everything from glTF + scene files
+7. **Phase 7: Validation** - Complete data-driven architecture verified
 
 ### In Progress (Current Focus)
-- **Phase 1: Backend Parity** - DirectX depth testing, coordinate fixes
-- **CI Setup**: Automated rendering comparisons between backends
-- See `ARCHITECTURE_CLEANUP_ROADMAP.md` for complete plan
+- **Phase 1: CI Rendering** - Setting up automated rendering tests
+- **Backend Parity Validation**: Automated comparison between Vulkan/DirectX
+- See `ARCHITECTURE_REFACTOR_PLAN.md` for complete plan
 
 ### Coordinate System Handling
 All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while DirectX requires Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.

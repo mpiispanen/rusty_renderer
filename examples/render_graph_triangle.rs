@@ -45,7 +45,6 @@ fn main() -> Result<()> {
         match args[i].as_str() {
             "--headless" => headless = true,
             "vulkan" => backend_type = BackendType::Vulkan,
-            "wgpu" => backend_type = BackendType::Wgpu,
             "directx" | "dx12" => backend_type = BackendType::DirectX12,
             "--help" | "-h" => {
                 println!("Usage: render_graph_triangle [OPTIONS] [BACKEND]");

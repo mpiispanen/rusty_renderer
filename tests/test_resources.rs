@@ -144,11 +144,9 @@ fn test_sampler_creation_vulkan() {
 // ============================================================================
 // wgpu Backend Tests
 // ============================================================================
-
-#[test]
-#[ignore] // Requires GPU
+/* Removed - wgpu backend no longer supported
 fn test_buffer_creation_wgpu() {
-    let mut backend = create_backend(BackendType::Wgpu, false).unwrap();
+    let mut backend = create_backend(BackendType::Vulkan, false).unwrap();
     backend.initialize_headless(800, 600).unwrap();
 
     // Create vertex buffer
@@ -165,11 +163,11 @@ fn test_buffer_creation_wgpu() {
 
     backend.cleanup();
 }
+*/
 
-#[test]
-#[ignore] // Requires GPU
+/* Removed - wgpu backend no longer supported
 fn test_buffer_upload_wgpu() {
-    let mut backend = create_backend(BackendType::Wgpu, false).unwrap();
+    let mut backend = create_backend(BackendType::Vulkan, false).unwrap();
     backend.initialize_headless(800, 600).unwrap();
 
     // Create buffer
@@ -188,11 +186,11 @@ fn test_buffer_upload_wgpu() {
 
     backend.cleanup();
 }
+*/
 
-#[test]
-#[ignore] // Requires GPU
+/* Removed - wgpu backend no longer supported
 fn test_texture_creation_wgpu() {
-    let mut backend = create_backend(BackendType::Wgpu, false).unwrap();
+    let mut backend = create_backend(BackendType::Vulkan, false).unwrap();
     backend.initialize_headless(800, 600).unwrap();
 
     // Create texture
@@ -213,11 +211,11 @@ fn test_texture_creation_wgpu() {
 
     backend.cleanup();
 }
+*/
 
-#[test]
-#[ignore] // Requires GPU
+/* Removed - wgpu backend no longer supported
 fn test_texture_upload_wgpu() {
-    let mut backend = create_backend(BackendType::Wgpu, false).unwrap();
+    let mut backend = create_backend(BackendType::Vulkan, false).unwrap();
     backend.initialize_headless(800, 600).unwrap();
 
     // Create texture
@@ -254,11 +252,10 @@ fn test_texture_upload_wgpu() {
 
     backend.cleanup();
 }
-
-#[test]
-#[ignore] // Requires GPU
+*/
+/* Removed - wgpu backend no longer supported
 fn test_sampler_creation_wgpu() {
-    let mut backend = create_backend(BackendType::Wgpu, false).unwrap();
+    let mut backend = create_backend(BackendType::Vulkan, false).unwrap();
     backend.initialize_headless(800, 600).unwrap();
 
     // Create sampler
@@ -276,6 +273,7 @@ fn test_sampler_creation_wgpu() {
 
     backend.cleanup();
 }
+*/
 
 // ============================================================================
 // DirectX 12 Backend Tests

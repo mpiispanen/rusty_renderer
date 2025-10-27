@@ -156,38 +156,58 @@ impl Transform {
         let r00 = cy * cz;
         let r01 = -cy * sz;
         let r02 = sy;
-        
+
         let r10 = cx * sz + cz * sx * sy;
         let r11 = cx * cz - sx * sy * sz;
         let r12 = -cy * sx;
-        
+
         let r20 = sx * sz - cx * cz * sy;
         let r21 = cz * sx + cx * sy * sz;
         let r22 = cx * cy;
 
         // Scale and combine with translation
         [
-            [r00 * self.scale[0], r01 * self.scale[0], r02 * self.scale[0], 0.0],
-            [r10 * self.scale[1], r11 * self.scale[1], r12 * self.scale[1], 0.0],
-            [r20 * self.scale[2], r21 * self.scale[2], r22 * self.scale[2], 0.0],
-            [self.position[0],    self.position[1],    self.position[2],    1.0],
+            [
+                r00 * self.scale[0],
+                r01 * self.scale[0],
+                r02 * self.scale[0],
+                0.0,
+            ],
+            [
+                r10 * self.scale[1],
+                r11 * self.scale[1],
+                r12 * self.scale[1],
+                0.0,
+            ],
+            [
+                r20 * self.scale[2],
+                r21 * self.scale[2],
+                r22 * self.scale[2],
+                0.0,
+            ],
+            [self.position[0], self.position[1], self.position[2], 1.0],
         ]
     }
 
     /// Calculate the normal matrix (inverse transpose of upper 3x3)
     pub fn normal_matrix(&self) -> [[f32; 4]; 4] {
         let m = self.matrix();
-        
+
         // Extract 3x3 rotation-scale part
-        let m00 = m[0][0]; let m01 = m[0][1]; let m02 = m[0][2];
-        let m10 = m[1][0]; let m11 = m[1][1]; let m12 = m[1][2];
-        let m20 = m[2][0]; let m21 = m[2][1]; let m22 = m[2][2];
-        
+        let m00 = m[0][0];
+        let m01 = m[0][1];
+        let m02 = m[0][2];
+        let m10 = m[1][0];
+        let m11 = m[1][1];
+        let m12 = m[1][2];
+        let m20 = m[2][0];
+        let m21 = m[2][1];
+        let m22 = m[2][2];
+
         // Calculate determinant
-        let det = m00 * (m11 * m22 - m12 * m21)
-                - m01 * (m10 * m22 - m12 * m20)
-                + m02 * (m10 * m21 - m11 * m20);
-        
+        let det = m00 * (m11 * m22 - m12 * m21) - m01 * (m10 * m22 - m12 * m20)
+            + m02 * (m10 * m21 - m11 * m20);
+
         if det.abs() < 1e-6 {
             // Singular matrix, return identity
             return [
@@ -197,23 +217,23 @@ impl Transform {
                 [0.0, 0.0, 0.0, 1.0],
             ];
         }
-        
+
         let inv_det = 1.0 / det;
-        
+
         // Calculate inverse transpose (transpose of inverse = inverse of transpose)
         // For normal transformation, we need inverse transpose
         let n00 = (m11 * m22 - m12 * m21) * inv_det;
         let n01 = (m02 * m21 - m01 * m22) * inv_det;
         let n02 = (m01 * m12 - m02 * m11) * inv_det;
-        
+
         let n10 = (m12 * m20 - m10 * m22) * inv_det;
         let n11 = (m00 * m22 - m02 * m20) * inv_det;
         let n12 = (m02 * m10 - m00 * m12) * inv_det;
-        
+
         let n20 = (m10 * m21 - m11 * m20) * inv_det;
         let n21 = (m01 * m20 - m00 * m21) * inv_det;
         let n22 = (m00 * m11 - m01 * m10) * inv_det;
-        
+
         // Return as 4x4 matrix (padding with 0s and 1 for homogeneous coords)
         [
             [n00, n01, n02, 0.0],
@@ -336,19 +356,19 @@ fn default_intensity() -> f32 {
 pub struct Material {
     /// Material name
     pub name: String,
-    
+
     /// Base color (RGB)
     #[serde(default = "default_white")]
     pub base_color: [f32; 3],
-    
+
     /// Optional diffuse texture path (relative to scene file)
     #[serde(default)]
     pub diffuse_texture: Option<String>,
-    
+
     /// Metallic factor (0.0 = dielectric, 1.0 = metal)
     #[serde(default)]
     pub metallic: f32,
-    
+
     /// Roughness factor (0.0 = smooth, 1.0 = rough)
     #[serde(default = "default_roughness")]
     pub roughness: f32,
@@ -381,7 +401,9 @@ impl Scene {
         // Validate objects
         for (i, obj) in self.objects.iter().enumerate() {
             match obj {
-                SceneObject::Mesh { geometry, material, .. } => {
+                SceneObject::Mesh {
+                    geometry, material, ..
+                } => {
                     if let GeometryData::Inline { vertices, .. } = geometry {
                         if vertices.is_empty() {
                             anyhow::bail!("Object {i} has no vertices");

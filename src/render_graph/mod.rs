@@ -12,8 +12,8 @@ mod resource;
 pub use barrier::{Barrier, BarrierType, ImageBarrier, MemoryAccess, MemoryBarrier};
 pub use graph::{CompiledGraph, RenderGraph};
 pub use pass::{
-    AccessType, ImageLayout, IndexType, PassCallback, PassExecutionContext, PassPreparationContext, PassId, PassKind,
-    PipelineStage, RenderPass, ResourceAccess,
+    AccessType, ImageLayout, IndexType, PassCallback, PassExecutionContext, PassId, PassKind,
+    PassPreparationContext, PipelineStage, RenderPass, ResourceAccess,
 };
 pub use resource::{
     Extent3D, Format, ImageUsageFlags, Resource, ResourceDescriptor, ResourceId, ResourceKind,

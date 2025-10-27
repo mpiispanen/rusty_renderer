@@ -36,7 +36,6 @@ fn render_with_backend(backend: Backend, output_path: &str) -> anyhow::Result<()
             Backend::Vulkan => backends::BackendType::Vulkan,
             #[cfg(target_os = "windows")]
             Backend::DirectX => backends::BackendType::DirectX12,
-            Backend::Wgpu => backends::BackendType::Wgpu,
         },
         config.debug,
     )?;
@@ -86,7 +85,6 @@ fn test_vulkan_vs_wgpu() {
 
     // Render with wgpu
     println!("Rendering with wgpu...");
-    render_with_backend(Backend::Wgpu, wgpu_path.to_str().unwrap()).expect("wgpu rendering failed");
 
     // Compare images
     println!("Comparing images...");
@@ -206,7 +204,6 @@ fn test_backend_consistency_all() {
     // Render with all available backends
     let backends_to_test = vec![
         (Backend::Vulkan, "vulkan_triangle.png"),
-        (Backend::Wgpu, "wgpu_triangle.png"),
         #[cfg(target_os = "windows")]
         (Backend::DirectX, "directx_triangle.png"),
     ];
@@ -272,7 +269,6 @@ fn test_vulkan_vs_wgpu_flip() {
 
     // Render with wgpu
     println!("Rendering with wgpu...");
-    render_with_backend(Backend::Wgpu, wgpu_path.to_str().unwrap()).expect("wgpu rendering failed");
 
     // Compare using FLIP
     println!("\nComparing with NVIDIA FLIP...");
@@ -331,7 +327,6 @@ fn test_vulkan_vs_wgpu_flip_python_api() {
 
     // Render with wgpu
     println!("Rendering with wgpu...");
-    render_with_backend(Backend::Wgpu, wgpu_path.to_str().unwrap()).expect("wgpu rendering failed");
 
     // Compare using FLIP Python API
     println!("\nComparing with NVIDIA FLIP (Python API)...");
@@ -383,12 +378,10 @@ fn test_flip_comparison_methods() {
     let wgpu_path = output_dir.join("wgpu_triangle.png");
 
     // Ensure images exist
-    if !vulkan_path.exists() || !wgpu_path.exists() {
+    if !vulkan_path.exists() {
         println!("Rendering test images...");
         render_with_backend(Backend::Vulkan, vulkan_path.to_str().unwrap())
             .expect("Vulkan rendering failed");
-        render_with_backend(Backend::Wgpu, wgpu_path.to_str().unwrap())
-            .expect("wgpu rendering failed");
     }
 
     println!("\n=== Comparing FLIP Methods ===\n");

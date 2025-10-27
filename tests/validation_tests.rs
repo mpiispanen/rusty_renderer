@@ -69,52 +69,15 @@ fn test_vulkan_validation_disabled() {
 }
 
 #[test]
+#[ignore] // Wgpu backend removed
 fn test_wgpu_validation_enabled() {
-    let config = RenderConfig {
-        backend: Backend::Wgpu,
-        scene: "triangle".to_string(),
-        width: 800,
-        height: 600,
-        debug: true, // Enable validation
-        vsync: false,
-        log_level: log::LevelFilter::Info,
-        max_frames: Some(1),
-        headless: true,
-        screenshot: None,
-        screenshot_interval: 0,
-    };
-
-    // wgpu validation should work on all platforms
-    let result = backends::create_backend(backends::BackendType::Wgpu, config.debug);
-    assert!(
-        result.is_ok(),
-        "wgpu backend with validation should initialize successfully"
-    );
-
-    println!("✅ wgpu validation/debug mode enabled successfully");
+    // Removed - wgpu backend no longer supported
 }
 
 #[test]
+#[ignore] // Wgpu backend removed
 fn test_wgpu_validation_disabled() {
-    let config = RenderConfig {
-        backend: Backend::Wgpu,
-        scene: "triangle".to_string(),
-        width: 800,
-        height: 600,
-        debug: false, // Disable validation
-        vsync: false,
-        log_level: log::LevelFilter::Warn,
-        max_frames: Some(1),
-        headless: true,
-        screenshot: None,
-        screenshot_interval: 0,
-    };
-
-    let result = backends::create_backend(backends::BackendType::Wgpu, config.debug);
-    assert!(
-        result.is_ok(),
-        "wgpu backend without validation should initialize successfully"
-    );
+    // Removed - wgpu backend no longer supported
 }
 
 #[test]
@@ -182,7 +145,7 @@ fn test_directx_validation_disabled() {
 fn test_validation_flag_consistency() {
     // Verify debug flag is properly passed through config
     let config_debug = RenderConfig {
-        backend: Backend::Wgpu,
+        backend: Backend::Vulkan,
         scene: "triangle".to_string(),
         width: 800,
         height: 600,
@@ -196,7 +159,7 @@ fn test_validation_flag_consistency() {
     };
 
     let config_no_debug = RenderConfig {
-        backend: Backend::Wgpu,
+        backend: Backend::Vulkan,
         scene: "triangle".to_string(),
         width: 800,
         height: 600,

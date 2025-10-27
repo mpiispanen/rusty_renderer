@@ -21,8 +21,12 @@ pub struct GpuMaterial {
 impl GpuMaterial {
     /// Create GPU material from scene material
     pub fn from_scene(material: &SceneMaterial) -> Self {
-        let has_texture = if material.diffuse_texture.is_some() { 1.0 } else { 0.0 };
-        
+        let has_texture = if material.diffuse_texture.is_some() {
+            1.0
+        } else {
+            0.0
+        };
+
         let result = Self {
             base_color: [
                 material.base_color[0],
@@ -37,16 +41,20 @@ impl GpuMaterial {
                 0.0, // padding
             ],
         };
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "GpuMaterial created: base_color=[{:.2}, {:.2}, {:.2}], has_texture={}, texture_path={:?}",
-                result.base_color[0], result.base_color[1], result.base_color[2], 
+                result.base_color[0], result.base_color[1], result.base_color[2],
                 has_texture, material.diffuse_texture);
         }
         log::info!("GpuMaterial created: base_color=[{:.2}, {:.2}, {:.2}], has_texture={}, texture_path={:?}",
-            result.base_color[0], result.base_color[1], result.base_color[2], 
+            result.base_color[0], result.base_color[1], result.base_color[2],
             has_texture, material.diffuse_texture);
-        
+
         result
     }
 
@@ -87,12 +95,12 @@ mod tests {
         };
 
         let gpu_mat = GpuMaterial::from_scene(&scene_mat);
-        
+
         assert_eq!(gpu_mat.base_color[0], 1.0);
         assert_eq!(gpu_mat.base_color[1], 0.5);
         assert_eq!(gpu_mat.base_color[2], 0.25);
         assert_eq!(gpu_mat.base_color[3], 1.0); // alpha
-        
+
         assert_eq!(gpu_mat.properties[0], 0.8); // metallic
         assert_eq!(gpu_mat.properties[1], 0.3); // roughness
         assert_eq!(gpu_mat.properties[2], 1.0); // has texture

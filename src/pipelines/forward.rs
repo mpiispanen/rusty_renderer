@@ -18,10 +18,10 @@ use crate::passes::ForwardPass;
 use crate::render_graph::{
     Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
-use std::io::Write;
 use crate::resources::TextureLoader;
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
+use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -53,7 +53,7 @@ impl ForwardPipeline {
         // Use provided normal or calculate default
         let normal = vertex.normal.unwrap_or([0.0, 0.0, 1.0]);
         let uv = vertex.uv.unwrap_or([0.0, 0.0]);
-        
+
         BackendVertex::new(
             vertex.position,
             normal,
@@ -114,7 +114,7 @@ impl ForwardPipeline {
         };
 
         let buffer = backend.create_buffer(&buffer_desc)?;
-        
+
         // Upload camera data
         let data = bytemuck::bytes_of(camera_uniforms);
         backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
@@ -137,7 +137,7 @@ impl ForwardPipeline {
         };
 
         let buffer = backend.create_buffer(&buffer_desc)?;
-        
+
         // Upload lighting data
         let data = bytemuck::bytes_of(lighting_uniforms);
         backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
@@ -160,16 +160,20 @@ impl ForwardPipeline {
         };
 
         let buffer = backend.create_buffer(&buffer_desc)?;
-        
+
         // Upload material data
         let data = material.as_bytes();
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "Uploading material to buffer: base_color=[{:.2}, {:.2}, {:.2}, {:.2}], properties=[{:.2}, {:.2}, {:.2}, {:.2}]",
                 material.base_color[0], material.base_color[1], material.base_color[2], material.base_color[3],
                 material.properties[0], material.properties[1], material.properties[2], material.properties[3]);
         }
-        
+
         backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
 
         Ok(buffer)
@@ -183,7 +187,7 @@ impl ForwardPipeline {
     ) -> Result<Box<dyn Texture>> {
         // Load image from file
         let image = TextureLoader::load_from_file(Path::new(path))
-            .with_context(|| format!("Failed to load texture from '{}'", path))?;
+            .with_context(|| format!("Failed to load texture from '{path}'"))?;
 
         // Create texture descriptor with initial data
         let texture_desc = TextureDescriptor {
@@ -206,7 +210,7 @@ impl ForwardPipeline {
     fn create_default_texture(backend: &mut dyn GraphicsBackend) -> Result<Box<dyn Texture>> {
         // Create 1x1 white RGBA texture
         let white_pixel = vec![255u8, 255, 255, 255]; // RGBA white
-        
+
         let texture_desc = TextureDescriptor {
             width: 1,
             height: 1,
@@ -224,7 +228,9 @@ impl ForwardPipeline {
     }
 
     /// Create a default material buffer
-    fn create_default_material(backend: &mut dyn GraphicsBackend) -> Result<Box<dyn crate::backends::Buffer>> {
+    fn create_default_material(
+        backend: &mut dyn GraphicsBackend,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
         let default_material = GpuMaterial {
             base_color: [1.0, 1.0, 1.0, 1.0], // White
             properties: [0.0, 0.5, 0.0, 0.0], // No metallic, medium roughness, no texture
@@ -286,10 +292,20 @@ impl RenderPipeline for ForwardPipeline {
         scene: &Scene,
         backend: &mut dyn crate::backends::GraphicsBackend,
     ) -> Result<RenderGraph> {
-        log::debug!("Building forward render graph for scene: {}", scene.metadata.name);
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-            let _ = writeln!(f, "ForwardPipeline::build_graph ENTERED for scene '{}'", scene.metadata.name);
+        log::debug!(
+            "Building forward render graph for scene: {}",
+            scene.metadata.name
+        );
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(
+                f,
+                "ForwardPipeline::build_graph ENTERED for scene '{}'",
+                scene.metadata.name
+            );
             let _ = f.flush();
         }
 
@@ -306,19 +322,30 @@ impl RenderPipeline for ForwardPipeline {
         self.camera = Some(camera);
 
         // Create camera uniform buffer
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "About to create camera uniform buffer");
             let _ = writeln!(f, "Camera view_proj matrix:");
             for (i, row) in camera_uniforms.view_proj.iter().enumerate() {
-                let _ = writeln!(f, "  row{}: [{:.4}, {:.4}, {:.4}, {:.4}]", i, row[0], row[1], row[2], row[3]);
+                let _ = writeln!(
+                    f,
+                    "  row{}: [{:.4}, {:.4}, {:.4}, {:.4}]",
+                    i, row[0], row[1], row[2], row[3]
+                );
             }
             let _ = f.flush();
         }
-        let camera_buffer = Self::create_camera_buffer(backend, &camera_uniforms, "camera_uniforms")
-            .context("Failed to create camera uniform buffer")?;
+        let camera_buffer =
+            Self::create_camera_buffer(backend, &camera_uniforms, "camera_uniforms")
+                .context("Failed to create camera uniform buffer")?;
         let camera_buffer = Arc::new(camera_buffer);
-        
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
             let _ = writeln!(f, "Camera uniform buffer created");
             let _ = f.flush();
         }
@@ -336,7 +363,7 @@ impl RenderPipeline for ForwardPipeline {
             lighting_uniforms.ambient_light_count[2],
             lighting_uniforms.ambient_light_count[3]
         );
-        
+
         // Log first light for debugging
         if lighting_uniforms.ambient_light_count[3] > 0.0 {
             let light = &lighting_uniforms.lights[0];
@@ -352,7 +379,7 @@ impl RenderPipeline for ForwardPipeline {
                 light.color_intensity[3]
             );
         }
-        
+
         // Log second light too
         if lighting_uniforms.ambient_light_count[3] > 1.0 {
             let light = &lighting_uniforms.lights[1];
@@ -370,8 +397,9 @@ impl RenderPipeline for ForwardPipeline {
         }
 
         // Create lighting uniform buffer
-        let lighting_buffer = Self::create_lighting_buffer(backend, &lighting_uniforms, "lighting_uniforms")
-            .context("Failed to create lighting uniform buffer")?;
+        let lighting_buffer =
+            Self::create_lighting_buffer(backend, &lighting_uniforms, "lighting_uniforms")
+                .context("Failed to create lighting uniform buffer")?;
         let lighting_buffer = Arc::new(lighting_buffer);
 
         log::info!(
@@ -410,7 +438,7 @@ impl RenderPipeline for ForwardPipeline {
             let default_tex = Self::create_default_texture(backend)
                 .context("Failed to create default texture")?;
             self.default_texture = Some(Arc::new(default_tex));
-            
+
             let default_mat = Self::create_default_material(backend)
                 .context("Failed to create default material")?;
             self.default_material_buffer = Some(Arc::new(default_mat));
@@ -419,7 +447,12 @@ impl RenderPipeline for ForwardPipeline {
         // Process each object in the scene
         for obj in scene.objects.iter() {
             match obj {
-                SceneObject::Mesh { name, geometry, transform, material } => match geometry {
+                SceneObject::Mesh {
+                    name,
+                    geometry,
+                    transform,
+                    material,
+                } => match geometry {
                     GeometryData::Inline { vertices, .. } => {
                         let vertex_count = vertices.len();
                         log::info!("  - Mesh '{name}': {vertex_count} vertices");
@@ -429,29 +462,44 @@ impl RenderPipeline for ForwardPipeline {
 
                         // Create vertex buffer
                         let label = format!("{name}_vertices");
-                        let vertex_buffer = Self::create_vertex_buffer(backend, &vertices_with_normals, &label)
-                            .with_context(|| {
-                            format!("Failed to create vertex buffer for mesh '{name}'")
-                        })?;
+                        let vertex_buffer =
+                            Self::create_vertex_buffer(backend, &vertices_with_normals, &label)
+                                .with_context(|| {
+                                    format!("Failed to create vertex buffer for mesh '{name}'")
+                                })?;
 
                         // Load material and texture if specified, otherwise use defaults
                         let (material_buffer, texture) = if let Some(mat_idx) = material {
                             if *mat_idx < scene.materials.len() {
                                 let scene_material = &scene.materials[*mat_idx];
-                                log::info!("  - Using material '{}' (index {})", scene_material.name, mat_idx);
-                                
+                                log::info!(
+                                    "  - Using material '{}' (index {})",
+                                    scene_material.name,
+                                    mat_idx
+                                );
+
                                 // Create material uniform buffer
                                 let gpu_material = GpuMaterial::from_scene(scene_material);
-                                let material_buffer = Self::create_material_buffer(backend, &gpu_material, &format!("{}_material", name))
-                                    .context("Failed to create material buffer")?;
-                                
+                                let material_buffer = Self::create_material_buffer(
+                                    backend,
+                                    &gpu_material,
+                                    &format!("{name}_material"),
+                                )
+                                .context("Failed to create material buffer")?;
+
                                 // Load texture if specified, otherwise use default white texture
-                                let texture = if let Some(ref texture_path) = scene_material.diffuse_texture {
-                                    log::info!("  - Loading texture: {}", texture_path);
-                                    match Self::load_texture(backend, texture_path, &format!("{}_diffuse", name)) {
+                                let texture = if let Some(ref texture_path) =
+                                    scene_material.diffuse_texture
+                                {
+                                    log::info!("  - Loading texture: {texture_path}");
+                                    match Self::load_texture(
+                                        backend,
+                                        texture_path,
+                                        &format!("{name}_diffuse"),
+                                    ) {
                                         Ok(tex) => Some(Arc::new(tex)),
                                         Err(e) => {
-                                            log::warn!("  - Failed to load texture '{}': {}, using default", texture_path, e);
+                                            log::warn!("  - Failed to load texture '{texture_path}': {e}, using default");
                                             self.default_texture.clone()
                                         }
                                     }
@@ -459,34 +507,46 @@ impl RenderPipeline for ForwardPipeline {
                                     log::info!("  - No texture specified, using default white");
                                     self.default_texture.clone()
                                 };
-                                
+
                                 (Some(Arc::new(material_buffer)), texture)
                             } else {
-                                log::warn!("  - Invalid material index {}, using defaults", mat_idx);
-                                (self.default_material_buffer.clone(), self.default_texture.clone())
+                                log::warn!("  - Invalid material index {mat_idx}, using defaults");
+                                (
+                                    self.default_material_buffer.clone(),
+                                    self.default_texture.clone(),
+                                )
                             }
                         } else {
                             log::info!("  - No material specified, using defaults");
-                            (self.default_material_buffer.clone(), self.default_texture.clone())
+                            (
+                                self.default_material_buffer.clone(),
+                                self.default_texture.clone(),
+                            )
                         };
 
                         // Add forward rendering pass with camera and lighting
                         let vertex_count = vertices_with_normals.len() as u32;
-                        
+
                         // Debug: log which material buffer we're using
-                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .create(true)
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
                             use std::io::Write;
                             match &material_buffer {
                                 Some(buf) => {
-                                    let ptr = buf.as_ref().as_ref() as *const dyn crate::backends::Buffer as *const std::ffi::c_void;
-                                    let _ = writeln!(f, "Creating ForwardPass for '{}' with material buffer at {:p}", name, ptr);
-                                },
+                                    let ptr = buf.as_ref().as_ref()
+                                        as *const dyn crate::backends::Buffer
+                                        as *const std::ffi::c_void;
+                                    let _ = writeln!(f, "Creating ForwardPass for '{name}' with material buffer at {ptr:p}");
+                                }
                                 None => {
-                                    let _ = writeln!(f, "Creating ForwardPass for '{}' with NO material buffer (using default)", name);
+                                    let _ = writeln!(f, "Creating ForwardPass for '{name}' with NO material buffer (using default)");
                                 }
                             }
                         }
-                        
+
                         let _pass = ForwardPass::new(
                             &mut graph,
                             color_buffer,

@@ -21,28 +21,22 @@ fn test_create_directx_backend() {
 }
 
 #[test]
+#[ignore] // Wgpu backend removed
 fn test_create_wgpu_backend() {
-    let backend = create_backend(BackendType::Wgpu, false);
-    assert!(backend.is_ok(), "Failed to create wgpu backend");
-    let backend = backend.unwrap();
-    assert_eq!(backend.backend_type(), BackendType::Wgpu);
+    // Removed - wgpu backend no longer supported
 }
 
 #[test]
 fn test_backend_factory_returns_correct_types() {
     let vulkan = create_backend(BackendType::Vulkan, false).unwrap();
     let directx = create_backend(BackendType::DirectX12, false).unwrap();
-    let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
 
     // Verify each backend has correct type
     assert_eq!(vulkan.backend_type(), BackendType::Vulkan);
     assert_eq!(directx.backend_type(), BackendType::DirectX12);
-    assert_eq!(wgpu.backend_type(), BackendType::Wgpu);
 
     // Verify they're different instances
     assert_ne!(vulkan.backend_type(), directx.backend_type());
-    assert_ne!(vulkan.backend_type(), wgpu.backend_type());
-    assert_ne!(directx.backend_type(), wgpu.backend_type());
 }
 
 #[test]

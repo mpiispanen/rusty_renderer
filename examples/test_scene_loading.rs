@@ -8,8 +8,10 @@ use rusty_renderer::scene::SceneLoader;
 fn main() -> Result<()> {
     println!("=== Scene Loading Test ===\n");
 
+    let loader = SceneLoader::new()?;
+
     // Load triangle scene
-    let scene = SceneLoader::load_from_file("scenes/triangle.toml")?;
+    let scene = loader.load_from_file("scenes/triangle.toml")?;
     println!("✓ Loaded scene: {}", scene.metadata.name);
     println!("  Description: {}", scene.metadata.description);
     println!("  Objects: {}", scene.objects.len());
@@ -17,7 +19,7 @@ fn main() -> Result<()> {
     println!();
 
     // Load quad scene
-    let scene = SceneLoader::load_from_file("scenes/quad.toml")?;
+    let scene = loader.load_from_file("scenes/quad.toml")?;
     println!("✓ Loaded scene: {}", scene.metadata.name);
     println!("  Description: {}", scene.metadata.description);
     println!("  Objects: {}", scene.objects.len());

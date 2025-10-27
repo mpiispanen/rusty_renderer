@@ -48,10 +48,10 @@ mod tests {
 
     #[test]
     fn test_config_creation() {
-        let config = test_config(rusty_renderer::config::Backend::Wgpu, 1024, 768);
+        let config = test_config(rusty_renderer::config::Backend::Vulkan, 1024, 768);
         assert_eq!(config.width, 1024);
         assert_eq!(config.height, 768);
-        assert_eq!(config.backend, rusty_renderer::config::Backend::Wgpu);
+        assert_eq!(config.backend, rusty_renderer::config::Backend::Vulkan);
         assert!(config.debug);
         assert!(!config.vsync);
     }

@@ -22,11 +22,7 @@ use rusty_renderer::backends::{create_backend, BackendType};
 
 #[test]
 fn test_all_backend_types_creatable() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let result = create_backend(backend_type, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().backend_type(), backend_type);
@@ -37,11 +33,9 @@ fn test_all_backend_types_creatable() {
 fn test_backend_type_string_conversion() {
     assert_eq!(BackendType::Vulkan.as_str(), "vulkan");
     assert_eq!(BackendType::DirectX12.as_str(), "directx12");
-    assert_eq!(BackendType::Wgpu.as_str(), "wgpu");
 
     assert_eq!(BackendType::Vulkan.to_string(), "vulkan");
     assert_eq!(BackendType::DirectX12.to_string(), "directx12");
-    assert_eq!(BackendType::Wgpu.to_string(), "wgpu");
 }
 
 #[test]
@@ -51,12 +45,10 @@ fn test_backend_type_equality_and_hash() {
     let mut set = HashSet::new();
     set.insert(BackendType::Vulkan);
     set.insert(BackendType::DirectX12);
-    set.insert(BackendType::Wgpu);
 
-    assert_eq!(set.len(), 3);
+    assert_eq!(set.len(), 2);
     assert!(set.contains(&BackendType::Vulkan));
     assert!(set.contains(&BackendType::DirectX12));
-    assert!(set.contains(&BackendType::Wgpu));
 }
 
 // ============================================================================
@@ -65,11 +57,7 @@ fn test_backend_type_equality_and_hash() {
 
 #[test]
 fn test_all_backends_provide_device() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let backend = create_backend(backend_type, false).unwrap();
         let device = backend.device();
 
@@ -80,11 +68,7 @@ fn test_all_backends_provide_device() {
 
 #[test]
 fn test_device_feature_queries() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let backend = create_backend(backend_type, false).unwrap();
         let device = backend.device();
 
@@ -102,11 +86,7 @@ fn test_device_feature_queries() {
 
 #[test]
 fn test_all_backends_provide_swapchain() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let backend = create_backend(backend_type, false).unwrap();
         let swapchain = backend.swapchain();
 
@@ -121,11 +101,7 @@ fn test_all_backends_provide_swapchain() {
 
 #[test]
 fn test_swapchain_dimensions_reasonable() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let backend = create_backend(backend_type, false).unwrap();
         let swapchain = backend.swapchain();
 
@@ -142,11 +118,7 @@ fn test_swapchain_dimensions_reasonable() {
 #[test]
 #[ignore] // Requires window context for swapchain operations
 fn test_backend_lifecycle_methods() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let mut backend = create_backend(backend_type, false).unwrap();
 
         // All backends should support basic lifecycle
@@ -162,11 +134,7 @@ fn test_backend_lifecycle_methods() {
 #[test]
 #[ignore] // Requires window context for swapchain operations
 fn test_backend_multiple_frame_cycle() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let mut backend = create_backend(backend_type, false).unwrap();
 
         // Should handle multiple frame cycles
@@ -179,11 +147,7 @@ fn test_backend_multiple_frame_cycle() {
 
 #[test]
 fn test_backend_resize_operations() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let mut backend = create_backend(backend_type, false).unwrap();
 
         // Test various resize scenarios
@@ -202,20 +166,14 @@ fn test_backend_resize_operations() {
 fn test_backend_parity_type_consistency() {
     let vulkan = create_backend(BackendType::Vulkan, false).unwrap();
     let directx = create_backend(BackendType::DirectX12, false).unwrap();
-    let wgpu = create_backend(BackendType::Wgpu, false).unwrap();
 
     assert_eq!(vulkan.backend_type(), BackendType::Vulkan);
     assert_eq!(directx.backend_type(), BackendType::DirectX12);
-    assert_eq!(wgpu.backend_type(), BackendType::Wgpu);
 }
 
 #[test]
 fn test_backend_parity_interface() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let backend = create_backend(backend_type, false).unwrap();
 
         // All backends provide same interface
@@ -227,11 +185,7 @@ fn test_backend_parity_interface() {
 
 #[test]
 fn test_multiple_backend_instances() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         // Should be able to create multiple instances
         let backend1 = create_backend(backend_type, false).unwrap();
         let backend2 = create_backend(backend_type, false).unwrap();
@@ -246,11 +200,7 @@ fn test_multiple_backend_instances() {
 
 #[test]
 fn test_multiple_cleanup_calls_safe() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let mut backend = create_backend(backend_type, false).unwrap();
 
         // Multiple cleanup calls should be safe
@@ -262,11 +212,7 @@ fn test_multiple_cleanup_calls_safe() {
 #[test]
 #[ignore] // Requires window context for swapchain operations
 fn test_backend_operations_after_cleanup() {
-    for backend_type in [
-        BackendType::Vulkan,
-        BackendType::DirectX12,
-        BackendType::Wgpu,
-    ] {
+    for backend_type in [BackendType::Vulkan, BackendType::DirectX12] {
         let mut backend = create_backend(backend_type, false).unwrap();
 
         backend.cleanup();

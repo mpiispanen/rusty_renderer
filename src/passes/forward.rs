@@ -107,20 +107,20 @@ impl PassCallback for ForwardPassCallback {
         log::info!("Preparing forward rendering pass");
 
         // Prepare camera uniforms (set 0, binding 0)
-        let camera_ptr = self.camera_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let camera_ptr =
+            self.camera_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
         let camera_size = std::mem::size_of::<CameraUniforms>() as u64;
-        
+
         if let Err(e) = context.prepare_uniform_buffer(0, 0, camera_ptr, 0, camera_size) {
             log::error!("Failed to prepare camera uniforms: {e}");
             return;
         }
 
         // Prepare lighting uniforms (set 0, binding 1)
-        let lighting_ptr = self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let lighting_ptr =
+            self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
         let lighting_size = std::mem::size_of::<LightingUniforms>() as u64;
-        
+
         if let Err(e) = context.prepare_uniform_buffer(0, 1, lighting_ptr, 0, lighting_size) {
             log::error!("Failed to prepare lighting uniforms: {e}");
             return;
@@ -128,10 +128,10 @@ impl PassCallback for ForwardPassCallback {
 
         // Prepare material uniforms (set 0, binding 3) if available
         if let Some(ref material_buffer) = self.material_buffer {
-            let material_ptr = material_buffer.as_ref().as_ref() as *const dyn Buffer
-                as *const std::ffi::c_void;
+            let material_ptr =
+                material_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
             let material_size = 32u64; // GpuMaterial size
-            
+
             if let Err(e) = context.prepare_uniform_buffer(0, 3, material_ptr, 0, material_size) {
                 log::error!("Failed to prepare material uniforms: {e}");
                 return;
@@ -142,7 +142,7 @@ impl PassCallback for ForwardPassCallback {
         if let Some(ref texture) = self.texture {
             let texture_ptr = texture.as_ref().as_ref() as *const dyn crate::backends::Texture
                 as *const std::ffi::c_void;
-            
+
             if let Err(e) = context.prepare_texture(0, 2, texture_ptr) {
                 log::error!("Failed to prepare texture: {e}");
                 return;
@@ -152,7 +152,7 @@ impl PassCallback for ForwardPassCallback {
         // Compute push constant data (model + normal matrices)
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
-        
+
         let mut push_data = Vec::with_capacity(128);
         for row in &model_matrix {
             for &val in row {
@@ -169,34 +169,47 @@ impl PassCallback for ForwardPassCallback {
     }
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
-        log::info!("Executing forward rendering pass with {} vertices", self.vertex_count);
+        log::info!(
+            "Executing forward rendering pass with {} vertices",
+            self.vertex_count
+        );
 
         // Push model and normal matrices as push constants
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
-        
-        log::info!("Model matrix: [{:.2}, {:.2}, {:.2}, {:.2}]", 
-            model_matrix[0][0], model_matrix[0][1], model_matrix[0][2], model_matrix[0][3]);
-        log::info!("Normal matrix: [{:.2}, {:.2}, {:.2}, {:.2}]",
-            normal_matrix[0][0], normal_matrix[0][1], normal_matrix[0][2], normal_matrix[0][3]);
-        
+
+        log::info!(
+            "Model matrix: [{:.2}, {:.2}, {:.2}, {:.2}]",
+            model_matrix[0][0],
+            model_matrix[0][1],
+            model_matrix[0][2],
+            model_matrix[0][3]
+        );
+        log::info!(
+            "Normal matrix: [{:.2}, {:.2}, {:.2}, {:.2}]",
+            normal_matrix[0][0],
+            normal_matrix[0][1],
+            normal_matrix[0][2],
+            normal_matrix[0][3]
+        );
+
         // Combine both matrices into a single byte array (128 bytes total)
         let mut push_data = Vec::with_capacity(128);
-        
+
         // Add model matrix (64 bytes)
         for row in &model_matrix {
             for &val in row {
                 push_data.extend_from_slice(&val.to_ne_bytes());
             }
         }
-        
+
         // Add normal matrix (64 bytes)
         for row in &normal_matrix {
             for &val in row {
                 push_data.extend_from_slice(&val.to_ne_bytes());
             }
         }
-        
+
         // Push constants to vertex shader (stage flag 0x1 = VERTEX)
         if let Err(e) = context.push_constants(0x1, 0, &push_data) {
             log::error!("Failed to push constants: {e}");
@@ -205,10 +218,10 @@ impl PassCallback for ForwardPassCallback {
         log::info!("Push constants uploaded (model + normal matrices)");
 
         // Bind camera uniforms (set 0, binding 0)
-        let camera_ptr = self.camera_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let camera_ptr =
+            self.camera_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
         let camera_size = std::mem::size_of::<CameraUniforms>() as u64;
-        
+
         if let Err(e) = context.bind_uniform_buffer(0, 0, camera_ptr, 0, camera_size) {
             log::error!("Failed to bind camera uniforms: {e}");
             return;
@@ -216,10 +229,10 @@ impl PassCallback for ForwardPassCallback {
         log::info!("Camera uniforms bound");
 
         // Bind lighting uniforms (set 0, binding 1)
-        let lighting_ptr = self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
+        let lighting_ptr =
+            self.lighting_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
         let lighting_size = std::mem::size_of::<LightingUniforms>() as u64;
-        
+
         if let Err(e) = context.bind_uniform_buffer(0, 1, lighting_ptr, 0, lighting_size) {
             log::error!("Failed to bind lighting uniforms: {e}");
             return;
@@ -228,10 +241,10 @@ impl PassCallback for ForwardPassCallback {
 
         // Bind material uniforms (set 0, binding 3) if available
         if let Some(ref material_buffer) = self.material_buffer {
-            let material_ptr = material_buffer.as_ref().as_ref() as *const dyn Buffer
-                as *const std::ffi::c_void;
+            let material_ptr =
+                material_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
             let material_size = 32u64; // GpuMaterial size
-            
+
             if let Err(e) = context.bind_uniform_buffer(0, 3, material_ptr, 0, material_size) {
                 log::error!("Failed to bind material uniforms: {e}");
                 return;
@@ -245,7 +258,7 @@ impl PassCallback for ForwardPassCallback {
         if let Some(ref texture) = self.texture {
             let texture_ptr = texture.as_ref().as_ref() as *const dyn crate::backends::Texture
                 as *const std::ffi::c_void;
-            
+
             if let Err(e) = context.bind_texture(0, 2, texture_ptr) {
                 log::error!("Failed to bind texture: {e}");
                 return;
@@ -256,9 +269,9 @@ impl PassCallback for ForwardPassCallback {
         }
 
         // Bind vertex buffer
-        let vertex_ptr = self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer
-            as *const std::ffi::c_void;
-        
+        let vertex_ptr =
+            self.vertex_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
+
         if let Err(e) = context.bind_vertex_buffer(0, vertex_ptr, 0) {
             log::error!("Failed to bind vertex buffer: {e}");
             return;

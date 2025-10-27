@@ -34,7 +34,6 @@ fn main() -> Result<()> {
     while i < args.len() {
         match args[i].as_str() {
             "vulkan" => backend_type = BackendType::Vulkan,
-            "wgpu" => backend_type = BackendType::Wgpu,
             "directx" | "dx12" => backend_type = BackendType::DirectX12,
             "--help" | "-h" => {
                 print_usage();
@@ -42,7 +41,7 @@ fn main() -> Result<()> {
             }
             arg => {
                 if arg.starts_with('-') {
-                    eprintln!("Unknown option: {}", arg);
+                    eprintln!("Unknown option: {arg}");
                     print_usage();
                     std::process::exit(1);
                 }
@@ -57,17 +56,17 @@ fn main() -> Result<()> {
         "scenes/gltf_textured.toml".to_string()
     });
 
-    println!("Backend: {:?}", backend_type);
-    println!("Model: {}\n", model_path);
+    println!("Backend: {backend_type:?}");
+    println!("Model: {model_path}\n");
 
     // Load scene
     let scene = load_model(&model_path)?;
-    
+
     println!("\n✓ Model loaded successfully!");
     print_scene_info(&scene);
 
     // Create backend
-    println!("\nInitializing {} backend...", backend_type);
+    println!("\nInitializing {backend_type} backend...");
     let mut backend = create_backend(backend_type, false)?;
     backend.initialize_headless(800, 600)?;
     println!("✓ Backend initialized (800x600)");
@@ -81,7 +80,10 @@ fn main() -> Result<()> {
     // Compile render graph
     println!("\nCompiling render graph...");
     let compiled = graph.compile()?;
-    println!("✓ Render graph compiled: {} passes", compiled.execution_order.len());
+    println!(
+        "✓ Render graph compiled: {} passes",
+        compiled.execution_order.len()
+    );
 
     // Execute one frame
     println!("\nRendering...");
@@ -93,50 +95,56 @@ fn main() -> Result<()> {
     // Capture and save output
     println!("\nCapturing frame...");
     let (width, height, pixels) = backend.capture_frame()?;
-    println!("Captured: {}x{}", width, height);
+    println!("Captured: {width}x{height}");
 
     let output_path = generate_output_filename(&model_path, backend_type);
-    image::save_buffer(&output_path, &pixels, width, height, image::ColorType::Rgba8)?;
-    println!("✓ Saved to: {}", output_path);
+    image::save_buffer(
+        &output_path,
+        &pixels,
+        width,
+        height,
+        image::ColorType::Rgba8,
+    )?;
+    println!("✓ Saved to: {output_path}");
 
     backend.cleanup();
 
     println!("\n=== Rendering Complete ===");
-    println!("Output saved to: {}", output_path);
+    println!("Output saved to: {output_path}");
 
     Ok(())
 }
 
 fn load_model(path: &str) -> Result<Scene> {
-    let path_obj = Path::new(path);
-    
+    let _path_obj = Path::new(path);
+
     // Check if it's a TOML scene file or a direct GLTF file
     if path.ends_with(".toml") {
-        println!("Loading scene from TOML: {}", path);
+        println!("Loading scene from TOML: {path}");
         let loader = SceneLoader::new()?;
         loader.load_from_file(path)
     } else if path.ends_with(".gltf") || path.ends_with(".glb") {
-        println!("Loading GLTF model directly: {}", path);
+        println!("Loading GLTF model directly: {path}");
         load_gltf_direct(path)
     } else {
-        anyhow::bail!("Unsupported file format: {}. Expected .toml, .gltf, or .glb", path)
+        anyhow::bail!("Unsupported file format: {path}. Expected .toml, .gltf, or .glb")
     }
 }
 
 fn load_gltf_direct(path: &str) -> Result<Scene> {
     use rusty_renderer::resources::GltfLoader;
-    use rusty_renderer::scene::{Camera, Lighting, Light};
-    
+    use rusty_renderer::scene::{Camera, Light, Lighting};
+
     // Resolve path
     let resolver = AssetPathResolver::new()?;
     let model_dir = Path::new(path).parent();
     let resolved_path = resolver.resolve_and_verify(path, model_dir)?;
-    
+
     println!("Resolved path: {}", resolved_path.display());
-    
+
     // Load GLTF
     let (objects, materials, metadata) = GltfLoader::load(&resolved_path)?;
-    
+
     // Create default camera and lighting
     let camera = Camera::Perspective {
         position: [2.0, 2.0, 3.0],
@@ -146,7 +154,7 @@ fn load_gltf_direct(path: &str) -> Result<Scene> {
         near: 0.1,
         far: 100.0,
     };
-    
+
     let lighting = Lighting {
         ambient: [0.2, 0.2, 0.2],
         lights: vec![
@@ -162,7 +170,7 @@ fn load_gltf_direct(path: &str) -> Result<Scene> {
             },
         ],
     };
-    
+
     Ok(Scene {
         metadata,
         objects,
@@ -178,7 +186,7 @@ fn print_scene_info(scene: &Scene) {
     println!("  Description: {}", scene.metadata.description);
     println!("  Objects: {}", scene.objects.len());
     println!("  Materials: {}", scene.materials.len());
-    
+
     if scene.objects.len() <= 5 {
         println!("\n  Object details:");
         for (i, obj) in scene.objects.iter().enumerate() {
@@ -187,15 +195,19 @@ fn print_scene_info(scene: &Scene) {
                     rusty_renderer::scene::GeometryData::Inline { vertices, .. } => vertices.len(),
                     _ => 0,
                 };
-                println!("    [{}] {} ({} vertices)", i, name, vertex_count);
+                println!("    [{i}] {name} ({vertex_count} vertices)");
             }
         }
     }
-    
+
     if scene.materials.len() <= 10 {
         println!("\n  Materials:");
         for (i, mat) in scene.materials.iter().enumerate() {
-            let has_texture = if mat.diffuse_texture.is_some() { "✓" } else { "✗" };
+            let has_texture = if mat.diffuse_texture.is_some() {
+                "✓"
+            } else {
+                "✗"
+            };
             println!("    [{}] {} [texture: {}]", i, mat.name, has_texture);
         }
     }
@@ -203,17 +215,17 @@ fn print_scene_info(scene: &Scene) {
 
 fn generate_output_filename(input_path: &str, backend: BackendType) -> String {
     let path = Path::new(input_path);
-    let stem = path.file_stem()
+    let stem = path
+        .file_stem()
         .and_then(|s| s.to_str())
         .unwrap_or("output");
-    
+
     let backend_name = match backend {
         BackendType::Vulkan => "vulkan",
-        BackendType::Wgpu => "wgpu",
         BackendType::DirectX12 => "dx12",
     };
-    
-    format!("{}_{}.png", stem, backend_name)
+
+    format!("{stem}_{backend_name}.png")
 }
 
 fn print_usage() {
