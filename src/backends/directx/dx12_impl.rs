@@ -1701,6 +1701,15 @@ impl DirectXBackendImpl {
             }
             crate::backends::MemoryLocation::CpuToGpu | crate::backends::MemoryLocation::GpuToCpu => {
                 // CPU-accessible buffers can be mapped directly
+                
+                // Log material buffers (32 bytes = material size)
+                if data.len() == 32 {
+                    let floats: &[f32] = unsafe { std::slice::from_raw_parts(data.as_ptr() as *const f32, 8) };
+                    log::info!("DX: Uploading 32-byte buffer (material): base_color=[{:.2}, {:.2}, {:.2}, {:.2}], properties=[{:.2}, {:.2}, {:.2}, {:.2}]",
+                        floats[0], floats[1], floats[2], floats[3],
+                        floats[4], floats[5], floats[6], floats[7]);
+                }
+                
                 unsafe {
                     let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
                     dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
@@ -1950,21 +1959,110 @@ impl DirectXBackendImpl {
                 upload_buffer.Unmap(0, None);
             }
 
-            // TODO: Need command list and queue to perform copy
-            // For now, this is a placeholder implementation
-            // Full implementation requires:
-            // 1. Create/get command allocator and list
-            // 2. Record CopyTextureRegion command
-            // 3. Execute command list
-            // 4. Wait for completion
+            // Get or create command list for texture upload
+            let command_list = self.command_list.as_ref().context("Command list not initialized")?;
+            let command_allocator = self.command_allocator.as_ref().context("Command allocator not initialized")?;
+            let command_queue = self.command_queue.as_ref().context("Command queue not initialized")?;
+            
+            // Reset command allocator and list for texture upload
+            unsafe {
+                command_allocator.Reset()?;
+                command_list.Reset(command_allocator, None)?;
+            }
+            
+            // Transition texture to COPY_DEST state
+            let barrier_to_copy = D3D12_RESOURCE_BARRIER {
+                Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                    Transition: std::mem::ManuallyDrop::new(D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: unsafe { std::mem::transmute_copy(&dx_texture.resource) },
+                        Subresource: mip_level,
+                        StateBefore: D3D12_RESOURCE_STATE_COMMON,
+                        StateAfter: D3D12_RESOURCE_STATE_COPY_DEST,
+                    }),
+                },
+            };
+            
+            unsafe {
+                command_list.ResourceBarrier(&[barrier_to_copy]);
+            }
+            
+            // Set up texture copy region
+            let texture_copy_location_dst = D3D12_TEXTURE_COPY_LOCATION {
+                pResource: unsafe { std::mem::transmute_copy(&dx_texture.resource) },
+                Type: D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX,
+                Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                    SubresourceIndex: mip_level,
+                },
+            };
+            
+            let texture_copy_location_src = D3D12_TEXTURE_COPY_LOCATION {
+                pResource: unsafe { std::mem::transmute_copy(&upload_buffer) },
+                Type: D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT,
+                Anonymous: D3D12_TEXTURE_COPY_LOCATION_0 {
+                    PlacedFootprint: D3D12_PLACED_SUBRESOURCE_FOOTPRINT {
+                        Offset: 0,
+                        Footprint: D3D12_SUBRESOURCE_FOOTPRINT {
+                            Format: dx12_helpers::texture_format_to_dxgi(texture.format()),
+                            Width: mip_width,
+                            Height: mip_height,
+                            Depth: 1,
+                            RowPitch: row_pitch,
+                        },
+                    },
+                },
+            };
+            
+            // Copy from upload buffer to texture
+            unsafe {
+                command_list.CopyTextureRegion(
+                    &texture_copy_location_dst,
+                    0, 0, 0, // DstX, DstY, DstZ
+                    &texture_copy_location_src,
+                    None, // Copy entire source
+                );
+            }
+            
+            // Transition texture to PIXEL_SHADER_RESOURCE state
+            let barrier_to_shader = D3D12_RESOURCE_BARRIER {
+                Type: D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+                Flags: D3D12_RESOURCE_BARRIER_FLAG_NONE,
+                Anonymous: D3D12_RESOURCE_BARRIER_0 {
+                    Transition: std::mem::ManuallyDrop::new(D3D12_RESOURCE_TRANSITION_BARRIER {
+                        pResource: unsafe { std::mem::transmute_copy(&dx_texture.resource) },
+                        Subresource: mip_level,
+                        StateBefore: D3D12_RESOURCE_STATE_COPY_DEST,
+                        StateAfter: D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE,
+                    }),
+                },
+            };
+            
+            unsafe {
+                command_list.ResourceBarrier(&[barrier_to_shader]);
+            }
+            
+            // Close and execute command list
+            unsafe {
+                command_list.Close()?;
+                command_queue.ExecuteCommandLists(&[Some(command_list.clone().cast()?)]);
+            }
+            
+            // Wait for upload to complete
+            let fence_value = self.fence_value + 1;
+            self.fence_value = fence_value;
+            
+            unsafe {
+                command_queue.Signal(self.fence.as_ref().context("Fence not initialized")?, fence_value)?;
+                if self.fence.as_ref().unwrap().GetCompletedValue() < fence_value {
+                    self.fence.as_ref().unwrap().SetEventOnCompletion(fence_value, None)?;
+                }
+            }
 
             log::debug!(
-                "DirectX texture upload to mip level {} (staging only)",
-                mip_level
+                "DirectX texture uploaded to mip level {} ({}x{})",
+                mip_level, mip_width, mip_height
             );
-
-            // Note: The upload buffer is dropped here, which is fine for now
-            // In a full implementation, we'd need to keep it alive until GPU is done
 
             Ok(())
         }
@@ -2675,6 +2773,12 @@ impl PassExecutionContext for DirectXPassContext {
 
         unsafe {
             let command_list = self.command_list();
+            
+            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                use std::io::Write;
+                let _ = writeln!(f, "bind_uniform_buffer called: set={}, binding={}, buffer_ptr={:p}", 
+                    set, binding, buffer_ptr);
+            }
 
             // Downcast to DirectX buffer
             let buffer = &*(buffer_ptr as *const DirectXBuffer);
@@ -2771,14 +2875,14 @@ impl PassExecutionContext for DirectXPassContext {
         binding: u32,
         texture_ptr: *const std::ffi::c_void,
     ) -> Result<()> {
-        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
             let _ = writeln!(f, "bind_texture called: set={}, binding={}", set, binding);
         }
         log::debug!("DirectXPassContext: Binding texture at set {}, binding {}", set, binding);
         
         // For MVP, we only support set 0, binding 2 (texture)
         if set != 0 || binding != 2 {
-            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
                 let _ = writeln!(f, "Texture binding SKIPPED (not set 0, binding 2)");
             }
             log::warn!("Only set 0, binding 2 is currently supported for textures, ignoring set {}, binding {}", set, binding);
@@ -2789,10 +2893,15 @@ impl PassExecutionContext for DirectXPassContext {
             // Get texture first
             let texture = &*(texture_ptr as *const DirectXTexture);
             
+            if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                let _ = writeln!(f, "Texture: {}x{}, format: {:?}, has SRV: {}", 
+                    texture.width, texture.height, texture.format, texture.srv_gpu_handle.is_some());
+            }
+            
             // Get GPU descriptor handle for the texture's SRV
             if let Some(gpu_handle) = texture.srv_gpu_handle {
-                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
-                    let _ = writeln!(f, "Binding texture with GPU handle");
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                    let _ = writeln!(f, "Binding texture with GPU handle ptr: {}", gpu_handle.ptr);
                 }
                 // Get pointers
                 let cmd_list_ptr = self.command_list;
@@ -2805,13 +2914,27 @@ impl PassExecutionContext for DirectXPassContext {
                 // Set SRV descriptor heap
                 if let Some(heap) = &backend.cbv_srv_uav_heap {
                     command_list.SetDescriptorHeaps(&[Some(heap.clone())]);
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "Set descriptor heap");
+                    }
+                } else {
+                    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "WARNING: No SRV descriptor heap!");
+                    }
                 }
                 
                 // Root parameter 4 is the descriptor table for textures (t0)
                 command_list.SetGraphicsRootDescriptorTable(4, gpu_handle);
                 
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                    let _ = writeln!(f, "SetGraphicsRootDescriptorTable(4, gpu_handle) called");
+                }
+                
                 log::debug!("DirectXPassContext: Texture bound to root parameter 4 (descriptor table)");
             } else {
+                if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                    let _ = writeln!(f, "WARNING: Texture has no SRV!");
+                }
                 log::warn!("DirectXPassContext: Texture has no SRV, cannot bind");
             }
         }

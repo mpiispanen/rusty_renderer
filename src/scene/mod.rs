@@ -99,12 +99,16 @@ pub enum GeometryData {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct VertexData {
     pub position: [f32; 3],
-    #[serde(default)]
+    #[serde(default = "default_vertex_color")]
     pub color: [f32; 3],
     #[serde(default)]
     pub normal: Option<[f32; 3]>,
     #[serde(default)]
     pub uv: Option<[f32; 2]>,
+}
+
+fn default_vertex_color() -> [f32; 3] {
+    [1.0, 1.0, 1.0] // White - neutral for multiplying with texture/material colors
 }
 
 /// Transform (position, rotation, scale)

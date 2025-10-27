@@ -163,6 +163,13 @@ impl ForwardPipeline {
         
         // Upload material data
         let data = material.as_bytes();
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "Uploading material to buffer: base_color=[{:.2}, {:.2}, {:.2}, {:.2}], properties=[{:.2}, {:.2}, {:.2}, {:.2}]",
+                material.base_color[0], material.base_color[1], material.base_color[2], material.base_color[3],
+                material.properties[0], material.properties[1], material.properties[2], material.properties[3]);
+        }
+        
         backend.upload_to_buffer(buffer.as_ref(), data, 0)?;
 
         Ok(buffer)
@@ -465,6 +472,21 @@ impl RenderPipeline for ForwardPipeline {
 
                         // Add forward rendering pass with camera and lighting
                         let vertex_count = vertices_with_normals.len() as u32;
+                        
+                        // Debug: log which material buffer we're using
+                        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+                            use std::io::Write;
+                            match &material_buffer {
+                                Some(buf) => {
+                                    let ptr = buf.as_ref().as_ref() as *const dyn crate::backends::Buffer as *const std::ffi::c_void;
+                                    let _ = writeln!(f, "Creating ForwardPass for '{}' with material buffer at {:p}", name, ptr);
+                                },
+                                None => {
+                                    let _ = writeln!(f, "Creating ForwardPass for '{}' with NO material buffer (using default)", name);
+                                }
+                            }
+                        }
+                        
                         let _pass = ForwardPass::new(
                             &mut graph,
                             color_buffer,

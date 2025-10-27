@@ -1,0 +1,25 @@
+================================================
+Running rusty_renderer with Proton
+================================================
+Proton: /home/matpii01/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)
+VKD3D Debug: warn
+Arguments: --max-frames 1 --scene scenes/gltf_textured_cube.toml --pipeline forward
+================================================
+
+wine: using kernel write watches, use_kernel_writewatch 1.
+fsync: up and running.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+
+================================================
+Exit code: 1
+================================================

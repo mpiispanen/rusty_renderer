@@ -1,0 +1,116 @@
+Starting Rusty Renderer v0.1.0
+Initializing logging
+Parsing arguments
+Arguments parsed successfully
+Running application
+Shutdown complete
+ called
+Backend type: DirectX12, headless: false
+Entering windowed mode branch
+Event loop created, max_frames: 1
+About to call run_app
+WindowedApp::resumed called
+Window is none: true
+Attempting to create window
+Window created successfully
+Initializing backend with window
+DirectX initialize() ENTERED
+DirectX window size: 800x600
+DirectX enabling validation
+DirectX calling create_factory
+DirectX calling create_device
+DirectX calling create_command_queue
+DirectX calling create_swap_chain
+DirectX calling create_render_targets
+DirectX calling create_depth_stencil
+DirectX calling create_srv_heap
+DirectX calling create_command_objects
+DirectX calling create_fence
+DirectX calling create_pipeline
+Shader compilation SUCCESS for VSMain (vs_5_0)
+Shader compilation SUCCESS for PSMain (ps_5_0)
+DirectX initialized successfully!
+Building render graph
+ForwardPipeline::build_graph ENTERED for scene 'Textured GLTF Cube'
+About to create camera uniform buffer
+Camera view_proj matrix:
+  row0: [-1.5066, -0.6496, -0.4856, -0.4851]
+  row1: [0.0000, 2.1112, -0.4856, -0.4851]
+  row2: [1.0044, -0.9744, -0.7283, -0.7276]
+  row3: [-0.0000, 0.0000, 4.0271, 4.1231]
+create_buffer called: 64 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 64 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+Camera uniform buffer created
+create_buffer called: 400 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 400 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 32 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 32 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+Uploading 32-byte buffer (material?): base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.00, 0.50, 0.00, 0.00]
+create_buffer called: 1728 bytes, usage: BufferUsage { vertex: true, index: false, uniform: false, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 1728 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+GpuMaterial created: base_color=[1.00, 1.00, 1.00], has_texture=1, texture_path=Some("Z:\\var\\home\\matpii01\\rusty_renderer\\assets/models\\.gltf_cache\\textured_cube_mat0_basecolor.png")
+create_buffer called: 32 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: true }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 32 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.10, 0.70, 1.00, 0.00]
+Uploading 32-byte buffer (material?): base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.10, 0.70, 1.00, 0.00]
+Creating ForwardPass for 'TexturedCube' with material buffer at 0x859630
+Render graph built successfully
+Graph compiled successfully
+Requesting initial redraw
+Window setup complete, redraw requested
+RedrawRequested: frame_count=0, max_frames=1
+About to begin_frame
+About to execute_graph
+Push constants: 32 DWORDs (128 bytes) at offset 0
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x8593f0
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102400000, size=64
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x859450
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102410000, size=400
+bind_uniform_buffer called: set=0, binding=3, buffer_ptr=0x859630
+Binding uniform: set=0, binding=3, root_param=3, gpu_addr=0xffff800102440000, size=32
+bind_texture called: set=0, binding=2
+Texture: 256x256, format: Rgba8Unorm, has SRV: true
+Binding texture with GPU handle ptr: 12884901952
+Set descriptor heap
+SetGraphicsRootDescriptorTable(4, gpu_handle) called
+DirectX Draw: 36 vertices, 1 instances
+About to end_frame
+end_frame completed successfully, incrementing frame_count
+frame_count incremented to 1, max_frames=1
+Checking if should exit: 1 >= 1 = true
+YES! Should exit now. screenshot_path = Some("gltf_textured_dx12.png")
+About to check screenshot_path
+Capturing final screenshot to "gltf_textured_dx12.png"
+Backend exists, calling capture_frame
+capture_frame FAILED: Frame capture is only available in headless mode
+run_app returned

@@ -606,19 +606,49 @@ impl ApplicationHandler for WindowedApp {
                         return;
                     }
 
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "end_frame completed successfully, incrementing frame_count");
+                    }
+
                     // Frame pacing: request next frame immediately
                     self.frame_count += 1;
                     
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "frame_count incremented to {}, max_frames={}", self.frame_count, self.max_frames);
+                    }
+                    
+                    if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                        let _ = writeln!(f, "Checking if should exit: {} >= {} = {}", 
+                            self.frame_count, self.max_frames, 
+                            self.max_frames > 0 && self.frame_count >= self.max_frames as u64);
+                    }
+                    
                     // Check if we've reached max frames
                     if self.max_frames > 0 && self.frame_count >= self.max_frames as u64 {
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                            let _ = writeln!(f, "YES! Should exit now. screenshot_path = {:?}", self.screenshot_path);
+                        }
                         log::info!("Rendered {} frames, exiting", self.frame_count);
+                        
+                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                            let _ = writeln!(f, "About to check screenshot_path");
+                        }
                         
                         // Capture screenshot if requested
                         if let Some(ref path) = self.screenshot_path {
+                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                let _ = writeln!(f, "Capturing final screenshot to {:?}", path);
+                            }
                             log::info!("Capturing final screenshot to {}", path.display());
                             if let Some(backend) = &mut self.backend {
+                                if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                    let _ = writeln!(f, "Backend exists, calling capture_frame");
+                                }
                                 match backend.capture_frame() {
                                     Ok((width, height, pixels)) => {
+                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                            let _ = writeln!(f, "capture_frame returned: {}x{}, {} bytes", width, height, pixels.len());
+                                        }
                                         if let Err(e) = image::save_buffer(
                                             path,
                                             &pixels,
@@ -626,12 +656,21 @@ impl ApplicationHandler for WindowedApp {
                                             height,
                                             image::ColorType::Rgba8,
                                         ) {
+                                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                                let _ = writeln!(f, "Failed to save screenshot: {}", e);
+                                            }
                                             log::error!("Failed to save screenshot: {e}");
                                         } else {
+                                            if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                                let _ = writeln!(f, "Screenshot saved successfully to {:?}", path);
+                                            }
                                             log::info!("Screenshot saved: {width}x{height} to {}", path.display());
                                         }
                                     }
                                     Err(e) => {
+                                        if let Ok(mut f) = std::fs::OpenOptions::new().append(true).open("rusty_renderer_debug.log") {
+                                            let _ = writeln!(f, "capture_frame FAILED: {}", e);
+                                        }
                                         log::error!("Failed to capture frame: {e}");
                                     }
                                 }

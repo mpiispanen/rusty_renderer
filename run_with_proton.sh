@@ -20,7 +20,7 @@ TEST_DIR="windows_test_directx"
 VKD3D_DEBUG_LEVEL="warn"
 APP_ARGS=()
 DEFAULT_SCENE="scenes/gltf_textured.toml"
-DEFAULT_MAX_FRAMES="3"
+DEFAULT_MAX_FRAMES=""  # No frame limit by default
 DEFAULT_PIPELINE="forward"
 
 # Parse arguments
@@ -43,19 +43,14 @@ if [[ ! " ${APP_ARGS[@]} " =~ " --scene " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -s 
     APP_ARGS+=("--scene" "$DEFAULT_SCENE")
 fi
 
-# If no --max-frames argument was provided, add the default
-if [[ ! " ${APP_ARGS[@]} " =~ " --max-frames " ]]; then
+# If no --max-frames argument was provided, add the default (if set)
+if [[ ! " ${APP_ARGS[@]} " =~ " --max-frames " ]] && [[ -n "$DEFAULT_MAX_FRAMES" ]]; then
     APP_ARGS+=("--max-frames" "$DEFAULT_MAX_FRAMES")
 fi
 
 # If no --pipeline argument was provided, add the default
 if [[ ! " ${APP_ARGS[@]} " =~ " --pipeline " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -p " ]]; then
     APP_ARGS+=("--pipeline" "$DEFAULT_PIPELINE")
-fi
-
-# If max-frames is set and no explicit headless flag, add --headless for automatic screenshot
-if [[ " ${APP_ARGS[@]} " =~ " --max-frames " ]] && [[ ! " ${APP_ARGS[@]} " =~ " --headless " ]]; then
-    APP_ARGS+=("--headless")
 fi
 
 # Check if Proton exists

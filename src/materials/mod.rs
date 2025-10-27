@@ -6,6 +6,7 @@
 //! - GPU-side material data structures
 
 use crate::scene::Material as SceneMaterial;
+use std::io::Write;
 
 /// GPU-friendly material data (std140 layout)
 #[repr(C)]
@@ -20,7 +21,9 @@ pub struct GpuMaterial {
 impl GpuMaterial {
     /// Create GPU material from scene material
     pub fn from_scene(material: &SceneMaterial) -> Self {
-        Self {
+        let has_texture = if material.diffuse_texture.is_some() { 1.0 } else { 0.0 };
+        
+        let result = Self {
             base_color: [
                 material.base_color[0],
                 material.base_color[1],
@@ -30,10 +33,21 @@ impl GpuMaterial {
             properties: [
                 material.metallic,
                 material.roughness,
-                if material.diffuse_texture.is_some() { 1.0 } else { 0.0 },
+                has_texture,
                 0.0, // padding
             ],
+        };
+        
+        if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open("rusty_renderer_debug.log") {
+            let _ = writeln!(f, "GpuMaterial created: base_color=[{:.2}, {:.2}, {:.2}], has_texture={}, texture_path={:?}",
+                result.base_color[0], result.base_color[1], result.base_color[2], 
+                has_texture, material.diffuse_texture);
         }
+        log::info!("GpuMaterial created: base_color=[{:.2}, {:.2}, {:.2}], has_texture={}, texture_path={:?}",
+            result.base_color[0], result.base_color[1], result.base_color[2], 
+            has_texture, material.diffuse_texture);
+        
+        result
     }
 
     /// Convert to raw bytes for GPU upload
