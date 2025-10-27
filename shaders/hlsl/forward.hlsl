@@ -62,29 +62,52 @@ PSInput VSMain(VSInput input) {
 
 float4 PSMain(PSInput input) : SV_TARGET {
     // Start with base color
-    float3 color = baseColor.rgb;
+    float3 albedo = baseColor.rgb;
     
     // Sample and apply texture if available  
     if (properties.z > 0.5) {
         float4 texColor = diffuseTexture.Sample(diffuseSampler, input.uv);
-        color *= texColor.rgb;
+        albedo *= texColor.rgb;
     }
     
     // Blend with vertex color
-    color *= input.color.rgb;
+    albedo *= input.color.rgb;
     
-    // Simple ambient lighting
+    // Normalize the normal
+    float3 normal = normalize(input.normal);
+    
+    // Start with ambient light
     float3 ambient = ambientLightCount.xyz;
-    float3 finalColor = ambient * color;
+    float3 finalColor = ambient * albedo;
     
-    // Add a simple diffuse term for the first directional light
+    // Accumulate light contributions
     int lightCount = (int)ambientLightCount.w;
-    if (lightCount > 0 && lights[0].lightType == LIGHT_DIRECTIONAL) {
-        float3 lightDir = normalize(-lights[0].positionOrDirection.xyz);
-        float3 normal = normalize(input.normal);
-        float diff = max(dot(normal, lightDir), 0.0);
-        finalColor += diff * lights[0].colorIntensity.rgb * lights[0].colorIntensity.a * color;
+    for (int i = 0; i < lightCount && i < MAX_LIGHTS; i++) {
+        if (lights[i].lightType == LIGHT_DIRECTIONAL) {
+            // Directional light
+            float3 lightDir = normalize(-lights[i].positionOrDirection.xyz);
+            float diff = max(dot(normal, lightDir), 0.0);
+            float3 diffuse = diff * lights[i].colorIntensity.rgb;
+            float intensity = lights[i].colorIntensity.a;
+            finalColor += diffuse * intensity * albedo;
+        } else if (lights[i].lightType == LIGHT_POINT) {
+            // Point light
+            float3 lightPos = lights[i].positionOrDirection.xyz;
+            float3 toLight = lightPos - input.worldPos;
+            float distance = length(toLight);
+            float3 lightDir = normalize(toLight);
+            
+            // Attenuation
+            float attenuation = 1.0 / max(distance * distance, 0.01);
+            
+            // Diffuse
+            float diff = max(dot(normal, lightDir), 0.0);
+            float3 diffuse = diff * lights[i].colorIntensity.rgb;
+            float intensity = lights[i].colorIntensity.a;
+            finalColor += diffuse * intensity * attenuation * albedo;
+        }
     }
     
     return float4(finalColor, 1.0);
 }
+
