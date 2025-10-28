@@ -443,17 +443,31 @@ def main():
     
     # Find all backend screenshots
     backends = {}
-    for png_file in screenshot_dir.glob("*triangle*.png"):
-        name = png_file.stem
-        if "vulkan" in name.lower():
-            backends["vulkan"] = png_file
-        elif "wgpu" in name.lower():
-            backends["wgpu"] = png_file
-        elif "directx" in name.lower() or "dx" in name.lower():
-            backends["directx"] = png_file
+    
+    # First, try to find screenshots in subdirectories (vulkan/, directx/, etc.)
+    for backend_dir in screenshot_dir.iterdir():
+        if backend_dir.is_dir():
+            backend_name = backend_dir.name.lower()
+            # Find first PNG in this backend directory
+            for png_file in backend_dir.glob("*.png"):
+                backends[backend_name] = png_file
+                break
+    
+    # If no subdirectories, look for screenshots in the root directory
+    if len(backends) == 0:
+        for png_file in screenshot_dir.glob("*.png"):
+            name = png_file.stem.lower()
+            if "vulkan" in name:
+                backends["vulkan"] = png_file
+            elif "wgpu" in name:
+                backends["wgpu"] = png_file
+            elif "directx" in name or "dx" in name:
+                backends["directx"] = png_file
     
     if len(backends) < 2:
         print(f"Error: Need at least 2 backend screenshots, found {len(backends)}", file=sys.stderr)
+        print(f"Searched in: {screenshot_dir}", file=sys.stderr)
+        print(f"Found backends: {list(backends.keys())}", file=sys.stderr)
         sys.exit(1)
     
     print(f"Found backends: {', '.join(backends.keys())}")
