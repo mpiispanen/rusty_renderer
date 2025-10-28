@@ -255,11 +255,30 @@ fn compile_hlsl_shaders(out_dir: &str) {
 }
 
 fn compile_forward_shaders() {
-    println!("cargo:warning=Compiling forward shaders from HLSL to SPIR-V");
-    
     let hlsl_src = "shaders/hlsl/forward.hlsl";
     let vert_spv = "shaders/forward.vert.spv";
     let frag_spv = "shaders/forward.frag.spv";
+    
+    // Check if shaders already exist
+    if Path::new(vert_spv).exists() && Path::new(frag_spv).exists() {
+        println!("cargo:warning=Using pre-compiled forward shaders");
+        return;
+    }
+    
+    // Check if glslangValidator is available
+    if Command::new("glslangValidator").arg("--version").output().is_err() {
+        eprintln!("Warning: glslangValidator not found");
+        eprintln!("Pre-compiled shaders should exist at:");
+        eprintln!("  - {}", vert_spv);
+        eprintln!("  - {}", frag_spv);
+        
+        if !Path::new(vert_spv).exists() || !Path::new(frag_spv).exists() {
+            panic!("glslangValidator not found and no pre-compiled shaders available!");
+        }
+        return;
+    }
+    
+    println!("cargo:warning=Compiling forward shaders from HLSL to SPIR-V");
     
     // Compile vertex shader with VULKAN define
     let vert_result = Command::new("glslangValidator")
