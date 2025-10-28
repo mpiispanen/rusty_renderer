@@ -88,7 +88,7 @@ jobs:
 
   test-rendering-vulkan:
     name: Test Vulkan Rendering
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, GPU]
     needs: build
     steps:
       - uses: actions/checkout@v4
@@ -96,10 +96,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       
-      - name: Install Vulkan software renderer (lavapipe)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers libvulkan1
+      # No need to install lavapipe - using real GPU on self-hosted runner
       
       - name: Cache cargo
         uses: actions/cache@v4
@@ -129,8 +126,6 @@ jobs:
           test -f screenshots/vulkan/gltf_textured.png
           test -s screenshots/vulkan/gltf_textured.png
           echo "✅ Vulkan screenshot created successfully"
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
       
       - name: Upload Vulkan screenshots
         if: always()
