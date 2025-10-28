@@ -1170,7 +1170,7 @@ impl VulkanBackend {
         let clear_values = &[
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
+                    float32: [0.1, 0.1, 0.2, 1.0], // Dark blue background (matches DirectX)
                 },
             },
             vk::ClearValue {
@@ -2511,7 +2511,7 @@ impl GraphicsBackend for VulkanBackend {
         let clear_values = &[
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
+                    float32: [0.1, 0.1, 0.2, 1.0], // Dark blue background (matches DirectX)
                 },
             },
             vk::ClearValue {

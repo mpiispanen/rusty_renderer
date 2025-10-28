@@ -77,6 +77,13 @@ float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize the normal
     float3 normal = normalize(input.normal);
     
+    // View direction (assuming camera at origin - matches Vulkan shader)
+    float3 viewDir = normalize(-input.worldPos);
+    
+    // Material properties (match Vulkan shader)
+    const float shininess = 32.0;
+    const float specularStrength = 0.5;
+    
     // Start with ambient light
     float3 ambient = ambientLightCount.xyz;
     float3 finalColor = ambient * albedo;
@@ -84,29 +91,35 @@ float4 PSMain(PSInput input) : SV_TARGET {
     // Accumulate light contributions
     int lightCount = (int)ambientLightCount.w;
     for (int i = 0; i < lightCount && i < MAX_LIGHTS; i++) {
+        float3 lightDir;
+        float attenuation = 1.0;
+        
         if (lights[i].lightType == LIGHT_DIRECTIONAL) {
             // Directional light
-            float3 lightDir = normalize(-lights[i].positionOrDirection.xyz);
-            float diff = max(dot(normal, lightDir), 0.0);
-            float3 diffuse = diff * lights[i].colorIntensity.rgb;
-            float intensity = lights[i].colorIntensity.a;
-            finalColor += diffuse * intensity * albedo;
+            lightDir = normalize(-lights[i].positionOrDirection.xyz);
         } else if (lights[i].lightType == LIGHT_POINT) {
             // Point light
             float3 lightPos = lights[i].positionOrDirection.xyz;
             float3 toLight = lightPos - input.worldPos;
             float distance = length(toLight);
-            float3 lightDir = normalize(toLight);
+            lightDir = normalize(toLight);
             
-            // Attenuation
-            float attenuation = 1.0 / max(distance * distance, 0.01);
-            
-            // Diffuse
-            float diff = max(dot(normal, lightDir), 0.0);
-            float3 diffuse = diff * lights[i].colorIntensity.rgb;
-            float intensity = lights[i].colorIntensity.a;
-            finalColor += diffuse * intensity * attenuation * albedo;
+            // Attenuation (inverse square law with minimum)
+            attenuation = 1.0 / max(distance * distance, 0.01);
         }
+        
+        // Diffuse (Lambertian)
+        float diff = max(dot(normal, lightDir), 0.0);
+        float3 diffuse = diff * lights[i].colorIntensity.rgb;
+        
+        // Specular (Blinn-Phong) - NOW MATCHES VULKAN
+        float3 halfwayDir = normalize(lightDir + viewDir);
+        float spec = pow(max(dot(normal, halfwayDir), 0.0), shininess);
+        float3 specular = specularStrength * spec * lights[i].colorIntensity.rgb;
+        
+        // Apply intensity and attenuation
+        float intensity = lights[i].colorIntensity.a;
+        finalColor += (diffuse + specular) * intensity * attenuation * albedo;
     }
     
     return float4(finalColor, 1.0);

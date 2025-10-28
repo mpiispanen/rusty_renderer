@@ -16,10 +16,4 @@ Camera view_proj matrix:
 Camera uniform buffer created
 GpuMaterial created: base_color=[1.00, 1.00, 1.00], has_texture=1, texture_path=Some("/var/home/matpii01/rusty_renderer/assets/models/.gltf_cache/textured_cube_mat0_basecolor.png")
 Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.10, 0.70, 1.00, 0.00]
-Creating ForwardPass for 'TexturedCube' with material buffer at 0x555e6cd2bb20
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
-("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
-("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
-("texture.png")
+Creating ForwardPass for 'TexturedCube' with material buffer at 0x55915baf7a80
