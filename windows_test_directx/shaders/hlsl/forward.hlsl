@@ -21,7 +21,16 @@ cbuffer LightingUniforms : register(b1) {
     Light lights[MAX_LIGHTS];
 };
 
-cbuffer PushConstants : register(b2) {
+// Push constants: use Vulkan attribute when compiling to SPIR-V
+// DirectX runtime compiler will ignore the [[vk::push_constant]] attribute
+#ifdef VULKAN
+[[vk::push_constant]]
+#endif
+cbuffer PushConstants
+#ifndef VULKAN
+: register(b2)
+#endif
+{
     float4x4 model;
     float4x4 normalMatrix;
 };
@@ -54,8 +63,14 @@ PSInput VSMain(VSInput input) {
     float4 worldPos = mul(model, float4(input.position, 1.0));
     output.worldPos = worldPos.xyz;
     output.normal = mul((float3x3)normalMatrix, input.normal);
-    // Flip V coordinate for DirectX texture convention (V=0 at top vs Vulkan V=0 at bottom)
-    output.uv = float2(input.uv.x, 1.0 - input.uv.y);
+    
+    // UV handling: DirectX has V=0 at top, Vulkan has V=0 at bottom
+    #ifdef VULKAN
+    output.uv = input.uv;  // No flip for Vulkan
+    #else
+    output.uv = float2(input.uv.x, 1.0 - input.uv.y);  // Flip V for DirectX
+    #endif
+    
     output.color = input.color;
     output.position = mul(viewProj, worldPos);
     return output;

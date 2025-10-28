@@ -698,12 +698,12 @@ impl VulkanBackend {
         let vert_stage = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::VERTEX)
             .module(vert_shader_module)
-            .name(b"main\0");
+            .name(b"VSMain\0"); // HLSL entry point
 
         let frag_stage = vk::PipelineShaderStageCreateInfo::builder()
             .stage(vk::ShaderStageFlags::FRAGMENT)
             .module(frag_shader_module)
-            .name(b"main\0");
+            .name(b"PSMain\0"); // HLSL entry point
 
         let stages = &[vert_stage, frag_stage];
 

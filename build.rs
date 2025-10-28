@@ -8,12 +8,17 @@ fn main() {
     println!("cargo:rerun-if-changed=shaders/triangle.vert");
     println!("cargo:rerun-if-changed=shaders/triangle.frag");
     println!("cargo:rerun-if-changed=shaders/hlsl/triangle.hlsl");
+    println!("cargo:rerun-if-changed=shaders/hlsl/forward.hlsl");
 
     let out_dir = env::var("OUT_DIR").unwrap();
 
     // Compile HLSL shaders for DirectX (Windows only)
     #[cfg(target_os = "windows")]
     compile_hlsl_shaders(&out_dir);
+
+    // Compile forward rendering shaders from HLSL to SPIR-V
+    // This ensures both Vulkan and DirectX use the same shader source
+    compile_forward_shaders();
 
     // Note: For cross-compilation from Linux, we skip HLSL compilation
     // and embed pre-compiled bytecode instead
@@ -246,5 +251,88 @@ fn compile_hlsl_shaders(out_dir: &str) {
                 }
             }
         }
+    }
+}
+
+fn compile_forward_shaders() {
+    println!("cargo:warning=Compiling forward shaders from HLSL to SPIR-V");
+    
+    let hlsl_src = "shaders/hlsl/forward.hlsl";
+    let vert_spv = "shaders/forward.vert.spv";
+    let frag_spv = "shaders/forward.frag.spv";
+    
+    // Compile vertex shader with VULKAN define
+    let vert_result = Command::new("glslangValidator")
+        .arg("-V")              // Generate SPIR-V (automatically defines VULKAN)
+        .arg("-D")              // Input is HLSL
+        .arg("-e")
+        .arg("VSMain")          // Entry point
+        .arg("--hlsl-iomap")    // Use HLSL I/O mapping
+        .arg("-S")
+        .arg("vert")            // Shader stage
+        .arg(hlsl_src)
+        .arg("-o")
+        .arg(vert_spv)
+        .output()
+        .expect("Failed to run glslangValidator for forward vertex shader");
+    
+    if !vert_result.status.success() {
+        panic!(
+            "Forward vertex shader compilation failed:\n{}",
+            String::from_utf8_lossy(&vert_result.stderr)
+        );
+    }
+    
+    // Compile fragment shader with VULKAN define
+    let frag_result = Command::new("glslangValidator")
+        .arg("-V")              // Generate SPIR-V (automatically defines VULKAN)
+        .arg("-D")              // Input is HLSL
+        .arg("-e")
+        .arg("PSMain")          // Entry point
+        .arg("--hlsl-iomap")    // Use HLSL I/O mapping
+        .arg("-S")
+        .arg("frag")            // Shader stage
+        .arg(hlsl_src)
+        .arg("-o")
+        .arg(frag_spv)
+        .output()
+        .expect("Failed to run glslangValidator for forward fragment shader");
+    
+    if !frag_result.status.success() {
+        panic!(
+            "Forward fragment shader compilation failed:\n{}",
+            String::from_utf8_lossy(&frag_result.stderr)
+        );
+    }
+    
+    println!("cargo:warning=Forward shaders compiled successfully with glslangValidator");
+    
+    // Validate shaders
+    if Command::new("spirv-val").arg("--version").output().is_ok() {
+        let vert_val = Command::new("spirv-val")
+            .arg(vert_spv)
+            .output()
+            .expect("Failed to run spirv-val");
+        
+        if !vert_val.status.success() {
+            panic!(
+                "Forward vertex shader validation failed:\n{}",
+                String::from_utf8_lossy(&vert_val.stderr)
+            );
+        }
+        
+        let frag_val = Command::new("spirv-val")
+            .arg(frag_spv)
+            .output()
+            .expect("Failed to run spirv-val");
+        
+        if !frag_val.status.success() {
+            panic!(
+                "Forward fragment shader validation failed:\n{}",
+                String::from_utf8_lossy(&frag_val.stderr)
+            );
+        }
+        
+        println!("cargo:warning=Forward shaders validated successfully with spirv-val");
     }
 }
