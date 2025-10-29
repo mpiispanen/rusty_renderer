@@ -891,7 +891,7 @@ mod tests {
     fn test_pipeline_description_collection() {
         use crate::render_graph::shader::{ShaderDescriptor, ShaderSource, ShaderStage};
         use crate::render_graph::DeclarativePass;
-        
+
         let mut graph = RenderGraph::new();
 
         // Register test shaders
@@ -928,18 +928,18 @@ mod tests {
         struct TestPass {
             output: ResourceId,
         }
-        
+
         impl DeclarativePass for TestPass {
             fn name(&self) -> &str {
                 "test_pass"
             }
 
-            fn declare_dependencies(
-                &self,
-                builder: &mut crate::render_graph::PassBuilder,
-            ) {
+            fn declare_dependencies(&self, builder: &mut crate::render_graph::PassBuilder) {
                 use crate::render_graph::PipelineStage;
-                builder.write(self.output, PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT));
+                builder.write(
+                    self.output,
+                    PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
+                );
             }
 
             fn declare_pipeline(
@@ -949,9 +949,7 @@ mod tests {
             ) {
                 let vs_handle = registry.get_handle("test.vert").unwrap();
                 let fs_handle = registry.get_handle("test.frag").unwrap();
-                builder
-                    .vertex_shader(vs_handle)
-                    .fragment_shader(fs_handle);
+                builder.vertex_shader(vs_handle).fragment_shader(fs_handle);
             }
 
             fn prepare(&self, _context: &mut dyn crate::render_graph::PassPreparationContext) {}

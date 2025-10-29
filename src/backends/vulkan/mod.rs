@@ -95,7 +95,8 @@ pub struct VulkanBackend {
     #[allow(dead_code)] // Will be used when we compile pipelines from descriptions
     pipeline_cache: std::collections::HashMap<crate::render_graph::PassId, vk::Pipeline>,
     #[allow(dead_code)] // Will be used when we compile shaders from registry
-    shader_module_cache: std::collections::HashMap<crate::render_graph::ShaderHandle, vk::ShaderModule>,
+    shader_module_cache:
+        std::collections::HashMap<crate::render_graph::ShaderHandle, vk::ShaderModule>,
 
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
@@ -2567,7 +2568,11 @@ impl GraphicsBackend for VulkanBackend {
                     log::debug!("  - {} shader(s) declared", shaders.len());
                 }
                 let depth = pipeline_desc.get_depth_state();
-                log::debug!("  - Depth test: {}, write: {}", depth.test_enable, depth.write_enable);
+                log::debug!(
+                    "  - Depth test: {}, write: {}",
+                    depth.test_enable,
+                    depth.write_enable
+                );
                 // TODO: Compile and bind pipeline from description instead of hardcoded one
             }
 
