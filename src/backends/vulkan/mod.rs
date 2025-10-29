@@ -91,6 +91,12 @@ pub struct VulkanBackend {
     // Default texture sampler (M10 Phase 4)
     default_sampler: vk::Sampler,
 
+    // Declarative pipeline system (Phase 4)
+    #[allow(dead_code)] // Will be used when we compile pipelines from descriptions
+    pipeline_cache: std::collections::HashMap<crate::render_graph::PassId, vk::Pipeline>,
+    #[allow(dead_code)] // Will be used when we compile shaders from registry
+    shader_module_cache: std::collections::HashMap<crate::render_graph::ShaderHandle, vk::ShaderModule>,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -147,6 +153,8 @@ impl VulkanBackend {
             descriptor_set_layouts: vec![],
             descriptor_sets: vec![],
             default_sampler: vk::Sampler::null(),
+            pipeline_cache: std::collections::HashMap::new(),
+            shader_module_cache: std::collections::HashMap::new(),
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -2550,6 +2558,18 @@ impl GraphicsBackend for VulkanBackend {
         // Execute passes in order
         for pass_id in &compiled.execution_order {
             log::debug!("Executing pass: {pass_id:?}");
+
+            // Check if we have a pipeline description for this pass (Phase 4)
+            if let Some(pipeline_desc) = compiled.pipeline_descriptions.get(pass_id) {
+                log::debug!("Pass has pipeline description:");
+                let shaders = pipeline_desc.shaders();
+                if !shaders.is_empty() {
+                    log::debug!("  - {} shader(s) declared", shaders.len());
+                }
+                let depth = pipeline_desc.get_depth_state();
+                log::debug!("  - Depth test: {}, write: {}", depth.test_enable, depth.write_enable);
+                // TODO: Compile and bind pipeline from description instead of hardcoded one
+            }
 
             // Find barriers before this pass
             for barrier in &compiled.barriers {
