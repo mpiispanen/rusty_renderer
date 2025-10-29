@@ -494,3 +494,35 @@ builder.fragment_shader("forward.frag")
        .variant(quality_setting);
 ```
 
+
+## GitHub Issues
+
+### Phase 1: Resource Registry
+- #75 - Implement resource registry and name-based lookup
+- #76 - Extend resource descriptors with all required fields
+
+### Phase 2: Declarative Pass API  
+- #77 - Add declarative methods to RenderPass trait
+- #78 - Implement PassBuilder for dependency declaration
+- #79 - Update PassExecutionContext to provide resources
+
+### Phase 3: Shader & Pipeline Integration
+- #84 - Implement shader registry and ShaderDescriptor
+- #80 - Add PipelineBuilder for declarative pipeline configuration
+- #81 - Extend RenderPass trait with pipeline declaration
+
+### Phase 4: Migration
+- #85 - Migrate ForwardPass to declarative API
+
+### Phase 5: Automatic Execution
+- #82 - Implement pass dependency analysis and topological sort
+- #83 - Implement automatic pipeline barrier insertion
+
+### Related Issues
+- #65 - Design and implement pass requirement system (existing)
+- #66 - Implement automatic resource allocation in render graph (existing)
+
+---
+
+*Issues created: 2025-10-29*
+*Ready to implement!*
