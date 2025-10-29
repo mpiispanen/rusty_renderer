@@ -4,7 +4,10 @@
 
 use crate::render_graph::barrier::{Barrier, BarrierInserter};
 use crate::render_graph::pass::{PassId, RenderPass};
-use crate::render_graph::resource::{Resource, ResourceDescriptor, ResourceId, ResourceKind};
+use crate::render_graph::resource::{
+    BufferUsageFlags, Extent3D, Format, ImageUsageFlags, Resource, ResourceDescriptor,
+    ResourceId, ResourceKind, SampleCount,
+};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -111,6 +114,74 @@ impl RenderGraph {
         self.resources.push(resource);
 
         id
+    }
+
+    /// Declare an image resource with the given descriptor
+    ///
+    /// This is a convenience method for creating image resources with a clean API.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let depth_id = graph.declare_image("depth", ImageDescriptor {
+    ///     format: Format::Depth32Float,
+    ///     extent: Extent3D::new_2d(800, 600),
+    ///     usage: ImageUsageFlags::new(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
+    ///     samples: SampleCount::One,
+    /// });
+    /// ```
+    pub fn declare_image(
+        &mut self,
+        name: impl Into<String>,
+        format: Format,
+        extent: Extent3D,
+        usage: ImageUsageFlags,
+        samples: SampleCount,
+    ) -> ResourceId {
+        self.create_resource(
+            name,
+            ResourceDescriptor::Image {
+                format,
+                extent,
+                usage,
+                samples,
+            },
+        )
+    }
+
+    /// Declare a buffer resource with the given descriptor
+    ///
+    /// This is a convenience method for creating buffer resources with a clean API.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let uniform_id = graph.declare_buffer("camera_uniform", 256, 
+    ///     BufferUsageFlags::new(BufferUsageFlags::UNIFORM));
+    /// ```
+    pub fn declare_buffer(
+        &mut self,
+        name: impl Into<String>,
+        size: usize,
+        usage: BufferUsageFlags,
+    ) -> ResourceId {
+        self.create_resource(
+            name,
+            ResourceDescriptor::Buffer {
+                size,
+                usage,
+            },
+        )
+    }
+
+    /// Declare a sampler resource
+    ///
+    /// This is a convenience method for creating sampler resources.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let sampler_id = graph.declare_sampler("linear_sampler");
+    /// ```
+    pub fn declare_sampler(&mut self, name: impl Into<String>) -> ResourceId {
+        self.create_resource(name, ResourceDescriptor::Sampler)
     }
 
     /// Get a pass by ID
