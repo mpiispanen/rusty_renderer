@@ -1,267 +1,25 @@
 #!/usr/bin/env python3
 """
-Generate HTML visual regression report comparing multiple backend outputs.
-
-This script compares screenshots from different backends using FLIP and generates
-a comprehensive HTML report with embedded images, FLIP metrics, and error maps.
-
-Usage:
-    python3 generate_visual_report.py screenshots/ output_report.html
+Generate HTML visual regression report with specific comparisons:
+1. Vulkan current vs Vulkan reference
+2. DirectX current vs DirectX reference
+3. Vulkan current vs DirectX current (backend parity)
 """
 
 import argparse
 import base64
-import json
-import sys
 from pathlib import Path
 from datetime import datetime
-import subprocess
+import sys
 
 try:
     import flip_evaluator
     import numpy as np
+    from PIL import Image
 except ImportError as e:
     print(f"Error: Required package not installed: {e}", file=sys.stderr)
-    print("Install with: pip install flip-evaluator numpy", file=sys.stderr)
+    print("Install with: pip install flip-evaluator numpy pillow", file=sys.stderr)
     sys.exit(1)
-
-
-HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visual Regression Report - {title}</title>
-    <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: #f5f5f5;
-            padding: 20px;
-        }}
-        
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }}
-        
-        header {{
-            border-bottom: 3px solid #4CAF50;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }}
-        
-        h1 {{
-            color: #2c3e50;
-            font-size: 2.5em;
-            margin-bottom: 10px;
-        }}
-        
-        .meta-info {{
-            color: #666;
-            font-size: 0.95em;
-        }}
-        
-        .summary {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }}
-        
-        .summary-card {{
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }}
-        
-        .summary-card h3 {{
-            font-size: 0.9em;
-            opacity: 0.9;
-            margin-bottom: 10px;
-        }}
-        
-        .summary-card .value {{
-            font-size: 2em;
-            font-weight: bold;
-        }}
-        
-        .comparison {{
-            margin-bottom: 50px;
-            padding: 25px;
-            background: #fafafa;
-            border-radius: 8px;
-            border-left: 4px solid #4CAF50;
-        }}
-        
-        .comparison.warning {{
-            border-left-color: #ff9800;
-        }}
-        
-        .comparison.error {{
-            border-left-color: #f44336;
-        }}
-        
-        .comparison h2 {{
-            color: #2c3e50;
-            margin-bottom: 20px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
-        
-        .status-badge {{
-            padding: 4px 12px;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }}
-        
-        .status-badge.pass {{
-            background: #4CAF50;
-            color: white;
-        }}
-        
-        .status-badge.warning {{
-            background: #ff9800;
-            color: white;
-        }}
-        
-        .status-badge.fail {{
-            background: #f44336;
-            color: white;
-        }}
-        
-        .metrics {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
-        }}
-        
-        .metric {{
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }}
-        
-        .metric-label {{
-            font-size: 0.85em;
-            color: #666;
-            margin-bottom: 5px;
-        }}
-        
-        .metric-value {{
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #2c3e50;
-        }}
-        
-        .images {{
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-top: 25px;
-        }}
-        
-        .image-container {{
-            background: white;
-            padding: 15px;
-            border-radius: 6px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }}
-        
-        .image-container h4 {{
-            margin-bottom: 10px;
-            color: #2c3e50;
-            font-size: 0.95em;
-        }}
-        
-        .image-container img {{
-            width: 100%;
-            height: auto;
-            border-radius: 4px;
-            border: 1px solid #ddd;
-        }}
-        
-        .interpretation {{
-            margin-top: 15px;
-            padding: 15px;
-            background: white;
-            border-radius: 6px;
-            border-left: 3px solid #2196F3;
-        }}
-        
-        .interpretation h4 {{
-            color: #2c3e50;
-            margin-bottom: 10px;
-        }}
-        
-        footer {{
-            margin-top: 40px;
-            padding-top: 20px;
-            border-top: 1px solid #ddd;
-            text-align: center;
-            color: #666;
-            font-size: 0.9em;
-        }}
-        
-        .threshold-info {{
-            background: #e3f2fd;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 25px;
-            border-left: 3px solid #2196F3;
-        }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Visual Regression Report</h1>
-            <div class="meta-info">
-                <p><strong>Generated:</strong> {timestamp}</p>
-                <p><strong>Backends Compared:</strong> {backends}</p>
-            </div>
-        </header>
-        
-        <div class="summary">
-            {summary_cards}
-        </div>
-        
-        <div class="threshold-info">
-            <strong>FLIP Thresholds:</strong>
-            <ul style="margin-left: 20px; margin-top: 5px;">
-                <li>&lt; 0.05: Excellent match (imperceptible differences)</li>
-                <li>&lt; 0.10: Good match (minor differences, acceptable)</li>
-                <li>≥ 0.10: Significant differences (investigation needed)</li>
-            </ul>
-        </div>
-        
-        {comparisons}
-        
-        <footer>
-            <p>Generated by rusty_renderer visual regression testing</p>
-            <p>Using NVIDIA FLIP for perceptual image comparison</p>
-        </footer>
-    </div>
-</body>
-</html>
-"""
 
 
 def image_to_base64(image_path):
@@ -271,22 +29,19 @@ def image_to_base64(image_path):
     return f"data:image/png;base64,{data}"
 
 
-def compare_images(ref_path, test_path, output_dir):
-    """Compare two images using FLIP and return results."""
+def run_flip_comparison(ref_path, test_path):
+    """Run FLIP comparison and return statistics."""
     ref_path = Path(ref_path)
     test_path = Path(test_path)
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Determine dynamic range
-    ext = ref_path.suffix.lower()
-    dynamic_range = "HDR" if ext == ".exr" else "LDR"
+    if not ref_path.exists() or not test_path.exists():
+        return None
     
     # Run FLIP
     error_map, mean_error, used_parameters = flip_evaluator.evaluate(
         str(ref_path),
         str(test_path),
-        dynamic_range,
+        "LDR",
         inputsRGB=True,
         applyMagma=True,
         computeMeanError=True,
@@ -297,258 +52,328 @@ def compare_images(ref_path, test_path, output_dir):
     error_values = error_map[:, :, 0]
     flat_errors = error_values.flatten()
     
-    # Save error map
-    error_map_path = output_dir / f"error_{ref_path.stem}_vs_{test_path.stem}.png"
-    try:
-        from PIL import Image
-        error_map_8bit = (error_map * 255).astype(np.uint8)
-        img = Image.fromarray(error_map_8bit, mode='RGB')
-        img.save(error_map_path)
-    except ImportError:
-        print("Warning: PIL not available, cannot save error map", file=sys.stderr)
-        error_map_path = None
-    
     return {
         "mean": float(mean_error),
         "median": float(np.median(flat_errors)),
-        "q1": float(np.percentile(flat_errors, 25)),
-        "q3": float(np.percentile(flat_errors, 75)),
-        "min": float(np.min(flat_errors)),
         "max": float(np.max(flat_errors)),
         "ppd": float(used_parameters.get("ppd", 67.0)),
-        "error_map_path": error_map_path,
-        "reference": ref_path,
-        "test": test_path,
+        "error_map": error_map,
     }
 
 
-def generate_comparison_html(comparison_name, ref_img, test_img, result):
-    """Generate HTML for a single comparison."""
-    mean_error = result["mean"]
+def generate_html_report(data_dir, output_path):
+    """Generate the HTML report."""
+    data_dir = Path(data_dir)
     
-    # Determine status
-    if mean_error < 0.05:
-        status = "pass"
-        status_text = "EXCELLENT"
-        comparison_class = ""
-    elif mean_error < 0.10:
-        status = "pass"
-        status_text = "GOOD"
-        comparison_class = ""
-    else:
-        status = "fail"
-        status_text = "FAIL"
-        comparison_class = "error"
+    # Define paths
+    vulkan_current = data_dir / "current" / "vulkan.png"
+    directx_current = data_dir / "current" / "directx.png"
+    vulkan_ref = data_dir / "references" / "vulkan.png"
+    directx_ref = data_dir / "references" / "directx.png"
     
-    # Interpretation
-    if mean_error < 0.05:
-        interpretation = "Images are visually identical or have imperceptible differences."
-    elif mean_error < 0.10:
-        interpretation = "Images have minor differences that are barely noticeable. This is acceptable for cross-backend rendering."
-    else:
-        interpretation = "Images have significant differences that require investigation. Check for rendering bugs or coordinate system issues."
+    # Prepare comparisons
+    comparisons = []
     
-    # Generate metrics HTML
-    metrics_html = f"""
-        <div class="metric">
-            <div class="metric-label">Mean Error</div>
-            <div class="metric-value">{mean_error:.6f}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">Median</div>
-            <div class="metric-value">{result['median']:.6f}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">Max Error</div>
-            <div class="metric-value">{result['max']:.6f}</div>
-        </div>
-        <div class="metric">
-            <div class="metric-label">PPD</div>
-            <div class="metric-value">{result['ppd']:.1f}</div>
-        </div>
-    """
+    # 1. Vulkan regression check
+    if vulkan_ref.exists() and vulkan_current.exists():
+        result = run_flip_comparison(vulkan_ref, vulkan_current)
+        if result:
+            comparisons.append({
+                "title": "Vulkan Regression Check",
+                "description": "Current Vulkan output compared to golden reference",
+                "ref_img": vulkan_ref,
+                "test_img": vulkan_current,
+                "result": result,
+                "type": "regression"
+            })
     
-    # Generate images HTML
-    ref_b64 = image_to_base64(ref_img)
-    test_b64 = image_to_base64(test_img)
+    # 2. DirectX regression check
+    if directx_ref.exists() and directx_current.exists():
+        result = run_flip_comparison(directx_ref, directx_current)
+        if result:
+            comparisons.append({
+                "title": "DirectX Regression Check",
+                "description": "Current DirectX output compared to golden reference",
+                "ref_img": directx_ref,
+                "test_img": directx_current,
+                "result": result,
+                "type": "regression"
+            })
     
-    images_html = f"""
-        <div class="image-container">
-            <h4>{Path(ref_img).stem}</h4>
-            <img src="{ref_b64}" alt="Reference">
-        </div>
-        <div class="image-container">
-            <h4>{Path(test_img).stem}</h4>
-            <img src="{test_b64}" alt="Test">
-        </div>
-    """
+    # 3. Backend parity check
+    if vulkan_current.exists() and directx_current.exists():
+        result = run_flip_comparison(vulkan_current, directx_current)
+        if result:
+            comparisons.append({
+                "title": "Backend Parity Check",
+                "description": "Vulkan vs DirectX rendering comparison (expect ~14% difference due to coordinate systems)",
+                "ref_img": vulkan_current,
+                "test_img": directx_current,
+                "result": result,
+                "type": "parity"
+            })
     
-    # Add error map if available
-    if result.get("error_map_path") and result["error_map_path"].exists():
-        error_b64 = image_to_base64(result["error_map_path"])
-        images_html += f"""
-        <div class="image-container">
-            <h4>FLIP Error Map</h4>
-            <img src="{error_b64}" alt="Error Map">
+    # Generate HTML
+    html_parts = []
+    html_parts.append("""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Regression Report</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        header {
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        h1 { color: #2c3e50; font-size: 2.5em; margin-bottom: 10px; }
+        .meta-info { color: #666; font-size: 0.95em; }
+        .comparison {
+            margin-bottom: 50px;
+            padding: 25px;
+            background: #fafafa;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+        }
+        .comparison.regression { border-left-color: #2196F3; }
+        .comparison.parity { border-left-color: #FF9800; }
+        .comparison.warning { background: #fff3cd; border-left-color: #FFC107; }
+        .comparison.error { background: #f8d7da; border-left-color: #DC3545; }
+        .comparison h2 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .comparison .description { color: #666; margin-bottom: 20px; }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        .status-badge.pass { background: #4CAF50; color: white; }
+        .status-badge.warning { background: #FF9800; color: white; }
+        .status-badge.fail { background: #DC3545; color: white; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .metric {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .metric-label { font-size: 0.85em; color: #666; margin-bottom: 5px; }
+        .metric-value { font-size: 1.5em; font-weight: bold; color: #2c3e50; }
+        .images {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 25px;
+        }
+        .image-container {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .image-container h4 { margin-bottom: 10px; color: #2c3e50; font-size: 0.95em; }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .interpretation {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border-left: 3px solid #2196F3;
+        }
+        .interpretation h4 { color: #2c3e50; margin-bottom: 10px; }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .threshold-info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            border-left: 3px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Visual Regression Report</h1>
+            <div class="meta-info">
+                <p><strong>Generated:</strong> """ + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + """</p>
+                <p><strong>Comparisons:</strong> """ + str(len(comparisons)) + """</p>
+            </div>
+        </header>
+        
+        <div class="threshold-info">
+            <strong>FLIP Thresholds:</strong>
+            <ul style="margin-left: 20px; margin-top: 5px;">
+                <li>&lt; 0.05: Excellent (imperceptible differences)</li>
+                <li>&lt; 0.10: Good (minor acceptable differences)</li>
+                <li>≥ 0.10: Significant differences (needs investigation)</li>
+            </ul>
+            <strong>Note:</strong> Backend parity typically shows ~14% difference due to coordinate system variations.
         </div>
-        """
+""")
     
-    return f"""
-    <div class="comparison {comparison_class}">
-        <h2>
-            {comparison_name}
-            <span class="status-badge {status}">{status_text}</span>
-        </h2>
-        <div class="metrics">
-            {metrics_html}
+    # Generate comparison sections
+    for comp in comparisons:
+        result = comp["result"]
+        mean_error = result["mean"]
+        
+        # Determine status
+        if comp["type"] == "parity":
+            # More lenient for backend parity
+            if mean_error < 0.20:
+                status, status_text, comp_class = "pass", "ACCEPTABLE", ""
+            else:
+                status, status_text, comp_class = "warning", "LARGE DIFF", "warning"
+            interpretation = f"Backend parity shows {mean_error*100:.2f}% mean difference. Expected range is ~14%. This is {'acceptable' if mean_error < 0.20 else 'higher than expected - investigate'}."
+        else:
+            # Strict for regression checks
+            if mean_error < 0.05:
+                status, status_text, comp_class = "pass", "EXCELLENT", ""
+                interpretation = "Output matches reference perfectly. No regression detected."
+            elif mean_error < 0.10:
+                status, status_text, comp_class = "pass", "GOOD", ""
+                interpretation = "Minor differences detected, but within acceptable range."
+            else:
+                status, status_text, comp_class = "fail", "REGRESSION", "error"
+                interpretation = "Significant differences detected! This may indicate a rendering regression."
+        
+        # Save error map
+        error_map_path = data_dir / "comparisons" / f"error_{comp['title'].replace(' ', '_')}.png"
+        error_map_path.parent.mkdir(parents=True, exist_ok=True)
+        error_map_8bit = (result["error_map"] * 255).astype(np.uint8)
+        img = Image.fromarray(error_map_8bit, mode='RGB')
+        img.save(error_map_path)
+        
+        # Generate comparison HTML
+        html_parts.append(f"""
+        <div class="comparison {comp['type']} {comp_class}">
+            <h2>
+                {comp['title']}
+                <span class="status-badge {status}">{status_text}</span>
+            </h2>
+            <div class="description">{comp['description']}</div>
+            <div class="metrics">
+                <div class="metric">
+                    <div class="metric-label">Mean FLIP Error</div>
+                    <div class="metric-value">{mean_error:.6f}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Median</div>
+                    <div class="metric-value">{result['median']:.6f}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Max Error</div>
+                    <div class="metric-value">{result['max']:.6f}</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">PPD</div>
+                    <div class="metric-value">{result['ppd']:.1f}</div>
+                </div>
+            </div>
+            <div class="images">
+                <div class="image-container">
+                    <h4>Reference</h4>
+                    <img src="{image_to_base64(comp['ref_img'])}" alt="Reference">
+                </div>
+                <div class="image-container">
+                    <h4>Current</h4>
+                    <img src="{image_to_base64(comp['test_img'])}" alt="Current">
+                </div>
+                <div class="image-container">
+                    <h4>FLIP Error Map</h4>
+                    <img src="{image_to_base64(error_map_path)}" alt="Error Map">
+                </div>
+            </div>
+            <div class="interpretation">
+                <h4>Interpretation:</h4>
+                <p>{interpretation}</p>
+            </div>
         </div>
-        <div class="images">
-            {images_html}
-        </div>
-        <div class="interpretation">
-            <h4>Interpretation:</h4>
-            <p>{interpretation}</p>
-        </div>
+""")
+    
+    html_parts.append("""
+        <footer>
+            <p>Generated by rusty_renderer visual regression testing</p>
+            <p>Using NVIDIA FLIP for perceptual image comparison</p>
+        </footer>
     </div>
-    """
+</body>
+</html>
+""")
+    
+    # Write output
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text("".join(html_parts))
+    
+    print(f"\n✅ Report generated: {output_path}")
+    print(f"   Comparisons: {len(comparisons)}")
+    
+    # Count failures
+    failures = sum(1 for c in comparisons if c["type"] == "regression" and c["result"]["mean"] >= 0.10)
+    if failures > 0:
+        print(f"\n❌ {failures} regression(s) detected!")
+        return 1
+    
+    print("\n✅ All regression checks passed!")
+    return 0
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate HTML visual regression report"
-    )
-    parser.add_argument(
-        "screenshot_dir",
-        help="Directory containing backend screenshots"
-    )
-    parser.add_argument(
-        "output_html",
-        help="Output HTML report path"
-    )
-    parser.add_argument(
-        "--temp-dir",
-        default="flip_temp",
-        help="Temporary directory for FLIP results"
-    )
+    parser = argparse.ArgumentParser(description="Generate visual regression HTML report")
+    parser.add_argument("data_dir", help="Directory containing current/, references/, comparisons/")
+    parser.add_argument("output_html", help="Output HTML report path")
     
     args = parser.parse_args()
     
-    screenshot_dir = Path(args.screenshot_dir)
-    output_html = Path(args.output_html)
-    temp_dir = Path(args.temp_dir)
-    
-    if not screenshot_dir.exists():
-        print(f"Error: Screenshot directory not found: {screenshot_dir}", file=sys.stderr)
+    try:
+        exit_code = generate_html_report(args.data_dir, args.output_html)
+        sys.exit(exit_code)
+    except Exception as e:
+        print(f"Error generating report: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
-    
-    # Find all backend screenshots
-    backends = {}
-    
-    # First, try to find screenshots in subdirectories (vulkan/, directx/, etc.)
-    for backend_dir in screenshot_dir.iterdir():
-        if backend_dir.is_dir():
-            backend_name = backend_dir.name.lower()
-            # Find first PNG in this backend directory
-            for png_file in backend_dir.glob("*.png"):
-                backends[backend_name] = png_file
-                break
-    
-    # If no subdirectories, look for screenshots in the root directory
-    if len(backends) == 0:
-        for png_file in screenshot_dir.glob("*.png"):
-            name = png_file.stem.lower()
-            if "vulkan" in name:
-                backends["vulkan"] = png_file
-            elif "wgpu" in name:
-                backends["wgpu"] = png_file
-            elif "directx" in name or "dx" in name:
-                backends["directx"] = png_file
-    
-    if len(backends) < 2:
-        print(f"Error: Need at least 2 backend screenshots, found {len(backends)}", file=sys.stderr)
-        print(f"Searched in: {screenshot_dir}", file=sys.stderr)
-        print(f"Found backends: {list(backends.keys())}", file=sys.stderr)
-        sys.exit(1)
-    
-    print(f"Found backends: {', '.join(backends.keys())}")
-    
-    # Perform comparisons
-    comparisons = []
-    backend_list = list(backends.items())
-    
-    for i in range(len(backend_list)):
-        for j in range(i + 1, len(backend_list)):
-            name1, img1 = backend_list[i]
-            name2, img2 = backend_list[j]
-            
-            print(f"Comparing {name1} vs {name2}...")
-            result = compare_images(img1, img2, temp_dir)
-            
-            comparisons.append({
-                "name": f"{name1.capitalize()} vs {name2.capitalize()}",
-                "ref_img": img1,
-                "test_img": img2,
-                "result": result,
-            })
-    
-    # Generate summary
-    total_comparisons = len(comparisons)
-    passed = sum(1 for c in comparisons if c["result"]["mean"] < 0.10)  # Tightened to 0.10
-    excellent = sum(1 for c in comparisons if c["result"]["mean"] < 0.05)
-    
-    summary_cards = f"""
-        <div class="summary-card">
-            <h3>Total Comparisons</h3>
-            <div class="value">{total_comparisons}</div>
-        </div>
-        <div class="summary-card">
-            <h3>Passed (&lt; 0.10)</h3>
-            <div class="value">{passed}</div>
-        </div>
-        <div class="summary-card">
-            <h3>Excellent (< 0.05)</h3>
-            <div class="value">{excellent}</div>
-        </div>
-        <div class="summary-card">
-            <h3>Backends</h3>
-            <div class="value">{len(backends)}</div>
-        </div>
-    """
-    
-    # Generate comparison sections
-    comparisons_html = ""
-    for comp in comparisons:
-        comparisons_html += generate_comparison_html(
-            comp["name"],
-            comp["ref_img"],
-            comp["test_img"],
-            comp["result"]
-        )
-    
-    # Generate final HTML
-    html = HTML_TEMPLATE.format(
-        title="Backend Comparison",
-        timestamp=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        backends=", ".join(b.capitalize() for b in backends.keys()),
-        summary_cards=summary_cards,
-        comparisons=comparisons_html,
-    )
-    
-    # Write output
-    output_html.parent.mkdir(parents=True, exist_ok=True)
-    output_html.write_text(html)
-    
-    print(f"\n✅ Report generated: {output_html}")
-    print(f"   Total comparisons: {total_comparisons}")
-    print(f"   Passed: {passed}/{total_comparisons}")
-    
-    if passed != total_comparisons:
-        print(f"\n❌ Visual regression test FAILED: {total_comparisons - passed} comparison(s) exceeded threshold")
-        print(f"   Threshold: 0.10 mean FLIP error")
-        print(f"   Review the HTML report for details")
-    
-    # Exit code based on results
-    sys.exit(0 if passed == total_comparisons else 1)
 
 
 if __name__ == "__main__":

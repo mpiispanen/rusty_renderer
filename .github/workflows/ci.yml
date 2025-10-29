@@ -342,9 +342,9 @@ jobs:
           mkdir -p comparisons/golden
           
           # Check Vulkan against golden reference
-          if [ -f "references/triangle/gltf_textured_vulkan.png" ] && [ -f "screenshots/vulkan/gltf_textured.png" ]; then
+          if [ -f "references/gltf_textured/gltf_textured_vulkan.png" ] && [ -f "screenshots/vulkan/gltf_textured.png" ]; then
             python3 scripts/flip_compare.py \
-              references/triangle/gltf_textured_vulkan.png \
+              references/gltf_textured/gltf_textured_vulkan.png \
               screenshots/vulkan/gltf_textured.png \
               --error-map comparisons/golden/vulkan_regression.png || {
                 echo "::warning::Vulkan regression detected - output differs from golden reference"
@@ -355,9 +355,9 @@ jobs:
           fi
           
           # Check DirectX against golden reference
-          if [ -f "references/triangle/gltf_textured_directx.png" ] && [ -f "screenshots/directx/gltf_textured.png" ]; then
+          if [ -f "references/gltf_textured/gltf_textured_directx.png" ] && [ -f "screenshots/directx/gltf_textured.png" ]; then
             python3 scripts/flip_compare.py \
-              references/triangle/gltf_textured_directx.png \
+              references/gltf_textured/gltf_textured_directx.png \
               screenshots/directx/gltf_textured.png \
               --error-map comparisons/golden/directx_regression.png || {
                 echo "::warning::DirectX regression detected - output differs from golden reference"
@@ -372,16 +372,24 @@ jobs:
         run: |
           echo "📊 Generating visual regression report..."
           
-          # Prepare all screenshots for report
-          mkdir -p report_input
-          cp -r screenshots/* report_input/ 2>/dev/null || true
-          cp -r comparisons/* report_input/ 2>/dev/null || true
+          # Create organized structure for report
+          mkdir -p report_data/{current,references,comparisons}
           
-          # Generate HTML report
+          # Copy current screenshots
+          cp screenshots/vulkan/gltf_textured.png report_data/current/vulkan.png 2>/dev/null || true
+          cp screenshots/directx/gltf_textured.png report_data/current/directx.png 2>/dev/null || true
+          
+          # Copy golden references
+          cp references/gltf_textured/gltf_textured_vulkan.png report_data/references/vulkan.png 2>/dev/null || true
+          cp references/gltf_textured/gltf_textured_directx.png report_data/references/directx.png 2>/dev/null || true
+          
+          # Copy comparison results
+          cp -r comparisons/* report_data/comparisons/ 2>/dev/null || true
+          
+          # Generate HTML report with proper structure
           python3 scripts/generate_visual_report.py \
-            report_input/ \
-            visual-regression-report.html \
-            --temp-dir flip_results || {
+            report_data/ \
+            visual-regression-report.html || {
               echo "⚠️  Report generation had issues but continuing..."
             }
         continue-on-error: true
