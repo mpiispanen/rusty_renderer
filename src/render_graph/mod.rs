@@ -16,6 +16,7 @@ pub use pass::{
     PassPreparationContext, PipelineStage, RenderPass, ResourceAccess,
 };
 pub use resource::{
-    BufferUsageFlags, Extent3D, Format, ImageUsageFlags, Resource, ResourceDescriptor,
-    ResourceId, ResourceKind, ResourceLifetime, SampleCount,
+    AddressMode, BufferUsageFlags, Extent3D, ExtentMode, FilterMode, Format, ImageUsageFlags,
+    Resource, ResourceDescriptor, ResourceId, ResourceKind, ResourceLifetime, SampleCount,
+    SamplerDescriptor,
 };

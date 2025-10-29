@@ -16,7 +16,7 @@ use crate::lighting::LightingUniforms;
 use crate::materials::GpuMaterial;
 use crate::passes::ForwardPass;
 use crate::render_graph::{
-    Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 use crate::resources::TextureLoader;
 use crate::scene::{GeometryData, SceneObject, VertexData};
@@ -411,18 +411,20 @@ impl RenderPipeline for ForwardPipeline {
         // Create color buffer resource
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(width, height),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("color_buffer", color_desc);
 
         // TODO: Create depth buffer for 3D rendering
         // let depth_desc = ResourceDescriptor::Image {
         //     format: Format::Depth32Float,
-        //     extent: Extent3D::new_2d(width, height),
+        //     extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
         //     usage: ImageUsageFlags::new(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
         //     samples: SampleCount::One,
+        //     mip_levels: 1,
         // };
         // let depth_buffer = graph.create_resource("depth_buffer", depth_desc);
 

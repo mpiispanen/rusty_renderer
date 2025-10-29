@@ -9,7 +9,7 @@ use crate::backends::{
 };
 use crate::passes::VertexBufferTrianglePass;
 use crate::render_graph::{
-    Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
@@ -108,9 +108,10 @@ impl RenderPipeline for SimplePipeline {
         // Create color buffer resource
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(width, height),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("color_buffer", color_desc);
 

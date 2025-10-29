@@ -5,8 +5,8 @@
 use crate::render_graph::barrier::{Barrier, BarrierInserter};
 use crate::render_graph::pass::{PassId, RenderPass};
 use crate::render_graph::resource::{
-    BufferUsageFlags, Extent3D, Format, ImageUsageFlags, Resource, ResourceDescriptor,
-    ResourceId, ResourceKind, SampleCount,
+    BufferUsageFlags, ExtentMode, Format, ImageUsageFlags, Resource, ResourceDescriptor,
+    ResourceId, ResourceKind, SampleCount, SamplerDescriptor,
 };
 use std::collections::HashMap;
 use thiserror::Error;
@@ -122,20 +122,44 @@ impl RenderGraph {
     ///
     /// # Example
     /// ```ignore
-    /// let depth_id = graph.declare_image("depth", ImageDescriptor {
-    ///     format: Format::Depth32Float,
-    ///     extent: Extent3D::new_2d(800, 600),
-    ///     usage: ImageUsageFlags::new(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
-    ///     samples: SampleCount::One,
-    /// });
+    /// // Absolute size
+    /// let color_id = graph.declare_image(
+    ///     "color",
+    ///     Format::Rgba8Unorm,
+    ///     ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
+    ///     ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
+    ///     SampleCount::One,
+    ///     1,
+    /// );
+    ///
+    /// // Swapchain-relative
+    /// let depth_id = graph.declare_image(
+    ///     "depth",
+    ///     Format::Depth32Float,
+    ///     ExtentMode::Swapchain,
+    ///     ImageUsageFlags::new(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
+    ///     SampleCount::One,
+    ///     1,
+    /// );
+    ///
+    /// // Half-size for performance
+    /// let shadow_id = graph.declare_image(
+    ///     "shadow",
+    ///     Format::Depth32Float,
+    ///     ExtentMode::SwapchainScaled(0.5),
+    ///     ImageUsageFlags::new(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
+    ///     SampleCount::One,
+    ///     1,
+    /// );
     /// ```
     pub fn declare_image(
         &mut self,
         name: impl Into<String>,
         format: Format,
-        extent: Extent3D,
+        extent: ExtentMode,
         usage: ImageUsageFlags,
         samples: SampleCount,
+        mip_levels: u32,
     ) -> ResourceId {
         self.create_resource(
             name,
@@ -144,6 +168,7 @@ impl RenderGraph {
                 extent,
                 usage,
                 samples,
+                mip_levels,
             },
         )
     }
@@ -154,7 +179,7 @@ impl RenderGraph {
     ///
     /// # Example
     /// ```ignore
-    /// let uniform_id = graph.declare_buffer("camera_uniform", 256, 
+    /// let uniform_id = graph.declare_buffer("camera_uniform", 256,
     ///     BufferUsageFlags::new(BufferUsageFlags::UNIFORM));
     /// ```
     pub fn declare_buffer(
@@ -163,13 +188,7 @@ impl RenderGraph {
         size: usize,
         usage: BufferUsageFlags,
     ) -> ResourceId {
-        self.create_resource(
-            name,
-            ResourceDescriptor::Buffer {
-                size,
-                usage,
-            },
-        )
+        self.create_resource(name, ResourceDescriptor::Buffer { size, usage })
     }
 
     /// Declare a sampler resource
@@ -178,10 +197,28 @@ impl RenderGraph {
     ///
     /// # Example
     /// ```ignore
-    /// let sampler_id = graph.declare_sampler("linear_sampler");
+    /// // Linear filtering sampler
+    /// let linear_sampler = graph.declare_sampler(
+    ///     "linear_sampler",
+    ///     SamplerDescriptor::default()
+    /// );
+    ///
+    /// // Nearest filtering for pixel art
+    /// let nearest_sampler = graph.declare_sampler(
+    ///     "nearest_sampler",
+    ///     SamplerDescriptor {
+    ///         min_filter: FilterMode::Nearest,
+    ///         mag_filter: FilterMode::Nearest,
+    ///         ..Default::default()
+    ///     }
+    /// );
     /// ```
-    pub fn declare_sampler(&mut self, name: impl Into<String>) -> ResourceId {
-        self.create_resource(name, ResourceDescriptor::Sampler)
+    pub fn declare_sampler(
+        &mut self,
+        name: impl Into<String>,
+        descriptor: SamplerDescriptor,
+    ) -> ResourceId {
+        self.create_resource(name, ResourceDescriptor::Sampler(descriptor))
     }
 
     /// Get a pass by ID

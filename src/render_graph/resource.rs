@@ -60,6 +60,63 @@ impl Extent3D {
             depth: 1,
         }
     }
+
+    /// Create a 3D extent
+    pub fn new_3d(width: u32, height: u32, depth: u32) -> Self {
+        Self {
+            width,
+            height,
+            depth,
+        }
+    }
+}
+
+/// Extent mode for flexible resource sizing
+///
+/// Allows resources to be sized relative to the swapchain or with absolute dimensions.
+#[derive(Debug, Clone, Copy)]
+pub enum ExtentMode {
+    /// Absolute size in pixels
+    Absolute(Extent3D),
+    /// Match swapchain size exactly (1.0x scale)
+    Swapchain,
+    /// Scale relative to swapchain (e.g., 0.5 = half size, 2.0 = double size)
+    SwapchainScaled(f32),
+}
+
+impl PartialEq for ExtentMode {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ExtentMode::Absolute(a), ExtentMode::Absolute(b)) => a == b,
+            (ExtentMode::Swapchain, ExtentMode::Swapchain) => true,
+            (ExtentMode::SwapchainScaled(a), ExtentMode::SwapchainScaled(b)) => {
+                (a - b).abs() < f32::EPSILON
+            }
+            _ => false,
+        }
+    }
+}
+
+impl ExtentMode {
+    /// Resolve the actual extent given the swapchain dimensions
+    ///
+    /// # Arguments
+    /// * `swapchain_width` - Current swapchain width
+    /// * `swapchain_height` - Current swapchain height
+    ///
+    /// # Returns
+    /// The resolved Extent3D
+    pub fn resolve(&self, swapchain_width: u32, swapchain_height: u32) -> Extent3D {
+        match self {
+            ExtentMode::Absolute(extent) => *extent,
+            ExtentMode::Swapchain => Extent3D::new_2d(swapchain_width, swapchain_height),
+            ExtentMode::SwapchainScaled(scale) => {
+                let width = (swapchain_width as f32 * scale).max(1.0) as u32;
+                let height = (swapchain_height as f32 * scale).max(1.0) as u32;
+                Extent3D::new_2d(width, height)
+            }
+        }
+    }
 }
 
 /// Sample count for multisampling
@@ -126,15 +183,65 @@ impl BufferUsageFlags {
     }
 }
 
+/// Sampler filter mode
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FilterMode {
+    Nearest,
+    Linear,
+}
+
+/// Sampler address mode (texture wrapping)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AddressMode {
+    Repeat,
+    MirroredRepeat,
+    ClampToEdge,
+    ClampToBorder,
+}
+
+/// Sampler descriptor
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SamplerDescriptor {
+    /// Minification filter
+    pub min_filter: FilterMode,
+    /// Magnification filter
+    pub mag_filter: FilterMode,
+    /// Mipmap filter
+    pub mipmap_filter: FilterMode,
+    /// Address mode for U coordinate
+    pub address_mode_u: AddressMode,
+    /// Address mode for V coordinate
+    pub address_mode_v: AddressMode,
+    /// Address mode for W coordinate
+    pub address_mode_w: AddressMode,
+    /// Maximum anisotropy (1.0 = disabled, 16.0 = max)
+    pub max_anisotropy: f32,
+}
+
+impl Default for SamplerDescriptor {
+    fn default() -> Self {
+        Self {
+            min_filter: FilterMode::Linear,
+            mag_filter: FilterMode::Linear,
+            mipmap_filter: FilterMode::Linear,
+            address_mode_u: AddressMode::Repeat,
+            address_mode_v: AddressMode::Repeat,
+            address_mode_w: AddressMode::Repeat,
+            max_anisotropy: 1.0,
+        }
+    }
+}
+
 /// Resource descriptor defining resource properties
 #[derive(Debug, Clone)]
 pub enum ResourceDescriptor {
     /// Image descriptor
     Image {
         format: Format,
-        extent: Extent3D,
+        extent: ExtentMode,
         usage: ImageUsageFlags,
         samples: SampleCount,
+        mip_levels: u32,
     },
     /// Buffer descriptor
     Buffer {
@@ -142,7 +249,7 @@ pub enum ResourceDescriptor {
         usage: BufferUsageFlags,
     },
     /// Sampler descriptor
-    Sampler,
+    Sampler(SamplerDescriptor),
 }
 
 /// Resource lifetime tracking
@@ -220,7 +327,7 @@ impl Resource {
         let kind = match descriptor {
             ResourceDescriptor::Image { .. } => ResourceKind::Image,
             ResourceDescriptor::Buffer { .. } => ResourceKind::Buffer,
-            ResourceDescriptor::Sampler => ResourceKind::Sampler,
+            ResourceDescriptor::Sampler(_) => ResourceKind::Sampler,
         };
 
         Self {

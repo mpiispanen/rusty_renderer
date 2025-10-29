@@ -7,7 +7,7 @@ use crate::backends::{self, BackendType, GraphicsBackend};
 use crate::config::{Backend, Config};
 use crate::passes::TrianglePass;
 use crate::render_graph::{
-    Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 use anyhow::{Context, Result};
 use winit::{
@@ -81,9 +81,10 @@ impl App {
         // Create color buffer resource (represents swapchain image)
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm, // Common swapchain format
-            extent: Extent3D::new_2d(width, height),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
