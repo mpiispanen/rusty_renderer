@@ -98,6 +98,49 @@ impl RenderGraph {
         id
     }
 
+    /// Add a declarative pass to the graph
+    ///
+    /// This is the preferred way to add passes using the new declarative API.
+    /// The pass will declare its resources and dependencies, which are then
+    /// automatically configured.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let pass = MyPass::new(color_buffer);
+    /// let pass_id = graph.add_declarative_pass(pass);
+    /// ```
+    ///
+    /// # Arguments
+    /// * `pass` - A type implementing DeclarativePass
+    ///
+    /// # Returns
+    /// The PassId of the newly added pass
+    pub fn add_declarative_pass<T: crate::render_graph::pass::DeclarativePass + 'static>(
+        &mut self,
+        pass: T,
+    ) -> PassId {
+        use crate::render_graph::pass::{DeclarativePassAdapter, PassBuilder};
+
+        let id = PassId(self.next_pass_id);
+        self.next_pass_id += 1;
+
+        // Let the pass declare any resources it needs
+        pass.declare_resources(self);
+
+        // Build dependencies using the builder
+        let mut builder = PassBuilder::new(id);
+        pass.declare_dependencies(&mut builder);
+        let (inputs, outputs) = builder.build();
+
+        // Create the RenderPass with the adapter
+        let mut render_pass = RenderPass::new(id, pass.name(), pass.kind());
+        render_pass.inputs = inputs;
+        render_pass.outputs = outputs;
+        render_pass.callback = Some(Box::new(DeclarativePassAdapter::new(pass)));
+
+        self.add_pass(render_pass)
+    }
+
     /// Create and add a new resource
     pub fn create_resource(
         &mut self,

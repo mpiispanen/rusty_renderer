@@ -149,6 +149,116 @@ pub trait PassCallback: Send + Sync {
     fn execute(&self, context: &mut dyn PassExecutionContext);
 }
 
+/// Declarative render pass trait (new API)
+///
+/// This trait provides a cleaner, more declarative way to define render passes.
+/// Unlike the low-level `PassCallback`, this trait allows passes to declare
+/// their resource dependencies and requirements upfront.
+///
+/// # Example
+/// ```ignore
+/// struct MyPass {
+///     color_output: ResourceId,
+///     depth_input: ResourceId,
+/// }
+///
+/// impl DeclarativePass for MyPass {
+///     fn name(&self) -> &str {
+///         "my_pass"
+///     }
+///
+///     fn kind(&self) -> PassKind {
+///         PassKind::Graphics
+///     }
+///
+///     fn declare_resources(&self, graph: &mut RenderGraph) {
+///         // Optionally create resources here
+///     }
+///
+///     fn declare_dependencies(&self, builder: &mut PassBuilder) {
+///         builder
+///             .read(self.depth_input, PipelineStage::new(PipelineStage::FRAGMENT_SHADER))
+///             .with_layout(ImageLayout::DepthStencilAttachment)
+///             .write(self.color_output, PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT))
+///             .with_layout(ImageLayout::ColorAttachment);
+///     }
+///
+///     fn execute(&self, ctx: &mut dyn PassExecutionContext) {
+///         // Record rendering commands
+///     }
+/// }
+/// ```
+pub trait DeclarativePass: Send + Sync {
+    /// Get the pass name
+    fn name(&self) -> &str;
+
+    /// Get the pass kind (Graphics, Compute, or Transfer)
+    fn kind(&self) -> PassKind {
+        PassKind::Graphics
+    }
+
+    /// Declare resources that this pass needs
+    ///
+    /// This optional method allows passes to create resources in the graph.
+    /// The default implementation does nothing.
+    ///
+    /// # Arguments
+    /// * `graph` - The render graph to add resources to
+    fn declare_resources(&self, _graph: &mut crate::render_graph::RenderGraph) {
+        // Default: no resources to declare
+    }
+
+    /// Declare this pass's resource dependencies
+    ///
+    /// Use the builder to declare which resources this pass reads from
+    /// and writes to, along with pipeline stages and layouts.
+    ///
+    /// # Arguments
+    /// * `builder` - PassBuilder for declaring dependencies
+    fn declare_dependencies(&self, builder: &mut PassBuilder);
+
+    /// Prepare resources before pass execution (optional)
+    ///
+    /// This method is called before the render pass begins.
+    /// The default implementation does nothing.
+    ///
+    /// # Arguments
+    /// * `context` - Preparation context for resource setup
+    fn prepare(&self, _context: &mut dyn PassPreparationContext) {
+        // Default: no preparation needed
+    }
+
+    /// Execute the pass
+    ///
+    /// # Arguments
+    /// * `context` - Execution context with access to backend and resources
+    fn execute(&self, context: &mut dyn PassExecutionContext);
+}
+
+/// Adapter to bridge DeclarativePass to PassCallback
+///
+/// This allows DeclarativePass implementations to work with the existing
+/// render graph execution system.
+pub(crate) struct DeclarativePassAdapter<T: DeclarativePass> {
+    pass: T,
+}
+
+impl<T: DeclarativePass> DeclarativePassAdapter<T> {
+    pub(crate) fn new(pass: T) -> Self {
+        Self { pass }
+    }
+}
+
+impl<T: DeclarativePass> PassCallback for DeclarativePassAdapter<T> {
+    fn prepare(&self, context: &mut dyn PassPreparationContext) {
+        self.pass.prepare(context);
+    }
+
+    fn execute(&self, context: &mut dyn PassExecutionContext) {
+        self.pass.execute(context);
+    }
+}
+
 /// Preparation context for resource setup before pass execution
 ///
 /// This trait allows passes to set up resources that need to exist before
@@ -348,6 +458,85 @@ pub struct RenderPass {
     pub outputs: Vec<ResourceAccess>,
     /// Execution callback
     pub callback: Option<Box<dyn PassCallback>>,
+}
+
+/// Builder for declaratively configuring pass dependencies
+///
+/// PassBuilder provides a clean API for passes to declare their resource
+/// dependencies without manually managing ResourceAccess objects.
+///
+/// # Example
+/// ```ignore
+/// fn declare_dependencies(&self, builder: &mut PassBuilder) {
+///     builder
+///         .read(self.depth_buffer, PipelineStage::FRAGMENT_SHADER)
+///         .write(self.color_buffer, PipelineStage::COLOR_ATTACHMENT_OUTPUT)
+///         .with_layout(ImageLayout::ColorAttachment);
+/// }
+/// ```
+pub struct PassBuilder {
+    #[allow(dead_code)]
+    pass_id: PassId,
+    inputs: Vec<ResourceAccess>,
+    outputs: Vec<ResourceAccess>,
+}
+
+impl PassBuilder {
+    /// Create a new pass builder
+    pub fn new(pass_id: PassId) -> Self {
+        Self {
+            pass_id,
+            inputs: Vec::new(),
+            outputs: Vec::new(),
+        }
+    }
+
+    /// Declare a read dependency on a resource
+    ///
+    /// # Arguments
+    /// * `resource` - Resource to read from
+    /// * `stage` - Pipeline stage where the read occurs
+    pub fn read(&mut self, resource: ResourceId, stage: PipelineStage) -> &mut Self {
+        self.inputs.push(ResourceAccess::read(resource, stage));
+        self
+    }
+
+    /// Declare a write dependency on a resource
+    ///
+    /// # Arguments
+    /// * `resource` - Resource to write to
+    /// * `stage` - Pipeline stage where the write occurs
+    pub fn write(&mut self, resource: ResourceId, stage: PipelineStage) -> &mut Self {
+        self.outputs.push(ResourceAccess::write(resource, stage));
+        self
+    }
+
+    /// Declare a read-write dependency on a resource
+    ///
+    /// # Arguments
+    /// * `resource` - Resource to read from and write to
+    /// * `stage` - Pipeline stage where the access occurs
+    pub fn read_write(&mut self, resource: ResourceId, stage: PipelineStage) -> &mut Self {
+        self.outputs
+            .push(ResourceAccess::read_write(resource, stage));
+        self
+    }
+
+    /// Set the image layout for the last added dependency
+    ///
+    /// This is a convenience method that modifies the most recently added
+    /// input or output dependency.
+    pub fn with_layout(&mut self, layout: ImageLayout) -> &mut Self {
+        if let Some(last) = self.outputs.last_mut().or_else(|| self.inputs.last_mut()) {
+            last.layout = Some(layout);
+        }
+        self
+    }
+
+    /// Take ownership of inputs and outputs (internal use)
+    pub(crate) fn build(self) -> (Vec<ResourceAccess>, Vec<ResourceAccess>) {
+        (self.inputs, self.outputs)
+    }
 }
 
 impl RenderPass {
