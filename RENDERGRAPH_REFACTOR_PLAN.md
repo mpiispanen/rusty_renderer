@@ -95,7 +95,9 @@ RenderGraph
 - [x] Implement ForwardDeclarativePass
 - [x] Migrate ForwardPipeline to use declarative API
 - [x] Register shaders in ShaderRegistry during app initialization
+- [x] Add pipeline description collection (declare_pipeline in PassCallback)
 - [ ] Update backends to compile shaders from registry
+- [ ] Create backend pipelines from pipeline descriptions
 - [ ] Test rendering with new declarative system
 - [ ] Deprecate/remove old ForwardPass
 
