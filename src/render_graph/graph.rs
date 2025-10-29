@@ -886,4 +886,92 @@ mod tests {
         assert_eq!(barrier.dst_pass, PassId(1));
         assert!(!barrier.image_barriers.is_empty());
     }
+
+    #[test]
+    fn test_pipeline_description_collection() {
+        use crate::render_graph::shader::{ShaderDescriptor, ShaderSource, ShaderStage};
+        use crate::render_graph::DeclarativePass;
+        
+        let mut graph = RenderGraph::new();
+
+        // Register test shaders
+        graph.register_shader(
+            "test.vert",
+            ShaderDescriptor {
+                source: ShaderSource::Embedded(&[0, 1, 2, 3]), // Dummy SPIR-V
+                entry_point: "main",
+                stage: ShaderStage::Vertex,
+                backend_compile: false,
+            },
+        );
+        graph.register_shader(
+            "test.frag",
+            ShaderDescriptor {
+                source: ShaderSource::Embedded(&[4, 5, 6, 7]), // Dummy SPIR-V
+                entry_point: "main",
+                stage: ShaderStage::Fragment,
+                backend_compile: false,
+            },
+        );
+
+        // Create a resource
+        let desc = ResourceDescriptor::Image {
+            format: Format::Rgba8Unorm,
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
+            usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
+            samples: SampleCount::One,
+            mip_levels: 1,
+        };
+        let color = graph.create_resource("color", desc);
+
+        // Create a declarative test pass
+        struct TestPass {
+            output: ResourceId,
+        }
+        
+        impl DeclarativePass for TestPass {
+            fn name(&self) -> &str {
+                "test_pass"
+            }
+
+            fn declare_dependencies(
+                &self,
+                builder: &mut crate::render_graph::PassBuilder,
+            ) {
+                use crate::render_graph::PipelineStage;
+                builder.write(self.output, PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT));
+            }
+
+            fn declare_pipeline(
+                &self,
+                builder: &mut crate::render_graph::PipelineBuilder,
+                registry: &crate::render_graph::ShaderRegistry,
+            ) {
+                let vs_handle = registry.get_handle("test.vert").unwrap();
+                let fs_handle = registry.get_handle("test.frag").unwrap();
+                builder
+                    .vertex_shader(vs_handle)
+                    .fragment_shader(fs_handle);
+            }
+
+            fn prepare(&self, _context: &mut dyn crate::render_graph::PassPreparationContext) {}
+
+            fn execute(&self, _context: &mut dyn crate::render_graph::PassExecutionContext) {}
+        }
+
+        let test_pass = TestPass { output: color };
+        let pass_id = graph.add_declarative_pass(test_pass);
+
+        // Compile the graph
+        let compiled = graph.compile().unwrap();
+
+        // Verify pipeline description was collected
+        assert_eq!(compiled.pipeline_descriptions.len(), 1);
+        assert!(compiled.pipeline_descriptions.contains_key(&pass_id));
+
+        // Verify the pipeline description contains the shaders
+        let pipeline_desc = &compiled.pipeline_descriptions[&pass_id];
+        let shaders = pipeline_desc.shaders();
+        assert_eq!(shaders.len(), 2); // Vertex and fragment shader
+    }
 }
