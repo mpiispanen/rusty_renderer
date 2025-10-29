@@ -313,25 +313,25 @@ impl RenderPipeline for ForwardPipeline {
         // Register shaders for the forward rendering pipeline
         use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
 
-        // Register vertex shader
+        // For now, use pre-compiled SPIR-V shaders embedded in the binary
+        // TODO: Add runtime HLSL compilation for development mode
         graph.register_shader(
             "forward.vert",
             ShaderDescriptor {
-                source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+                source: ShaderSource::Embedded(include_bytes!("../../shaders/forward.vert.spv")),
                 entry_point: "VSMain",
                 stage: ShaderStage::Vertex,
-                backend_compile: true,
+                backend_compile: false, // Already compiled to SPIR-V
             },
         );
 
-        // Register fragment/pixel shader
         graph.register_shader(
             "forward.frag",
             ShaderDescriptor {
-                source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+                source: ShaderSource::Embedded(include_bytes!("../../shaders/forward.frag.spv")),
                 entry_point: "PSMain",
                 stage: ShaderStage::Fragment,
-                backend_compile: true,
+                backend_compile: false, // Already compiled to SPIR-V
             },
         );
 

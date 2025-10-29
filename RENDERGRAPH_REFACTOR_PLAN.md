@@ -94,7 +94,7 @@ RenderGraph
 ### Phase 4: Migration 🚧 IN PROGRESS
 - [x] Implement ForwardDeclarativePass
 - [x] Migrate ForwardPipeline to use declarative API
-- [ ] Register shaders in ShaderRegistry during app initialization
+- [x] Register shaders in ShaderRegistry during app initialization
 - [ ] Update backends to compile shaders from registry
 - [ ] Test rendering with new declarative system
 - [ ] Deprecate/remove old ForwardPass
