@@ -38,18 +38,21 @@ RenderGraph
   ├── Resource Registry (manages all resources)
   │   ├── Images (render targets, depth, textures)
   │   ├── Buffers (uniform, vertex, index)
-  │   └── Samplers
+  │   ├── Samplers
+  │   └── Shaders (vertex, fragment, compute)
   │
   ├── Pass Registry
   │   └── Each pass declares:
   │       ├── Input resources (read)
   │       ├── Output resources (write)
-  │       ├── Pipeline requirements
+  │       ├── Shader requirements (by name)
+  │       ├── Pipeline state
   │       └── Execution callback
   │
   └── Compilation & Execution
       ├── Topological sort (dependency order)
       ├── Resource lifetime analysis
+      ├── Shader compilation/loading
       ├── Automatic barrier insertion
       └── Resource aliasing/reuse
 ```
@@ -68,11 +71,13 @@ RenderGraph
 - [ ] Remove manual resource management from passes
 - [ ] Update PassExecutionContext to provide resources
 
-### Phase 3: Pipeline Integration
-- [ ] Move pipeline resource creation to RenderGraph
-- [ ] Pipelines declare resource requirements, don't create them
+### Phase 3: Pipeline & Shader Integration
+- [ ] Shader registry in RenderGraph
+- [ ] Passes declare shaders by name (not hardcoded paths)
+- [ ] Automatic shader loading/compilation
+- [ ] Pipeline state declared in pass, not created manually
 - [ ] Update descriptor set management
-- [ ] Remove hardcoded resource paths from pipelines
+- [ ] Remove hardcoded shader paths from pipelines
 
 ### Phase 4: Scene/Material Resources
 - [ ] Scene loader registers resources with graph
@@ -269,3 +274,223 @@ impl<'a> PassExecutionContext<'a> {
 
 *Created: 2025-10-29*
 *Status: Planning Phase*
+
+## Shader Management
+
+### Current Problems
+
+**Hardcoded in Backend/Pipeline:**
+```rust
+// Current: Shaders hardcoded in pipeline code
+impl ForwardPipeline {
+    fn new(backend: &Backend) -> Self {
+        let vs_bytes = include_bytes!("../../shaders/compiled/forward.vert.spv");
+        let fs_bytes = include_bytes!("../../shaders/compiled/forward.frag.spv");
+        
+        let vertex_shader = backend.create_shader(vs_bytes);
+        let fragment_shader = backend.create_shader(fs_bytes);
+        // ...
+    }
+}
+```
+
+**Issues:**
+- Shader paths hardcoded in multiple places
+- No central shader management
+- Difficult to swap shaders at runtime
+- Can't reuse shaders across passes
+- Hard to hot-reload shaders for development
+
+### Target: Declarative Shader API
+
+**Shader Registry:**
+```rust
+// Shaders registered with graph by name
+graph.register_shader("forward.vert", ShaderDescriptor {
+    source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+    entry_point: "vs_main",
+    stage: ShaderStage::Vertex,
+    backend_compile: true,  // Let backend compile (HLSL -> SPIR-V/DXIL)
+});
+
+graph.register_shader("forward.frag", ShaderDescriptor {
+    source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+    entry_point: "ps_main",
+    stage: ShaderStage::Fragment,
+    backend_compile: true,
+});
+
+// Or use pre-compiled
+graph.register_shader("forward.vert", ShaderDescriptor {
+    source: ShaderSource::Compiled("shaders/compiled/forward.vert.spv"),
+    stage: ShaderStage::Vertex,
+    backend_compile: false,
+});
+```
+
+**Pass Declares Shaders:**
+```rust
+impl RenderPass for ForwardPass {
+    fn declare_pipeline(&self, builder: &mut PipelineBuilder) {
+        builder
+            .vertex_shader("forward.vert")
+            .fragment_shader("forward.frag")
+            .vertex_layout(VertexLayout::Pos3Color4Uv2)
+            .depth_test(true)
+            .depth_write(true)
+            .cull_mode(CullMode::Back);
+    }
+}
+```
+
+### Shader Source Types
+
+```rust
+pub enum ShaderSource {
+    /// Load from file (HLSL, GLSL, etc.)
+    File(&'static str),
+    
+    /// Pre-compiled bytecode (SPIR-V, DXIL)
+    Compiled(&'static str),
+    
+    /// Inline source code
+    Inline(&'static str),
+    
+    /// Embedded at compile-time
+    Embedded(&'static [u8]),
+}
+
+pub struct ShaderDescriptor {
+    pub source: ShaderSource,
+    pub entry_point: &'static str,
+    pub stage: ShaderStage,
+    pub backend_compile: bool,  // True = compile at runtime, False = use as-is
+}
+```
+
+### Shader Compilation Strategy
+
+**Development Mode:**
+- Load HLSL source from disk
+- Compile at runtime (hot-reload support)
+- Cache compiled shaders
+
+**Release Mode:**
+- Use pre-compiled SPIR-V/DXIL
+- Embedded in binary (`include_bytes!`)
+- No runtime compilation overhead
+
+### Implementation Plan
+
+**Step 1: Shader Registry**
+```rust
+pub struct ShaderRegistry {
+    shaders: HashMap<String, ShaderHandle>,
+    descriptors: HashMap<String, ShaderDescriptor>,
+}
+
+impl ShaderRegistry {
+    pub fn register(&mut self, name: &str, desc: ShaderDescriptor);
+    pub fn get(&self, name: &str) -> Option<ShaderHandle>;
+    pub fn compile(&mut self, backend: &dyn Backend);
+}
+```
+
+**Step 2: Pipeline Builder**
+```rust
+pub struct PipelineBuilder<'a> {
+    shaders: Vec<String>,  // Shader names
+    vertex_layout: Option<VertexLayout>,
+    depth_state: DepthState,
+    // ... other pipeline state
+}
+
+impl<'a> PipelineBuilder<'a> {
+    pub fn vertex_shader(&mut self, name: &str) -> &mut Self;
+    pub fn fragment_shader(&mut self, name: &str) -> &mut Self;
+    pub fn compute_shader(&mut self, name: &str) -> &mut Self;
+}
+```
+
+**Step 3: Pass Integration**
+```rust
+pub trait RenderPass {
+    fn declare_pipeline(&self, builder: &mut PipelineBuilder) {
+        // Default: no shaders (compute/transfer pass)
+    }
+}
+```
+
+### Example: Forward Pass Refactored
+
+**Before:**
+```rust
+// Hardcoded in pipeline
+let vs = include_bytes!("../../shaders/compiled/forward.vert.spv");
+let fs = include_bytes!("../../shaders/compiled/forward.frag.spv");
+```
+
+**After:**
+```rust
+// Application setup
+graph.register_shader("forward.vert", ShaderDescriptor {
+    source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+    entry_point: "vs_main",
+    stage: ShaderStage::Vertex,
+    backend_compile: true,
+});
+
+graph.register_shader("forward.frag", ShaderDescriptor {
+    source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+    entry_point: "ps_main",
+    stage: ShaderStage::Fragment,
+    backend_compile: true,
+});
+
+// Pass declares what it needs
+impl RenderPass for ForwardPass {
+    fn declare_pipeline(&self, builder: &mut PipelineBuilder) {
+        builder
+            .vertex_shader("forward.vert")
+            .fragment_shader("forward.frag");
+    }
+}
+```
+
+### Benefits
+
+1. **No Hardcoded Paths**
+   - Shaders referenced by name
+   - Easy to swap implementations
+
+2. **Shader Reuse**
+   - Same shader used across multiple passes
+   - Compiled once, used many times
+
+3. **Hot Reload**
+   - Watch shader files in dev mode
+   - Recompile on change
+   - No app restart needed
+
+4. **Backend Agnostic**
+   - Graph manages shader source
+   - Backend compiles to native format
+   - Same API for HLSL, GLSL, SPIR-V
+
+5. **Development vs Release**
+   - Dev: Source files, runtime compilation
+   - Release: Pre-compiled, embedded
+
+### Shader Variants
+
+For future advanced usage:
+```rust
+// Different shader variants for different quality levels
+graph.register_shader_variant("forward.frag", "low_quality", ...);
+graph.register_shader_variant("forward.frag", "high_quality", ...);
+
+// Pass can select variant
+builder.fragment_shader("forward.frag")
+       .variant(quality_setting);
+```
+
