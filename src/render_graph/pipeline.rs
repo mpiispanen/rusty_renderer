@@ -349,6 +349,31 @@ impl PipelineBuilder {
         self
     }
 
+    /// Get the list of shader handles
+    pub fn shaders(&self) -> &[ShaderHandle] {
+        &self.shaders
+    }
+
+    /// Get the vertex layout
+    pub fn get_vertex_layout(&self) -> Option<&VertexLayout> {
+        self.vertex_layout.as_ref()
+    }
+
+    /// Get the depth state
+    pub fn get_depth_state(&self) -> &DepthState {
+        &self.depth_state
+    }
+
+    /// Get the rasterizer state
+    pub fn get_rasterizer_state(&self) -> &RasterizerState {
+        &self.rasterizer_state
+    }
+
+    /// Get the blend states
+    pub fn get_blend_states(&self) -> &[BlendState] {
+        &self.blend_states
+    }
+
     /// Build the pipeline descriptor
     pub fn build(self) -> PipelineDescriptor {
         PipelineDescriptor {

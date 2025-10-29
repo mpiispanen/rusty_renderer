@@ -147,6 +147,23 @@ pub trait PassCallback: Send + Sync {
     /// # Arguments
     /// * `context` - Execution context with access to backend and resources
     fn execute(&self, context: &mut dyn PassExecutionContext);
+
+    /// Declare pipeline requirements (optional)
+    ///
+    /// This method is called during graph compilation to build the graphics/compute
+    /// pipeline for this pass. The default implementation does nothing, which is
+    /// appropriate for transfer passes or passes that manage their own pipelines.
+    ///
+    /// # Arguments
+    /// * `builder` - Pipeline builder for declaring pipeline state
+    /// * `registry` - Shader registry for looking up shaders by name
+    fn declare_pipeline(
+        &self,
+        _builder: &mut crate::render_graph::PipelineBuilder,
+        _registry: &crate::render_graph::ShaderRegistry,
+    ) {
+        // Default: no pipeline (transfer pass or custom pipeline management)
+    }
 }
 
 /// Declarative render pass trait (new API)
@@ -291,6 +308,14 @@ impl<T: DeclarativePass> PassCallback for DeclarativePassAdapter<T> {
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         self.pass.execute(context);
+    }
+
+    fn declare_pipeline(
+        &self,
+        builder: &mut crate::render_graph::PipelineBuilder,
+        registry: &crate::render_graph::ShaderRegistry,
+    ) {
+        self.pass.declare_pipeline(builder, registry);
     }
 }
 

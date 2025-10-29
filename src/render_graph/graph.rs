@@ -3,7 +3,8 @@
 //! This module implements the main render graph structure and compilation.
 
 use crate::render_graph::barrier::{Barrier, BarrierInserter};
-use crate::render_graph::pass::{PassId, RenderPass};
+use crate::render_graph::pass::{PassId, PassKind, RenderPass};
+use crate::render_graph::pipeline::PipelineBuilder;
 use crate::render_graph::resource::{
     BufferUsageFlags, ExtentMode, Format, ImageUsageFlags, Resource, ResourceDescriptor,
     ResourceId, ResourceKind, SampleCount, SamplerDescriptor,
@@ -349,6 +350,36 @@ impl RenderGraph {
     /// Allows direct access to the shader registry for advanced use cases.
     pub fn shader_registry_mut(&mut self) -> &mut ShaderRegistry {
         &mut self.shader_registry
+    }
+
+    /// Get pipeline description for a pass
+    ///
+    /// Calls the pass's `declare_pipeline` method to build a pipeline description.
+    /// This is used during graph compilation to create backend pipelines.
+    ///
+    /// # Arguments
+    /// * `pass_id` - ID of the pass to get pipeline description for
+    ///
+    /// # Returns
+    /// A PipelineBuilder containing the pipeline requirements, or None if the pass
+    /// doesn't declare a pipeline (e.g., transfer passes)
+    pub fn get_pipeline_description(&self, pass_id: PassId) -> Option<PipelineBuilder> {
+        let pass = self.get_pass(pass_id)?;
+
+        // Only graphics and compute passes have pipelines
+        if pass.kind != PassKind::Graphics && pass.kind != PassKind::Compute {
+            return None;
+        }
+
+        // Create a pipeline builder
+        let mut builder = PipelineBuilder::new();
+
+        // Let the pass declare its pipeline
+        if let Some(callback) = &pass.callback {
+            callback.declare_pipeline(&mut builder, &self.shader_registry);
+        }
+
+        Some(builder)
     }
 
     /// Build dependency edges between passes
