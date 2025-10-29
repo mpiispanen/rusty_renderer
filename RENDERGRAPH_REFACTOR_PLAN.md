@@ -1,5 +1,18 @@
 # Rendergraph Refactoring Plan
 
+**Status:** 🚧 Phase 4 - Migration in Progress  
+**Last Updated:** 2025-10-29  
+**Completed Phases:** 1, 2, 3 ✅  
+**Current Phase:** 4 - Migrating to declarative API
+
+## Progress Summary
+
+- ✅ Phase 1: Resource descriptors and registry complete
+- ✅ Phase 2: DeclarativePass trait and PassBuilder complete
+- ✅ Phase 3: ShaderRegistry and PipelineBuilder complete
+- 🚧 Phase 4: ForwardDeclarativePass implemented and integrated
+- ⏳ Phase 5: Automatic execution planned
+
 ## Current State
 
 **Problems:**
@@ -59,32 +72,34 @@ RenderGraph
 
 ## Migration Strategy
 
-### Phase 1: Resource Descriptors
+### Phase 1: Resource Descriptors ✅ COMPLETE
 - [x] Define resource descriptor types (already exists)
-- [ ] Add resource creation API to RenderGraph
-- [ ] Implement resource registry/storage
-- [ ] Add resource lookup by name/ID
+- [x] Add resource creation API to RenderGraph
+- [x] Implement resource registry/storage
+- [x] Add resource lookup by name/ID
 
-### Phase 2: Pass API Refactoring
-- [ ] Update RenderPass to declare resources declaratively
-- [ ] Add methods: `declare_read()`, `declare_write()`, `declare_attachment()`
-- [ ] Remove manual resource management from passes
-- [ ] Update PassExecutionContext to provide resources
+### Phase 2: Pass API Refactoring ✅ COMPLETE
+- [x] Update RenderPass to declare resources declaratively (DeclarativePass trait)
+- [x] Add methods: `declare_read()`, `declare_write()` (PassBuilder)
+- [x] Update PassExecutionContext to provide resources
+- [x] DeclarativePassAdapter to bridge new and old APIs
 
-### Phase 3: Pipeline & Shader Integration
-- [ ] Shader registry in RenderGraph
-- [ ] Passes declare shaders by name (not hardcoded paths)
-- [ ] Automatic shader loading/compilation
-- [ ] Pipeline state declared in pass, not created manually
-- [ ] Update descriptor set management
-- [ ] Remove hardcoded shader paths from pipelines
+### Phase 3: Pipeline & Shader Integration ✅ COMPLETE
+- [x] Shader registry in RenderGraph (ShaderRegistry)
+- [x] Passes declare shaders by name (via declare_pipeline)
+- [x] Shader compilation infrastructure (ShaderDescriptor, ShaderSource)
+- [x] Pipeline state declared in pass (PipelineBuilder)
+- [x] Declarative pipeline configuration
 
-### Phase 4: Scene/Material Resources
-- [ ] Scene loader registers resources with graph
-- [ ] Materials reference resources by ID, not direct handles
-- [ ] Texture/buffer upload through graph API
+### Phase 4: Migration 🚧 IN PROGRESS
+- [x] Implement ForwardDeclarativePass
+- [x] Migrate ForwardPipeline to use declarative API
+- [ ] Register shaders in ShaderRegistry during app initialization
+- [ ] Update backends to compile shaders from registry
+- [ ] Test rendering with new declarative system
+- [ ] Deprecate/remove old ForwardPass
 
-### Phase 5: Execution
+### Phase 5: Execution (PLANNED)
 - [ ] Implement automatic barrier insertion
 - [ ] Resource lifetime tracking
 - [ ] Dependency-ordered execution
