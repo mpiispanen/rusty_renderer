@@ -217,6 +217,41 @@ pub trait DeclarativePass: Send + Sync {
     /// * `builder` - PassBuilder for declaring dependencies
     fn declare_dependencies(&self, builder: &mut PassBuilder);
 
+    /// Declare pipeline configuration (shaders and state)
+    ///
+    /// This optional method allows graphics and compute passes to specify
+    /// their pipeline requirements. The default implementation does nothing,
+    /// which is appropriate for transfer-only passes.
+    ///
+    /// The render graph will use this declaration to automatically create
+    /// and cache the pipeline object for this pass.
+    ///
+    /// # Arguments
+    /// * `builder` - PipelineBuilder for configuring shaders and state
+    /// * `registry` - Shader registry for loading shaders
+    ///
+    /// # Example
+    /// ```ignore
+    /// fn declare_pipeline(&self, builder: &mut PipelineBuilder, registry: &ShaderRegistry) {
+    ///     let vs = registry.get_shader("forward.vert").unwrap();
+    ///     let fs = registry.get_shader("forward.frag").unwrap();
+    ///     
+    ///     builder
+    ///         .vertex_shader(vs)
+    ///         .fragment_shader(fs)
+    ///         .depth_test(true)
+    ///         .depth_write(true)
+    ///         .cull_mode(CullMode::Back);
+    /// }
+    /// ```
+    fn declare_pipeline(
+        &self,
+        _builder: &mut crate::render_graph::PipelineBuilder,
+        _registry: &crate::render_graph::ShaderRegistry,
+    ) {
+        // Default: no pipeline (compute/transfer passes or passes that manage their own pipeline)
+    }
+
     /// Prepare resources before pass execution (optional)
     ///
     /// This method is called before the render pass begins.
