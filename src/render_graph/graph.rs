@@ -8,6 +8,7 @@ use crate::render_graph::resource::{
     BufferUsageFlags, ExtentMode, Format, ImageUsageFlags, Resource, ResourceDescriptor,
     ResourceId, ResourceKind, SampleCount, SamplerDescriptor,
 };
+use crate::render_graph::shader::{ShaderDescriptor, ShaderHandle, ShaderRegistry};
 use std::collections::HashMap;
 use thiserror::Error;
 
@@ -71,6 +72,8 @@ pub struct RenderGraph {
     pass_names: HashMap<String, PassId>,
     /// Resource lookup by name
     resource_names: HashMap<String, ResourceId>,
+    /// Shader registry
+    shader_registry: ShaderRegistry,
     /// Next pass ID
     next_pass_id: usize,
     /// Next resource ID
@@ -85,6 +88,7 @@ impl RenderGraph {
             resources: Vec::new(),
             pass_names: HashMap::new(),
             resource_names: HashMap::new(),
+            shader_registry: ShaderRegistry::new(),
             next_pass_id: 0,
             next_resource_id: 0,
         }
@@ -311,6 +315,40 @@ impl RenderGraph {
     /// Get all resources
     pub fn resources(&self) -> &[Resource] {
         &self.resources
+    }
+
+    /// Register a shader with the graph
+    ///
+    /// Shaders registered here can be referenced by name in pipeline builders.
+    ///
+    /// # Example
+    /// ```ignore
+    /// graph.register_shader(
+    ///     "forward.vert",
+    ///     ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Vertex)
+    ///         .with_entry_point("vs_main")
+    /// );
+    /// ```
+    pub fn register_shader(
+        &mut self,
+        name: impl Into<String>,
+        descriptor: ShaderDescriptor,
+    ) -> ShaderHandle {
+        self.shader_registry.register(name, descriptor)
+    }
+
+    /// Get the shader registry
+    ///
+    /// Allows direct access to the shader registry for advanced use cases.
+    pub fn shader_registry(&self) -> &ShaderRegistry {
+        &self.shader_registry
+    }
+
+    /// Get mutable shader registry
+    ///
+    /// Allows direct access to the shader registry for advanced use cases.
+    pub fn shader_registry_mut(&mut self) -> &mut ShaderRegistry {
+        &mut self.shader_registry
     }
 
     /// Build dependency edges between passes

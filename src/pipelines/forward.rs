@@ -310,6 +310,33 @@ impl RenderPipeline for ForwardPipeline {
 
         let mut graph = RenderGraph::new();
 
+        // Register shaders for the forward rendering pipeline
+        use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
+
+        // Register vertex shader
+        graph.register_shader(
+            "forward.vert",
+            ShaderDescriptor {
+                source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+                entry_point: "VSMain",
+                stage: ShaderStage::Vertex,
+                backend_compile: true,
+            },
+        );
+
+        // Register fragment/pixel shader
+        graph.register_shader(
+            "forward.frag",
+            ShaderDescriptor {
+                source: ShaderSource::File("shaders/hlsl/forward.hlsl"),
+                entry_point: "PSMain",
+                stage: ShaderStage::Fragment,
+                backend_compile: true,
+            },
+        );
+
+        log::info!("Registered shaders in render graph");
+
         // Get dimensions from backend (or use defaults)
         let (width, height) = (800, 600); // TODO: Get from backend or args
 
@@ -559,7 +586,7 @@ impl RenderPipeline for ForwardPipeline {
                             *transform,
                             vertex_count,
                         );
-                        
+
                         let _pass_id = graph.add_declarative_pass(forward_pass);
 
                         log::debug!("Added forward rendering pass for mesh '{name}' with {vertex_count} vertices");

@@ -8,8 +8,8 @@ use crate::backends::Buffer;
 use crate::camera::CameraUniforms;
 use crate::lighting::LightingUniforms;
 use crate::render_graph::{
-    DeclarativePass, PassBuilder, PassExecutionContext,
-    PassKind, PassPreparationContext, PipelineBuilder, PipelineStage, ResourceId, ShaderRegistry,
+    DeclarativePass, PassBuilder, PassExecutionContext, PassKind, PassPreparationContext,
+    PipelineBuilder, PipelineStage, ResourceId, ShaderRegistry,
 };
 use crate::scene::Transform;
 use std::sync::Arc;
@@ -49,25 +49,25 @@ use std::sync::Arc;
 pub struct ForwardDeclarativePass {
     /// Color output resource
     color_output: ResourceId,
-    
+
     /// Vertex buffer containing geometry
     vertex_buffer: Arc<Box<dyn Buffer>>,
-    
+
     /// Camera uniform buffer (shared)
     camera_buffer: Arc<Box<dyn Buffer>>,
-    
+
     /// Lighting uniform buffer (shared)
     lighting_buffer: Arc<Box<dyn Buffer>>,
-    
+
     /// Optional material uniform buffer
     material_buffer: Option<Arc<Box<dyn Buffer>>>,
-    
+
     /// Optional texture
     texture: Option<Arc<Box<dyn crate::backends::Texture>>>,
-    
+
     /// Object transform (position, rotation, scale)
     transform: Transform,
-    
+
     /// Number of vertices to draw
     vertex_count: u32,
 }
@@ -133,22 +133,22 @@ impl DeclarativePass for ForwardDeclarativePass {
         // Get shaders from registry
         // For now, we'll use compile-time includes as fallback
         // TODO: Register shaders in the registry during app setup
-        
+
         use crate::render_graph::CullMode;
-        
+
         // Try to get shaders from registry (using get_handle which returns Result)
         if let Ok(vs_handle) = registry.get_handle("forward.vert") {
             builder.vertex_shader(vs_handle);
         } else {
             log::warn!("forward.vert not in shader registry, pipeline will be incomplete");
         }
-        
+
         if let Ok(fs_handle) = registry.get_handle("forward.frag") {
             builder.fragment_shader(fs_handle);
         } else {
             log::warn!("forward.frag not in shader registry, pipeline will be incomplete");
         }
-        
+
         // Configure pipeline state
         // Note: VertexLayout is a complex struct; for now we skip it and let
         // the backend handle vertex format. In the future, we should properly
