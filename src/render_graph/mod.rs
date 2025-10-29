@@ -7,6 +7,7 @@
 mod barrier;
 pub mod graph;
 mod pass;
+mod pipeline;
 mod resource;
 mod shader;
 
@@ -16,6 +17,11 @@ pub use pass::{
     AccessType, DeclarativePass, ImageLayout, IndexType, PassBuilder, PassCallback,
     PassExecutionContext, PassId, PassKind, PassPreparationContext, PipelineStage, RenderPass,
     ResourceAccess,
+};
+pub use pipeline::{
+    BlendFactor, BlendOp, BlendState, CompareOp, CullMode, DepthState, FrontFace, InputRate,
+    PipelineBuilder, PipelineDescriptor, PolygonMode, RasterizerState, VertexAttribute,
+    VertexBinding, VertexFormat, VertexLayout,
 };
 pub use resource::{
     AddressMode, BufferUsageFlags, Extent3D, ExtentMode, FilterMode, Format, ImageUsageFlags,

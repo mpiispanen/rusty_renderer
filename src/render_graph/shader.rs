@@ -138,7 +138,7 @@ impl ShaderDescriptor {
 
 /// Shader handle for referencing registered shaders
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ShaderHandle(usize);
+pub struct ShaderHandle(pub usize);
 
 /// Compiled shader data
 ///
