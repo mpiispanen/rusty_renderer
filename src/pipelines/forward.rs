@@ -14,7 +14,6 @@ use crate::backends::{
 use crate::camera::{CameraController, CameraUniforms};
 use crate::lighting::LightingUniforms;
 use crate::materials::GpuMaterial;
-use crate::passes::ForwardPass;
 use crate::render_graph::{
     Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
@@ -541,16 +540,16 @@ impl RenderPipeline for ForwardPipeline {
                                     let ptr = buf.as_ref().as_ref()
                                         as *const dyn crate::backends::Buffer
                                         as *const std::ffi::c_void;
-                                    let _ = writeln!(f, "Creating ForwardPass for '{name}' with material buffer at {ptr:p}");
+                                    let _ = writeln!(f, "Creating ForwardDeclarativePass for '{name}' with material buffer at {ptr:p}");
                                 }
                                 None => {
-                                    let _ = writeln!(f, "Creating ForwardPass for '{name}' with NO material buffer (using default)");
+                                    let _ = writeln!(f, "Creating ForwardDeclarativePass for '{name}' with NO material buffer (using default)");
                                 }
                             }
                         }
 
-                        let _pass = ForwardPass::new(
-                            &mut graph,
+                        // Use declarative pass API
+                        let forward_pass = crate::passes::ForwardDeclarativePass::new(
                             color_buffer,
                             vertex_buffer,
                             camera_buffer.clone(),
@@ -560,6 +559,8 @@ impl RenderPipeline for ForwardPipeline {
                             *transform,
                             vertex_count,
                         );
+                        
+                        let _pass_id = graph.add_declarative_pass(forward_pass);
 
                         log::debug!("Added forward rendering pass for mesh '{name}' with {vertex_count} vertices");
                     }
