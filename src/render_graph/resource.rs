@@ -363,9 +363,10 @@ mod tests {
     fn test_resource_creation() {
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
 
         let resource = Resource::new(ResourceId(0), "test_image", desc);

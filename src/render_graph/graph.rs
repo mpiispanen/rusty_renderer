@@ -559,9 +559,10 @@ mod tests {
 
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
 
         let res_id = graph.create_resource("color_buffer", desc);
@@ -578,9 +579,10 @@ mod tests {
         // Create a resource
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color = graph.create_resource("color", desc);
 
@@ -604,9 +606,10 @@ mod tests {
         // Create resources
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let res1 = graph.create_resource("res1", desc.clone());
         let res2 = graph.create_resource("res2", desc);
@@ -645,9 +648,10 @@ mod tests {
         // Create resources
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let res1 = graph.create_resource("res1", desc.clone());
         let res2 = graph.create_resource("res2", desc);
@@ -688,9 +692,10 @@ mod tests {
         // Create resources
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let res1 = graph.create_resource("res1", desc.clone());
         let res2 = graph.create_resource("res2", desc);
@@ -749,9 +754,10 @@ mod tests {
         // Create resources
         let desc = ResourceDescriptor::Image {
             format: Format::Rgba8Unorm,
-            extent: Extent3D::new_2d(1280, 720),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1280, 720)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let res1 = graph.create_resource("res1", desc.clone());
         let res2 = graph.create_resource("res2", desc);

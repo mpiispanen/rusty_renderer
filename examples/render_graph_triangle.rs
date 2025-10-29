@@ -17,7 +17,7 @@ use rusty_renderer::backends::{
 };
 use rusty_renderer::passes::VertexBufferTrianglePass;
 use rusty_renderer::render_graph::{
-    Extent3D, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
 
 /// Create simple triangle vertices (red, green, blue)
@@ -120,9 +120,10 @@ fn main() -> Result<()> {
         "color_output",
         ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(800, 600),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         },
     );
 

@@ -3,6 +3,8 @@
 //! A simple pass that renders a colored triangle. The triangle vertices
 //! are hardcoded in the vertex shader.
 
+#[cfg(test)]
+use crate::render_graph::ExtentMode;
 use crate::render_graph::{
     AccessType, ImageLayout, PassCallback, PassExecutionContext, PassId, PassKind, PipelineStage,
     RenderGraph, RenderPass, ResourceAccess, ResourceId,
@@ -144,9 +146,10 @@ mod tests {
         // Create a color buffer
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(800, 600),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("color_buffer", color_desc);
 
@@ -163,9 +166,10 @@ mod tests {
 
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(800, 600),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("color_buffer", color_desc);
 
@@ -185,9 +189,10 @@ mod tests {
 
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
-            extent: Extent3D::new_2d(800, 600),
+            extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
             usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
             samples: SampleCount::One,
+            mip_levels: 1,
         };
         let color_buffer = graph.create_resource("color_buffer", color_desc);
 

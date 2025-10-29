@@ -8,6 +8,7 @@ mod barrier;
 pub mod graph;
 mod pass;
 mod resource;
+mod shader;
 
 pub use barrier::{Barrier, BarrierType, ImageBarrier, MemoryAccess, MemoryBarrier};
 pub use graph::{CompiledGraph, RenderGraph};
@@ -20,4 +21,8 @@ pub use resource::{
     AddressMode, BufferUsageFlags, Extent3D, ExtentMode, FilterMode, Format, ImageUsageFlags,
     Resource, ResourceDescriptor, ResourceId, ResourceKind, ResourceLifetime, SampleCount,
     SamplerDescriptor,
+};
+pub use shader::{
+    CompiledShader, ShaderDescriptor, ShaderError, ShaderHandle, ShaderRegistry, ShaderSource,
+    ShaderStage,
 };

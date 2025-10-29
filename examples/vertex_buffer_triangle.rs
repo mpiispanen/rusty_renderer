@@ -16,7 +16,9 @@ use rusty_renderer::backends::{
     create_backend, BackendType, BufferDescriptor, BufferUsage, MemoryLocation, Vertex,
 };
 use rusty_renderer::passes::VertexBufferTrianglePass;
-use rusty_renderer::render_graph::{Extent3D, Format, ImageUsageFlags, RenderGraph, SampleCount};
+use rusty_renderer::render_graph::{
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, SampleCount,
+};
 
 /// Create triangle vertices using the Vertex struct
 fn create_triangle_vertices() -> Vec<Vertex> {
@@ -140,9 +142,10 @@ fn main() -> Result<()> {
     // Create color buffer resource (offscreen render target)
     let color_desc = rusty_renderer::render_graph::ResourceDescriptor::Image {
         format: Format::Bgra8Unorm,
-        extent: Extent3D::new_2d(800, 600),
+        extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
         usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
         samples: SampleCount::One,
+        mip_levels: 1,
     };
     let color_buffer = graph.create_resource("color_buffer", color_desc);
 

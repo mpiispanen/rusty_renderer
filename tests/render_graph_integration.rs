@@ -4,9 +4,9 @@
 //! and that the output matches the direct rendering implementation.
 
 use rusty_renderer::render_graph::{
-    AccessType, Extent3D, Format, ImageLayout, ImageUsageFlags, PassCallback, PassExecutionContext,
-    PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess, ResourceDescriptor,
-    SampleCount,
+    AccessType, Extent3D, ExtentMode, Format, ImageLayout, ImageUsageFlags, PassCallback,
+    PassExecutionContext, PassKind, PipelineStage, RenderGraph, RenderPass, ResourceAccess,
+    ResourceDescriptor, SampleCount,
 };
 use rusty_renderer::{RenderBackend, RenderConfig};
 use std::path::Path;
@@ -115,9 +115,10 @@ fn build_triangle_graph(width: u32, height: u32) -> anyhow::Result<RenderGraph> 
     // Create color buffer resource
     let color_desc = ResourceDescriptor::Image {
         format: Format::Bgra8Unorm,
-        extent: Extent3D::new_2d(width, height),
+        extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
         usage: ImageUsageFlags::new(ImageUsageFlags::COLOR_ATTACHMENT),
         samples: SampleCount::One,
+        mip_levels: 1,
     };
     let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
