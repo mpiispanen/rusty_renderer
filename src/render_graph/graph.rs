@@ -61,6 +61,8 @@ pub struct CompiledGraph {
     pub producers: HashMap<ResourceId, PassId>,
     /// Barriers to insert between passes
     pub barriers: Vec<Barrier>,
+    /// Pipeline descriptions for each graphics/compute pass
+    pub pipeline_descriptions: HashMap<PassId, PipelineBuilder>,
 }
 
 /// Main render graph structure
@@ -497,10 +499,27 @@ impl RenderGraph {
         // Insert barriers between passes
         let barriers = self.insert_barriers(&execution_order);
 
+        // Collect pipeline descriptions from passes
+        let mut pipeline_descriptions = HashMap::new();
+        for &pass_id in &execution_order {
+            if let Some(builder) = self.get_pipeline_description(pass_id) {
+                log::debug!("Collected pipeline description for pass {:?}", pass_id);
+                pipeline_descriptions.insert(pass_id, builder);
+            }
+        }
+
+        log::info!(
+            "Graph compiled: {} passes, {} barriers, {} pipelines",
+            execution_order.len(),
+            barriers.len(),
+            pipeline_descriptions.len()
+        );
+
         Ok(CompiledGraph {
             execution_order,
             producers,
             barriers,
+            pipeline_descriptions,
         })
     }
 
