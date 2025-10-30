@@ -134,6 +134,122 @@ impl ShaderDescriptor {
         self.entry_point = entry_point;
         self
     }
+
+    /// Compile shader to SPIR-V
+    ///
+    /// This method compiles the shader source to SPIR-V bytecode suitable for Vulkan.
+    /// For HLSL shaders, it uses DXC to compile to SPIR-V.
+    ///
+    /// # Returns
+    /// SPIR-V bytecode as a vector of u32 words
+    pub fn compile_to_spirv(&self) -> Result<Vec<u32>> {
+        match &self.source {
+            ShaderSource::Embedded(bytecode) => {
+                // Assume embedded bytecode is already SPIR-V
+                // Convert from u8 slice to u32 vec
+                if bytecode.len() % 4 != 0 {
+                    return Err(ShaderError::CompilationError(
+                        "Embedded bytecode length not aligned to 4 bytes".to_string(),
+                    ));
+                }
+                let spirv: Vec<u32> = bytecode
+                    .chunks_exact(4)
+                    .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+                    .collect();
+                Ok(spirv)
+            }
+            ShaderSource::Compiled(path) => {
+                // Load pre-compiled SPIR-V
+                let bytecode = ShaderRegistry::load_compiled(path)?;
+                if bytecode.len() % 4 != 0 {
+                    return Err(ShaderError::CompilationError(format!(
+                        "Compiled shader {} length not aligned to 4 bytes",
+                        path
+                    )));
+                }
+                let spirv: Vec<u32> = bytecode
+                    .chunks_exact(4)
+                    .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+                    .collect();
+                Ok(spirv)
+            }
+            ShaderSource::File(path) => {
+                // Compile from source file
+                if !self.backend_compile {
+                    return Err(ShaderError::CompilationError(
+                        "Shader marked as not backend-compilable but source is a file".to_string(),
+                    ));
+                }
+
+                // For now, assume all source files are HLSL and use DXC to compile to SPIR-V
+                self.compile_hlsl_to_spirv(path)
+            }
+        }
+    }
+
+    /// Compile HLSL source to SPIR-V using DXC
+    #[cfg(unix)]
+    fn compile_hlsl_to_spirv(&self, path: &str) -> Result<Vec<u32>> {
+        use std::process::Command;
+
+        // Determine shader profile based on stage
+        let profile = match self.stage {
+            ShaderStage::Vertex => "vs_6_0",
+            ShaderStage::Fragment => "ps_6_0",
+            ShaderStage::Compute => "cs_6_0",
+        };
+
+        // Create output path for SPIR-V
+        let output_path = format!("{}.spv", path);
+
+        // Run DXC to compile HLSL to SPIR-V
+        let output = Command::new("dxc")
+            .arg("-spirv")
+            .arg("-T")
+            .arg(profile)
+            .arg("-E")
+            .arg(self.entry_point)
+            .arg(path)
+            .arg("-Fo")
+            .arg(&output_path)
+            .output()
+            .map_err(|e| ShaderError::CompilationError(format!("Failed to run DXC: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ShaderError::CompilationError(format!(
+                "DXC compilation failed for {}: {}",
+                path, stderr
+            )));
+        }
+
+        // Load the compiled SPIR-V
+        let bytecode = std::fs::read(&output_path).map_err(|e| {
+            ShaderError::LoadError(format!("Failed to load compiled SPIR-V: {}", e))
+        })?;
+
+        if bytecode.len() % 4 != 0 {
+            return Err(ShaderError::CompilationError(
+                "Compiled SPIR-V length not aligned to 4 bytes".to_string(),
+            ));
+        }
+
+        let spirv: Vec<u32> = bytecode
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+
+        // Clean up temporary file
+        let _ = std::fs::remove_file(&output_path);
+
+        Ok(spirv)
+    }
+
+    #[cfg(windows)]
+    fn compile_hlsl_to_spirv(&self, path: &str) -> Result<Vec<u32>> {
+        // On Windows, use the same DXC approach
+        self.compile_hlsl_to_spirv(path)
+    }
 }
 
 /// Shader handle for referencing registered shaders

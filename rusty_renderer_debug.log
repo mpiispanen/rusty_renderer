@@ -19,3 +19,5 @@ Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0
 Creating ForwardDeclarativePass for 'TexturedCube' with material buffer at 0x55cbda01fc20
 GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
 ("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1None, texture_path=
+Some("texture.png")

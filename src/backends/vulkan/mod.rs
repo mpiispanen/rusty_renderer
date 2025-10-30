@@ -887,6 +887,297 @@ impl VulkanBackend {
         Ok(unsafe { device.create_shader_module(&info, None)? })
     }
 
+    /// Compile a graphics pipeline from a PipelineBuilder description
+    ///
+    /// This function takes a declarative pipeline description and creates the corresponding
+    /// Vulkan pipeline object. It handles shader module compilation, vertex layouts,
+    /// rasterizer state, depth testing, and blending configuration.
+    #[allow(dead_code)] // Will be used when migrating passes to declarative API (Issue #85)
+    fn compile_pipeline_from_builder(
+        &mut self,
+        builder: &crate::render_graph::PipelineBuilder,
+        shader_registry: &crate::render_graph::ShaderRegistry,
+    ) -> Result<vk::Pipeline> {
+        use crate::render_graph::{
+            CompareOp, CullMode, FrontFace, InputRate, PolygonMode, ShaderStage, VertexFormat,
+        };
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        log::debug!("Compiling pipeline from builder");
+
+        // Compile shader modules from shader registry
+        let mut shader_stages = Vec::new();
+        let mut entry_point_cstrings = Vec::new(); // Keep CStrings alive
+
+        for shader_handle in builder.shaders() {
+            let shader_desc = shader_registry
+                .get_by_handle(*shader_handle)
+                .context("Shader not found in registry")?;
+
+            // Check if we already have this shader compiled
+            let shader_module = if let Some(&module) = self.shader_module_cache.get(shader_handle) {
+                module
+            } else {
+                // Compile shader and cache it
+                let spirv = shader_desc
+                    .compile_to_spirv()
+                    .map_err(|e| anyhow::anyhow!("Shader compilation failed: {}", e))?;
+                let module = self.create_shader_module(&spirv)?;
+                self.shader_module_cache.insert(*shader_handle, module);
+                module
+            };
+
+            // Create shader stage info
+            let stage_flags = match shader_desc.stage {
+                ShaderStage::Vertex => vk::ShaderStageFlags::VERTEX,
+                ShaderStage::Fragment => vk::ShaderStageFlags::FRAGMENT,
+                ShaderStage::Compute => vk::ShaderStageFlags::COMPUTE,
+            };
+
+            let entry_point = shader_desc.entry_point;
+            let entry_point_cstr = std::ffi::CString::new(entry_point)?;
+            entry_point_cstrings.push(entry_point_cstr);
+
+            shader_stages.push(
+                vk::PipelineShaderStageCreateInfo::builder()
+                    .stage(stage_flags)
+                    .module(shader_module)
+                    .name(entry_point_cstrings.last().unwrap().as_bytes_with_nul())
+                    .build(),
+            );
+        }
+
+        // Convert vertex layout
+        let (vertex_bindings, vertex_attributes) = if let Some(layout) = builder.get_vertex_layout()
+        {
+            let bindings: Vec<_> = layout
+                .bindings
+                .iter()
+                .map(|b| {
+                    vk::VertexInputBindingDescription::builder()
+                        .binding(b.binding)
+                        .stride(b.stride)
+                        .input_rate(match b.input_rate {
+                            InputRate::Vertex => vk::VertexInputRate::VERTEX,
+                            InputRate::Instance => vk::VertexInputRate::INSTANCE,
+                        })
+                        .build()
+                })
+                .collect();
+
+            let attributes: Vec<_> = layout
+                .attributes
+                .iter()
+                .map(|a| {
+                    let format = match a.format {
+                        VertexFormat::Float32 => vk::Format::R32_SFLOAT,
+                        VertexFormat::Float32x2 => vk::Format::R32G32_SFLOAT,
+                        VertexFormat::Float32x3 => vk::Format::R32G32B32_SFLOAT,
+                        VertexFormat::Float32x4 => vk::Format::R32G32B32A32_SFLOAT,
+                        VertexFormat::Sint32 => vk::Format::R32_SINT,
+                        VertexFormat::Sint32x2 => vk::Format::R32G32_SINT,
+                        VertexFormat::Sint32x3 => vk::Format::R32G32B32_SINT,
+                        VertexFormat::Sint32x4 => vk::Format::R32G32B32A32_SINT,
+                        VertexFormat::Uint32 => vk::Format::R32_UINT,
+                        VertexFormat::Uint32x2 => vk::Format::R32G32_UINT,
+                        VertexFormat::Uint32x3 => vk::Format::R32G32B32_UINT,
+                        VertexFormat::Uint32x4 => vk::Format::R32G32B32A32_UINT,
+                    };
+
+                    vk::VertexInputAttributeDescription::builder()
+                        .binding(0) // TODO: Support multiple bindings
+                        .location(a.location)
+                        .format(format)
+                        .offset(a.offset)
+                        .build()
+                })
+                .collect();
+
+            (bindings, attributes)
+        } else {
+            // Empty vertex input for compute shaders or procedural geometry
+            (Vec::new(), Vec::new())
+        };
+
+        let vertex_input_info = vk::PipelineVertexInputStateCreateInfo::builder()
+            .vertex_binding_descriptions(&vertex_bindings)
+            .vertex_attribute_descriptions(&vertex_attributes);
+
+        // Input assembly
+        let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+            .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
+            .primitive_restart_enable(false);
+
+        // Viewport and scissor (use current swapchain extent)
+        let viewport = vk::Viewport::builder()
+            .x(0.0)
+            .y(0.0)
+            .width(self.swapchain_extent.width as f32)
+            .height(self.swapchain_extent.height as f32)
+            .min_depth(0.0)
+            .max_depth(1.0)
+            .build();
+
+        let scissor = vk::Rect2D::builder()
+            .offset(vk::Offset2D { x: 0, y: 0 })
+            .extent(self.swapchain_extent)
+            .build();
+
+        let viewports = vec![viewport];
+        let scissors = vec![scissor];
+        let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+            .viewports(&viewports)
+            .scissors(&scissors);
+
+        // Rasterization state
+        let rast_state = builder.get_rasterizer_state();
+        let polygon_mode = match rast_state.polygon_mode {
+            PolygonMode::Fill => vk::PolygonMode::FILL,
+            PolygonMode::Line => vk::PolygonMode::LINE,
+            PolygonMode::Point => vk::PolygonMode::POINT,
+        };
+
+        let cull_mode = match rast_state.cull_mode {
+            CullMode::None => vk::CullModeFlags::NONE,
+            CullMode::Front => vk::CullModeFlags::FRONT,
+            CullMode::Back => vk::CullModeFlags::BACK,
+            CullMode::FrontAndBack => vk::CullModeFlags::FRONT_AND_BACK,
+        };
+
+        let front_face = match rast_state.front_face {
+            FrontFace::Clockwise => vk::FrontFace::CLOCKWISE,
+            FrontFace::CounterClockwise => vk::FrontFace::COUNTER_CLOCKWISE,
+        };
+
+        let rasterization_info = vk::PipelineRasterizationStateCreateInfo::builder()
+            .depth_clamp_enable(false)
+            .rasterizer_discard_enable(false)
+            .polygon_mode(polygon_mode)
+            .line_width(rast_state.line_width)
+            .cull_mode(cull_mode)
+            .front_face(front_face)
+            .depth_bias_enable(false);
+
+        // Multisample state (disabled for now)
+        let multisample_info = vk::PipelineMultisampleStateCreateInfo::builder()
+            .sample_shading_enable(false)
+            .rasterization_samples(vk::SampleCountFlags::_1);
+
+        // Depth stencil state
+        let depth_state = builder.get_depth_state();
+        let compare_op = match depth_state.compare_op {
+            CompareOp::Never => vk::CompareOp::NEVER,
+            CompareOp::Less => vk::CompareOp::LESS,
+            CompareOp::Equal => vk::CompareOp::EQUAL,
+            CompareOp::LessOrEqual => vk::CompareOp::LESS_OR_EQUAL,
+            CompareOp::Greater => vk::CompareOp::GREATER,
+            CompareOp::NotEqual => vk::CompareOp::NOT_EQUAL,
+            CompareOp::GreaterOrEqual => vk::CompareOp::GREATER_OR_EQUAL,
+            CompareOp::Always => vk::CompareOp::ALWAYS,
+        };
+
+        let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+            .depth_test_enable(depth_state.test_enable)
+            .depth_write_enable(depth_state.write_enable)
+            .depth_compare_op(compare_op)
+            .depth_bounds_test_enable(false)
+            .stencil_test_enable(false);
+
+        // Color blend state
+        let blend_states = builder.get_blend_states();
+        let blend_attachments: Vec<_> = if blend_states.is_empty() {
+            // Default: no blending
+            vec![vk::PipelineColorBlendAttachmentState::builder()
+                .color_write_mask(vk::ColorComponentFlags::all())
+                .blend_enable(false)
+                .build()]
+        } else {
+            blend_states
+                .iter()
+                .map(|b| {
+                    let src_color = Self::convert_blend_factor(b.src_color_blend_factor);
+                    let dst_color = Self::convert_blend_factor(b.dst_color_blend_factor);
+                    let src_alpha = Self::convert_blend_factor(b.src_alpha_blend_factor);
+                    let dst_alpha = Self::convert_blend_factor(b.dst_alpha_blend_factor);
+                    let color_op = Self::convert_blend_op(b.color_blend_op);
+                    let alpha_op = Self::convert_blend_op(b.alpha_blend_op);
+
+                    vk::PipelineColorBlendAttachmentState::builder()
+                        .color_write_mask(vk::ColorComponentFlags::all())
+                        .blend_enable(b.blend_enable)
+                        .src_color_blend_factor(src_color)
+                        .dst_color_blend_factor(dst_color)
+                        .color_blend_op(color_op)
+                        .src_alpha_blend_factor(src_alpha)
+                        .dst_alpha_blend_factor(dst_alpha)
+                        .alpha_blend_op(alpha_op)
+                        .build()
+                })
+                .collect()
+        };
+
+        let color_blend_info = vk::PipelineColorBlendStateCreateInfo::builder()
+            .logic_op_enable(false)
+            .logic_op(vk::LogicOp::COPY)
+            .attachments(&blend_attachments);
+
+        // Create graphics pipeline
+        let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
+            .stages(&shader_stages)
+            .vertex_input_state(&vertex_input_info)
+            .input_assembly_state(&input_assembly_info)
+            .viewport_state(&viewport_info)
+            .rasterization_state(&rasterization_info)
+            .multisample_state(&multisample_info)
+            .depth_stencil_state(&depth_stencil_info)
+            .color_blend_state(&color_blend_info)
+            .layout(self.pipeline_layout)
+            .render_pass(self.render_pass)
+            .subpass(0);
+
+        let (pipelines, _) = unsafe {
+            device.create_graphics_pipelines(
+                vk::PipelineCache::null(),
+                &[pipeline_info.build()],
+                None,
+            )?
+        };
+
+        log::debug!("Pipeline compiled successfully");
+
+        Ok(pipelines[0])
+    }
+
+    #[allow(dead_code)] // Helper for compile_pipeline_from_builder
+    fn convert_blend_factor(factor: crate::render_graph::BlendFactor) -> vk::BlendFactor {
+        use crate::render_graph::BlendFactor;
+        match factor {
+            BlendFactor::Zero => vk::BlendFactor::ZERO,
+            BlendFactor::One => vk::BlendFactor::ONE,
+            BlendFactor::SrcColor => vk::BlendFactor::SRC_COLOR,
+            BlendFactor::OneMinusSrcColor => vk::BlendFactor::ONE_MINUS_SRC_COLOR,
+            BlendFactor::DstColor => vk::BlendFactor::DST_COLOR,
+            BlendFactor::OneMinusDstColor => vk::BlendFactor::ONE_MINUS_DST_COLOR,
+            BlendFactor::SrcAlpha => vk::BlendFactor::SRC_ALPHA,
+            BlendFactor::OneMinusSrcAlpha => vk::BlendFactor::ONE_MINUS_SRC_ALPHA,
+            BlendFactor::DstAlpha => vk::BlendFactor::DST_ALPHA,
+            BlendFactor::OneMinusDstAlpha => vk::BlendFactor::ONE_MINUS_DST_ALPHA,
+        }
+    }
+
+    #[allow(dead_code)] // Helper for compile_pipeline_from_builder
+    fn convert_blend_op(op: crate::render_graph::BlendOp) -> vk::BlendOp {
+        use crate::render_graph::BlendOp;
+        match op {
+            BlendOp::Add => vk::BlendOp::ADD,
+            BlendOp::Subtract => vk::BlendOp::SUBTRACT,
+            BlendOp::ReverseSubtract => vk::BlendOp::REVERSE_SUBTRACT,
+            BlendOp::Min => vk::BlendOp::MIN,
+            BlendOp::Max => vk::BlendOp::MAX,
+        }
+    }
+
     /// Create descriptor set layouts for uniform buffers (M8.3 MVP + M10 Phase 4)
     ///
     /// Creates a layout with:
