@@ -40,7 +40,10 @@ cbuffer MaterialUniforms : register(b3) {
     float4 properties; // x = metallic, y = roughness, z = hasTexture
 };
 
+// Explicitly specify Vulkan bindings for texture and sampler
+[[vk::binding(2, 0)]]
 Texture2D diffuseTexture : register(t0);
+[[vk::binding(2, 0)]]
 SamplerState diffuseSampler : register(s0);
 
 struct VSInput {
