@@ -141,15 +141,14 @@ impl ApplicationRunner {
     fn load_scene(&mut self) -> Result<()> {
         let scene_path = self
             .args
-            .scene
-            .as_ref()
+            .resolve_scene_path()
             .context("No scene specified. Use --scene <file> or --list-scenes")?;
 
         log::info!("Loading scene from: {}", scene_path.display());
 
         let loader = SceneLoader::new().context("Failed to create scene loader")?;
         let scene = loader
-            .load_from_file(scene_path)
+            .load_from_file(&scene_path)
             .with_context(|| format!("Failed to load scene: {}", scene_path.display()))?;
 
         log::info!("Scene loaded: {}", scene.metadata.name);

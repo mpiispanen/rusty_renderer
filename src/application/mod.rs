@@ -66,12 +66,41 @@ impl ApplicationArgs {
         Self::parse()
     }
 
+    /// Resolve scene path from scene name or path
+    ///
+    /// If the path exists as-is, use it. Otherwise, try to resolve it as:
+    /// - scenes/<name>.toml
+    /// - scenes/<name>
+    pub fn resolve_scene_path(&self) -> Option<PathBuf> {
+        let scene_path = self.scene.as_ref()?;
+
+        // If path exists as-is, use it
+        if scene_path.exists() {
+            return Some(scene_path.clone());
+        }
+
+        // Try adding .toml extension in scenes directory
+        let scene_dir = self.scene_directory();
+        let with_toml = scene_dir.join(format!("{}.toml", scene_path.display()));
+        if with_toml.exists() {
+            return Some(with_toml);
+        }
+
+        // Try as-is in scenes directory
+        let in_scenes = scene_dir.join(scene_path);
+        if in_scenes.exists() {
+            return Some(in_scenes);
+        }
+
+        None
+    }
+
     /// Validate arguments
     pub fn validate(&self) -> Result<()> {
-        // If scene is specified, it must exist
-        if let Some(scene_path) = &self.scene {
-            if !scene_path.exists() {
-                anyhow::bail!("Scene file not found: {}", scene_path.display());
+        // If scene is specified, it must exist (after resolution)
+        if let Some(_scene_path) = &self.scene {
+            if self.resolve_scene_path().is_none() {
+                anyhow::bail!("Scene file not found: {}", _scene_path.display());
             }
         }
 
