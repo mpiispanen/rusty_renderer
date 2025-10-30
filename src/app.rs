@@ -104,7 +104,7 @@ impl App {
 
         let (width, height) = self.config.window_size();
         let mut graph = RenderGraph::new();
-        
+
         // Clear external buffers from previous graph
         self.external_buffers.clear();
 
@@ -117,19 +117,6 @@ impl App {
                 self.config.scene
             );
 
-            // Register triangle shaders
-            use crate::render_graph::{ShaderDescriptor, ShaderStage};
-            graph.register_shader(
-                "triangle.vert",
-                ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
-                    .with_entry_point("VSMain"),
-            );
-            graph.register_shader(
-                "triangle.frag",
-                ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
-                    .with_entry_point("PSMain"),
-            );
-
             // Create color buffer resource (represents swapchain image)
             let color_desc = ResourceDescriptor::Image {
                 format: Format::Bgra8Unorm,
@@ -140,25 +127,12 @@ impl App {
             };
             let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
-            // Create triangle rendering pass
+            // Create triangle rendering pass (shaders registered inside)
             TrianglePass::new(&mut graph, color_buffer);
         } else {
             log::info!(
                 "Using forward rendering pass for scene: {}",
                 scene.metadata.name
-            );
-
-            // Register forward shaders
-            use crate::render_graph::{ShaderDescriptor, ShaderStage};
-            graph.register_shader(
-                "forward.vert",
-                ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Vertex)
-                    .with_entry_point("VSMain"),
-            );
-            graph.register_shader(
-                "forward.frag",
-                ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Fragment)
-                    .with_entry_point("PSMain"),
             );
 
             // Create color buffer
@@ -239,7 +213,9 @@ impl App {
                 .collect();
 
             // Create backend vertex buffer
-            use crate::backends::{BufferDescriptor as BackendBufferDesc, BufferUsage, MemoryLocation};
+            use crate::backends::{
+                BufferDescriptor as BackendBufferDesc, BufferUsage, MemoryLocation,
+            };
             let vb_desc = BackendBufferDesc {
                 size: vertex_data.len() as u64,
                 usage: BufferUsage::vertex(),
@@ -247,9 +223,13 @@ impl App {
                 label: Some("vertex_buffer".to_string()),
             };
             let backend_vertex_buffer = self.backend.as_mut().unwrap().create_buffer(&vb_desc)?;
-            self.backend.as_mut().unwrap().upload_to_buffer(backend_vertex_buffer.as_ref(), &vertex_data, 0)?;
+            self.backend.as_mut().unwrap().upload_to_buffer(
+                backend_vertex_buffer.as_ref(),
+                &vertex_data,
+                0,
+            )?;
             self.external_buffers.push(backend_vertex_buffer);
-            
+
             // Import into render graph
             let vertex_buffer = graph.import_buffer(
                 "vertex_buffer",
