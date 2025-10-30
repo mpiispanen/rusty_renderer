@@ -285,7 +285,9 @@ struct ForwardSimplePassCallback {
 
 impl PassCallback for ForwardSimplePassCallback {
     fn declare_pipeline(&self, builder: &mut PipelineBuilder, registry: &ShaderRegistry) {
-        use crate::render_graph::CullMode;
+        use crate::render_graph::{
+            CullMode, InputRate, VertexAttribute, VertexBinding, VertexFormat, VertexLayout,
+        };
 
         // Get shaders from registry
         let vs_handle = registry
@@ -295,9 +297,40 @@ impl PassCallback for ForwardSimplePassCallback {
             .get_handle("forward.frag")
             .expect("forward.frag not found in shader registry");
 
+        // Define vertex layout matching our Vertex struct:
+        // position (3xf32 = 12 bytes) + normal (3xf32 = 12 bytes) + uv (2xf32 = 8 bytes) + color (4xf32 = 16 bytes) = 48 bytes
+        let mut vertex_layout = VertexLayout::new();
+        vertex_layout
+            .add_attribute(VertexAttribute {
+                location: 0,
+                format: VertexFormat::Float32x3,
+                offset: 0, // position
+            })
+            .add_attribute(VertexAttribute {
+                location: 1,
+                format: VertexFormat::Float32x3,
+                offset: 12, // normal
+            })
+            .add_attribute(VertexAttribute {
+                location: 2,
+                format: VertexFormat::Float32x2,
+                offset: 24, // uv
+            })
+            .add_attribute(VertexAttribute {
+                location: 3,
+                format: VertexFormat::Float32x4,
+                offset: 32, // color
+            })
+            .add_binding(VertexBinding {
+                binding: 0,
+                stride: 48,
+                input_rate: InputRate::Vertex,
+            });
+
         builder
             .vertex_shader(vs_handle)
             .fragment_shader(fs_handle)
+            .vertex_layout(vertex_layout)
             .depth_test(true)
             .depth_write(true)
             .cull_mode(CullMode::Back);

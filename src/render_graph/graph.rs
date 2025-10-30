@@ -297,7 +297,7 @@ impl RenderGraph {
         let name_str = name.into();
         let descriptor = ResourceDescriptor::Buffer { size, usage };
         let mut resource = Resource::new(id, name_str.clone(), descriptor);
-        
+
         // Mark as external so the render graph doesn't try to create/destroy it
         resource.mark_external();
 
@@ -345,7 +345,7 @@ impl RenderGraph {
             mip_levels,
         };
         let mut resource = Resource::new(id, name_str.clone(), descriptor);
-        
+
         // Mark as external so the render graph doesn't try to create/destroy it
         resource.mark_external();
 

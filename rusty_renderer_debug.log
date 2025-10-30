@@ -21,3 +21,5 @@ GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 
 ("texture.png")
 GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
 ("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1None, texture_path=
+Some("texture.png")
