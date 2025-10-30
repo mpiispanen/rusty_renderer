@@ -6,20 +6,12 @@ Running application
 Shutdown complete
  called
 Backend type: Vulkan, headless: true
-ForwardPipeline::build_graph ENTERED for scene 'RGB Triangle'
+ForwardPipeline::build_graph ENTERED for scene 'Simple Cube'
 About to create camera uniform buffer
 Camera view_proj matrix:
-  row0: [1.8107, 0.0000, 0.0000, 0.0000]
-  row1: [0.0000, 2.4142, 0.0000, 0.0000]
-  row2: [0.0000, 0.0000, -1.0001, -1.0000]
-  row3: [0.0000, 0.0000, 2.9003, 3.0000]
+  row0: [1.2990, 0.0000, 0.0000, 0.0000]
+  row1: [0.0000, 1.7321, 0.0000, 0.0000]
+  row2: [0.0000, 0.0000, -1.0010, -1.0000]
+  row3: [0.0000, 0.0000, 4.9049, 5.0000]
 Camera uniform buffer created
-GpuMaterial created: base_color=[1.00, 1.00, 1.00], has_texture=0, texture_path=None
-Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.00, 0.50, 0.00, 0.00]
-Creating ForwardDeclarativePass for 'triangle' with material buffer at 0x55641dcf5870
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
-("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
-("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1None, texture_path=
-Some("texture.png")
+Creating ForwardDeclarativePass for 'cube' with material buffer at 0x55b8571c31e0
