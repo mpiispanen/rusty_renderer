@@ -575,21 +575,29 @@ impl RenderPipeline for ForwardPipeline {
                             }
                         }
 
-                        // Use declarative pass API
-                        let forward_pass = crate::passes::ForwardDeclarativePass::new(
-                            color_buffer,
-                            vertex_buffer,
-                            camera_buffer.clone(),
-                            lighting_buffer.clone(),
-                            material_buffer,
-                            texture,
-                            *transform,
-                            vertex_count,
-                        );
+                        // Use the new ForwardRenderPass builder API
+                        let mut builder = crate::passes::ForwardRenderPass::builder()
+                            .color_output(color_buffer)
+                            .vertex_buffer(vertex_buffer)
+                            .camera_buffer(camera_buffer.clone())
+                            .lighting_buffer(lighting_buffer.clone())
+                            .transform(*transform)
+                            .vertex_count(vertex_count)
+                            .with_name(format!("forward_{name}"));
 
-                        let _pass_id = graph.add_declarative_pass(forward_pass);
+                        // Add optional material buffer
+                        if let Some(mat_buf) = material_buffer {
+                            builder = builder.material_buffer(mat_buf);
+                        }
 
-                        log::debug!("Added forward rendering pass for mesh '{name}' with {vertex_count} vertices");
+                        // Add optional texture
+                        if let Some(tex) = texture {
+                            builder = builder.texture(tex);
+                        }
+
+                        let forward_pass = builder.build(&mut graph)?;
+
+                        log::debug!("Added forward rendering pass for mesh '{name}' with {vertex_count} vertices (PassId: {:?})", forward_pass.pass_id());
                     }
                     GeometryData::File { path } => {
                         log::warn!("  - Mesh '{name}': external file '{path}' not yet supported");

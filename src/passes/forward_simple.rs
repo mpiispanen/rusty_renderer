@@ -399,7 +399,7 @@ mod tests {
         // NOTE: We can't test graph.compile() here because buffers need producers
         // (either a transfer pass or external import), which requires backend integration.
         // For now, we just verify the pass was created successfully.
-        
+
         // Verify pass count
         assert_eq!(graph.passes().len(), 1);
     }
