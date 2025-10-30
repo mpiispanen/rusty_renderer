@@ -158,7 +158,7 @@ impl ForwardSimplePassBuilder {
     /// Build the pass and add it to the render graph
     pub fn build(self, graph: &mut RenderGraph) -> Result<ForwardSimplePass> {
         use crate::render_graph::{ShaderDescriptor, ShaderStage};
-        
+
         // Register shaders
         graph.register_shader(
             "forward.vert",
@@ -170,7 +170,7 @@ impl ForwardSimplePassBuilder {
             ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Fragment)
                 .with_entry_point("PSMain"),
         );
-        
+
         // Validate required resources
         let color_output = self
             .color_output

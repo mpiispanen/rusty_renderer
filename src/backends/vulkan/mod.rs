@@ -98,6 +98,10 @@ pub struct VulkanBackend {
     shader_module_cache:
         std::collections::HashMap<crate::render_graph::ShaderHandle, vk::ShaderModule>,
 
+    // Resource allocation and mapping (Phase 4.2)
+    resource_buffers: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Buffer>>,
+    resource_textures: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Texture>>,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -156,6 +160,8 @@ impl VulkanBackend {
             default_sampler: vk::Sampler::null(),
             pipeline_cache: std::collections::HashMap::new(),
             shader_module_cache: std::collections::HashMap::new(),
+            resource_buffers: std::collections::HashMap::new(),
+            resource_textures: std::collections::HashMap::new(),
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -2239,6 +2245,28 @@ impl VulkanBackend {
 
         Ok(())
     }
+
+    /// Allocate resources from the render graph
+    /// Allocate resources from the render graph
+    fn allocate_graph_resources(
+        &mut self,
+        _graph: &crate::render_graph::graph::RenderGraph,
+        compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
+        log::debug!(
+            "Resource allocation from render graph: {} resources declared (stub implementation)",
+            compiled.resources_to_allocate.len()
+        );
+        // TODO #87: Implement actual resource allocation
+        Ok(())
+    }
+
+    /// Convert render graph format to backend format
+    #[allow(dead_code)] // TODO #87: Will be used when resource allocation is implemented
+    fn convert_format(_format: crate::render_graph::Format) -> TextureFormat {
+        // TODO #87: Implement format conversion
+        TextureFormat::Rgba8Unorm
+    }
 }
 
 impl GraphicsBackend for VulkanBackend {
@@ -2791,6 +2819,12 @@ impl GraphicsBackend for VulkanBackend {
         graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
+        // Allocate resources if this is the first execution or resources changed
+        // TODO: Add smarter resource lifecycle management (issue #87)
+        if self.resource_buffers.is_empty() && self.resource_textures.is_empty() {
+            self.allocate_graph_resources(graph, compiled)?;
+        }
+
         // Compile pipelines if not already cached (first frame or after pipeline changes)
         for (pass_id, builder) in &compiled.pipeline_descriptions {
             if !self.pipeline_cache.contains_key(pass_id) {

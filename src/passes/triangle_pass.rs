@@ -43,7 +43,7 @@ impl TrianglePass {
     /// A TrianglePass instance that can be used to configure the pass further
     pub fn new(graph: &mut RenderGraph, color_output: ResourceId) -> Self {
         use crate::render_graph::{ShaderDescriptor, ShaderStage};
-        
+
         // Register shaders
         graph.register_shader(
             "triangle.vert",
@@ -55,7 +55,7 @@ impl TrianglePass {
             ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
                 .with_entry_point("PSMain"),
         );
-        
+
         let pass_id = graph.next_pass_id();
 
         let mut pass = RenderPass::new(pass_id, "triangle_pass", PassKind::Graphics);
@@ -151,7 +151,7 @@ impl TrianglePassBuilder {
     /// Build the pass and add it to the render graph
     pub fn build(self, graph: &mut RenderGraph) -> Result<TrianglePass> {
         use crate::render_graph::{ShaderDescriptor, ShaderStage};
-        
+
         // Register shaders
         graph.register_shader(
             "triangle.vert",
@@ -163,7 +163,7 @@ impl TrianglePassBuilder {
             ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
                 .with_entry_point("PSMain"),
         );
-        
+
         let pass_id = graph.next_pass_id();
 
         let mut pass = RenderPass::new(pass_id, &self.name, PassKind::Graphics);

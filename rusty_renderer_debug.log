@@ -5,16 +5,7 @@ Arguments parsed successfully
 Running application
 Shutdown complete
  called
-Backend type: Vulkan, headless: false
-Entering windowed mode branch
-Event loop created, max_frames: 5
-About to call run_app
-WindowedApp::resumed called
-Window is none: true
-Attempting to create window
-Window created successfully
-Initializing backend with window
-Building render graph
+Backend type: Vulkan, headless: true
 ForwardPipeline::build_graph ENTERED for scene 'Simple Cube'
 About to create camera uniform buffer
 Camera view_proj matrix:
@@ -23,51 +14,8 @@ Camera view_proj matrix:
   row2: [0.0000, 0.0000, -1.0010, -1.0000]
   row3: [0.0000, 0.0000, 4.9049, 5.0000]
 Camera uniform buffer created
-Creating ForwardDeclarativePass for 'cube' with material buffer at 0x562d0ddd9140
-Render graph built successfully
-Graph compiled successfully
-Requesting initial redraw
-Window setup complete, redraw requested
-RedrawRequested: frame_count=0, max_frames=5
-About to begin_frame
-About to execute_graph
-About to end_frame
-end_frame completed successfully, incrementing frame_count
-frame_count incremented to 1, max_frames=5
-Checking if should exit: 1 >= 5 = false
-RedrawRequested: frame_count=1, max_frames=5
-About to begin_frame
-About to execute_graph
-About to end_frame
-end_frame completed successfully, incrementing frame_count
-frame_count incremented to 2, max_frames=5
-Checking if should exit: 2 >= 5 = false
-RedrawRequested: frame_count=2, max_frames=5
-About to begin_frame
-About to execute_graph
-About to end_frame
-end_frame completed successfully, incrementing frame_count
-frame_count incremented to 3, max_frames=5
-Checking if should exit: 3 >= 5 = false
-RedrawRequested: frame_count=3, max_frames=5
-About to begin_frame
-About to execute_graph
-About to end_frame
-end_frame completed successfully, incrementing frame_count
-frame_count incremented to 4, max_frames=5
-Checking if should exit: 4 >= 5 = false
-RedrawRequested: frame_count=4, max_frames=5
-About to begin_frame
-About to execute_graph
-About to end_frame
-end_frame completed successfully, incrementing frame_count
-frame_count incremented to 5, max_frames=5
-Checking if should exit: 5 >= 5 = true
-YES! Should exit now. screenshot_path = Some("cube_vulkan.png")
-About to check screenshot_path
-Capturing final screenshot to "cube_vulkan.png"
-Backend exists, calling capture_frame
-capture_frame FAILED: Frame capture is only available in headless mode
-run_app returned
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
+Creating ForwardDeclarativePass for 'cube' with material buffer at 0x55726aa03600
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=SomeNone(
+"texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
 ("texture.png")
