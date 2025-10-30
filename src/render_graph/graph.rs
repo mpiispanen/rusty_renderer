@@ -63,6 +63,8 @@ pub struct CompiledGraph {
     pub barriers: Vec<Barrier>,
     /// Pipeline descriptions for each graphics/compute pass
     pub pipeline_descriptions: HashMap<PassId, PipelineBuilder>,
+    /// Resources that need to be allocated by the backend (excluding external resources)
+    pub resources_to_allocate: Vec<ResourceId>,
 }
 
 /// Main render graph structure
@@ -592,11 +594,20 @@ impl RenderGraph {
             }
         }
 
+        // Collect resources that need allocation (non-external resources)
+        let resources_to_allocate: Vec<ResourceId> = self
+            .resources
+            .iter()
+            .filter(|r| !r.is_external())
+            .map(|r| r.id)
+            .collect();
+
         log::info!(
-            "Graph compiled: {} passes, {} barriers, {} pipelines",
+            "Graph compiled: {} passes, {} barriers, {} pipelines, {} resources to allocate",
             execution_order.len(),
             barriers.len(),
-            pipeline_descriptions.len()
+            pipeline_descriptions.len(),
+            resources_to_allocate.len()
         );
 
         Ok(CompiledGraph {
@@ -604,6 +615,7 @@ impl RenderGraph {
             producers,
             barriers,
             pipeline_descriptions,
+            resources_to_allocate,
         })
     }
 

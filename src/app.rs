@@ -27,6 +27,8 @@ pub struct App {
     frame_count: u64,
     render_graph: Option<RenderGraph>,
     scene: Option<Scene>,
+    // External resources managed outside render graph
+    external_buffers: Vec<Box<dyn crate::backends::Buffer>>,
 }
 
 impl App {
@@ -74,6 +76,7 @@ impl App {
             frame_count: 0,
             render_graph: None,
             scene: None,
+            external_buffers: Vec::new(),
         })
     }
 
@@ -101,6 +104,9 @@ impl App {
 
         let (width, height) = self.config.window_size();
         let mut graph = RenderGraph::new();
+        
+        // Clear external buffers from previous graph
+        self.external_buffers.clear();
 
         // Check if we have a simple "triangle" scene (debug mode)
         let is_triangle_scene = self.config.scene == "triangle" || scene.objects.is_empty();
@@ -219,6 +225,7 @@ impl App {
 
             // Create vertex buffer
             use crate::render_graph::BufferUsageFlags;
+            // Prepare vertex data
             let vertex_data: Vec<u8> = all_vertices
                 .iter()
                 .flat_map(|v| {
@@ -231,11 +238,24 @@ impl App {
                 })
                 .collect();
 
-            let vertex_buffer_desc = ResourceDescriptor::Buffer {
-                size: vertex_data.len(),
-                usage: BufferUsageFlags::new(BufferUsageFlags::VERTEX),
+            // Create backend vertex buffer
+            use crate::backends::{BufferDescriptor as BackendBufferDesc, BufferUsage, MemoryLocation};
+            let vb_desc = BackendBufferDesc {
+                size: vertex_data.len() as u64,
+                usage: BufferUsage::vertex(),
+                memory_location: MemoryLocation::CpuToGpu,
+                label: Some("vertex_buffer".to_string()),
             };
-            let vertex_buffer = graph.create_resource("vertex_buffer", vertex_buffer_desc);
+            let backend_vertex_buffer = self.backend.as_mut().unwrap().create_buffer(&vb_desc)?;
+            self.backend.as_mut().unwrap().upload_to_buffer(backend_vertex_buffer.as_ref(), &vertex_data, 0)?;
+            self.external_buffers.push(backend_vertex_buffer);
+            
+            // Import into render graph
+            let vertex_buffer = graph.import_buffer(
+                "vertex_buffer",
+                vertex_data.len(),
+                BufferUsageFlags::new(BufferUsageFlags::VERTEX),
+            );
 
             // Create index buffer
             let index_data: Vec<u8> = all_indices.iter().flat_map(|i| i.to_le_bytes()).collect();
@@ -262,18 +282,34 @@ impl App {
             unsafe impl bytemuck::Pod for CameraUniforms {}
             unsafe impl bytemuck::Zeroable for CameraUniforms {}
 
-            let _camera_uniforms = CameraUniforms {
+            let camera_uniforms = CameraUniforms {
                 view,
                 proj,
                 view_pos: scene.camera.position(),
                 _padding: 0.0,
             };
 
-            let camera_buffer_desc = ResourceDescriptor::Buffer {
-                size: std::mem::size_of::<CameraUniforms>(),
-                usage: BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+            // Create backend camera buffer
+            let cb_desc = BackendBufferDesc {
+                size: std::mem::size_of::<CameraUniforms>() as u64,
+                usage: BufferUsage::uniform(),
+                memory_location: MemoryLocation::CpuToGpu,
+                label: Some("camera_uniforms".to_string()),
             };
-            let camera_buffer = graph.create_resource("camera_uniforms", camera_buffer_desc);
+            let backend_camera_buffer = self.backend.as_mut().unwrap().create_buffer(&cb_desc)?;
+            self.backend.as_mut().unwrap().upload_to_buffer(
+                backend_camera_buffer.as_ref(),
+                bytemuck::bytes_of(&camera_uniforms),
+                0,
+            )?;
+            self.external_buffers.push(backend_camera_buffer);
+
+            // Import into render graph
+            let camera_buffer = graph.import_buffer(
+                "camera_uniforms",
+                std::mem::size_of::<CameraUniforms>(),
+                BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+            );
 
             // Create lighting uniforms
             let lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
@@ -305,7 +341,7 @@ impl App {
                 })
                 .unwrap_or(([-0.5, -1.0, -0.3], [1.0, 1.0, 1.0], 1.0));
 
-            let _lighting_uniforms = LightingUniforms {
+            let lighting_uniforms = LightingUniforms {
                 ambient: lighting.ambient,
                 _padding1: 0.0,
                 light_dir,
@@ -314,11 +350,27 @@ impl App {
                 light_intensity,
             };
 
-            let lighting_buffer_desc = ResourceDescriptor::Buffer {
-                size: std::mem::size_of::<LightingUniforms>(),
-                usage: BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+            // Create backend lighting buffer
+            let lb_desc = BackendBufferDesc {
+                size: std::mem::size_of::<LightingUniforms>() as u64,
+                usage: BufferUsage::uniform(),
+                memory_location: MemoryLocation::CpuToGpu,
+                label: Some("lighting_uniforms".to_string()),
             };
-            let lighting_buffer = graph.create_resource("lighting_uniforms", lighting_buffer_desc);
+            let backend_lighting_buffer = self.backend.as_mut().unwrap().create_buffer(&lb_desc)?;
+            self.backend.as_mut().unwrap().upload_to_buffer(
+                backend_lighting_buffer.as_ref(),
+                bytemuck::bytes_of(&lighting_uniforms),
+                0,
+            )?;
+            self.external_buffers.push(backend_lighting_buffer);
+
+            // Import into render graph
+            let lighting_buffer = graph.import_buffer(
+                "lighting_uniforms",
+                std::mem::size_of::<LightingUniforms>(),
+                BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+            );
 
             // Get transform from first object (for now)
             let transform = scene
