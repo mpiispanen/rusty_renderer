@@ -140,8 +140,8 @@ fn main() -> Result<()> {
         },
     );
 
-    // Add triangle pass (single line!)
-    let _triangle_pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+    // Add triangle pass (single line!) - draw 3 vertices (triangle)
+    let _triangle_pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer, None, 3);
 
     println!("Built render graph with 1 pass");
 

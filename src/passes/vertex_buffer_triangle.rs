@@ -8,28 +8,29 @@ use crate::backends::Buffer;
 #[cfg(test)]
 use crate::render_graph::ExtentMode;
 use crate::render_graph::{
-    AccessType, ImageLayout, PassCallback, PassExecutionContext, PassId, PassKind, PipelineStage,
-    RenderGraph, RenderPass, ResourceAccess, ResourceId,
+    AccessType, ImageLayout, IndexType, PassCallback, PassExecutionContext, PassId, PassKind,
+    PipelineStage, RenderGraph, RenderPass, ResourceAccess, ResourceId,
 };
 use anyhow::Result;
 use std::sync::Arc;
 
 /// Vertex buffer triangle rendering pass
 ///
-/// This pass renders a colored triangle using vertex data from a GPU buffer.
+/// This pass renders geometry using vertex data from a GPU buffer.
 /// The vertex buffer is provided during construction and is owned by the pass
-/// through an Arc for shared ownership.
+/// through an Arc for shared ownership. Optionally supports indexed drawing.
 ///
 /// # Resources
 /// - **Output**: Color attachment (swapchain image or offscreen buffer)
 /// - **Input**: Vertex buffer (provided at construction)
+/// - **Input (optional)**: Index buffer for indexed drawing
 ///
 /// # Example
 /// ```no_run
 /// use rusty_renderer::passes::VertexBufferTrianglePass;
 /// use rusty_renderer::render_graph::RenderGraph;
 /// # fn example(mut graph: RenderGraph, color_buffer: rusty_renderer::render_graph::ResourceId, vertex_buffer: Box<dyn rusty_renderer::backends::Buffer>) {
-/// let triangle_pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+/// let triangle_pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer, None, 3);
 /// # }
 /// ```
 pub struct VertexBufferTrianglePass {
@@ -37,12 +38,14 @@ pub struct VertexBufferTrianglePass {
 }
 
 impl VertexBufferTrianglePass {
-    /// Create a new vertex buffer triangle rendering pass
+    /// Create a new vertex buffer rendering pass
     ///
     /// # Arguments
     /// * `graph` - The render graph to add the pass to
     /// * `color_output` - The color attachment resource to render to
-    /// * `vertex_buffer` - The vertex buffer containing triangle vertex data
+    /// * `vertex_buffer` - The vertex buffer containing vertex data
+    /// * `index_buffer` - Optional index buffer for indexed drawing
+    /// * `draw_count` - Number of vertices/indices to draw
     ///
     /// # Returns
     /// A VertexBufferTrianglePass instance
@@ -50,6 +53,8 @@ impl VertexBufferTrianglePass {
         graph: &mut RenderGraph,
         color_output: ResourceId,
         vertex_buffer: Box<dyn Buffer>,
+        index_buffer: Option<Box<dyn Buffer>>,
+        draw_count: u32,
     ) -> Self {
         let pass_id = graph.next_pass_id();
 
@@ -63,12 +68,15 @@ impl VertexBufferTrianglePass {
             Some(ImageLayout::ColorAttachment),
         ));
 
-        // Wrap buffer in Arc for shared ownership
+        // Wrap buffers in Arc for shared ownership
         let vertex_buffer_arc = Arc::new(vertex_buffer);
+        let index_buffer_arc = index_buffer.map(Arc::new);
 
         // Set up callback with vertex buffer
         pass = pass.with_callback(Box::new(VertexBufferTriangleCallback {
             vertex_buffer: vertex_buffer_arc,
+            index_buffer: index_buffer_arc,
+            draw_count,
         }));
 
         graph.add_pass(pass);
@@ -85,6 +93,8 @@ impl VertexBufferTrianglePass {
 /// Callback for vertex buffer triangle pass execution
 struct VertexBufferTriangleCallback {
     vertex_buffer: Arc<Box<dyn Buffer>>,
+    index_buffer: Option<Arc<Box<dyn Buffer>>>,
+    draw_count: u32,
 }
 
 impl PassCallback for VertexBufferTriangleCallback {
@@ -97,13 +107,13 @@ impl PassCallback for VertexBufferTriangleCallback {
             InputRate, VertexAttribute, VertexBinding, VertexFormat, VertexLayout,
         };
 
-        // Load triangle shaders
+        // Load simple vertex shaders that read from vertex buffers
         let vs = registry
-            .get_handle("triangle.vert")
-            .expect("Failed to load triangle vertex shader");
+            .get_handle("simple_vertex.vert")
+            .expect("Failed to load simple vertex shader");
         let fs = registry
-            .get_handle("triangle.frag")
-            .expect("Failed to load triangle fragment shader");
+            .get_handle("simple_vertex.frag")
+            .expect("Failed to load simple fragment shader");
 
         // Define vertex layout (position + color)
         let mut layout = VertexLayout::new();
@@ -141,7 +151,7 @@ impl PassCallback for VertexBufferTriangleCallback {
     }
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
-        log::debug!("Executing vertex buffer triangle pass");
+        log::debug!("Executing vertex buffer pass");
 
         // Get raw pointer from the buffer for backend API
         // Arc<Box<dyn Buffer>> -> &dyn Buffer -> *const dyn Buffer -> *const c_void
@@ -154,13 +164,39 @@ impl PassCallback for VertexBufferTriangleCallback {
             return;
         }
 
-        // Draw 3 vertices (triangle), 1 instance
-        if let Err(e) = context.draw(3, 1, 0, 0) {
-            log::error!("Failed to draw triangle: {e}");
-            return;
-        }
+        // If we have an index buffer, bind it and use indexed drawing
+        if let Some(ref index_buffer) = self.index_buffer {
+            let index_ptr =
+                index_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
 
-        log::debug!("Vertex buffer triangle drawn successfully");
+            // We use 32-bit indices (u32)
+            if let Err(e) = context.bind_index_buffer(index_ptr, 0, IndexType::U32) {
+                log::error!("Failed to bind index buffer: {e}");
+                return;
+            }
+
+            // Draw using indices
+            if let Err(e) = context.draw_indexed(self.draw_count, 1, 0, 0, 0) {
+                log::error!("Failed to draw indexed: {e}");
+                return;
+            }
+
+            log::debug!(
+                "Vertex buffer drawn successfully with {} indices",
+                self.draw_count
+            );
+        } else {
+            // Draw without indices
+            if let Err(e) = context.draw(self.draw_count, 1, 0, 0) {
+                log::error!("Failed to draw: {e}");
+                return;
+            }
+
+            log::debug!(
+                "Vertex buffer drawn successfully with {} vertices",
+                self.draw_count
+            );
+        }
     }
 }
 
@@ -321,7 +357,7 @@ mod tests {
         let vertex_buffer = Box::new(MockBuffer { size: 144 });
 
         // Create pass
-        let pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+        let pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer, None, 3);
 
         // Verify pass was created
         assert_eq!(pass.pass_id().0, 0);
@@ -361,13 +397,13 @@ mod tests {
 
         // Register shaders
         graph.register_shader(
-            "triangle.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+            "simple_vertex.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/simple_vertex.hlsl", ShaderStage::Vertex)
                 .with_entry_point("VSMain"),
         );
         graph.register_shader(
-            "triangle.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+            "simple_vertex.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/simple_vertex.hlsl", ShaderStage::Fragment)
                 .with_entry_point("PSMain"),
         );
 
@@ -382,7 +418,7 @@ mod tests {
 
         let vertex_buffer = Box::new(MockBuffer { size: 144 });
 
-        let _pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+        let _pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer, None, 3);
 
         // Graph should compile successfully
         let compiled = graph.compile().unwrap();

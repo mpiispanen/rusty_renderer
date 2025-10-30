@@ -76,6 +76,38 @@ impl SimplePipeline {
 
         Ok(vertex_buffer)
     }
+
+    /// Create index buffer from scene indices
+    fn create_index_buffer(
+        backend: &mut dyn GraphicsBackend,
+        indices: &[u32],
+        label: &str,
+    ) -> Result<Box<dyn crate::backends::Buffer>> {
+        // Create buffer descriptor for index buffer
+        let index_buffer_size = std::mem::size_of_val(indices) as u64;
+        let index_desc = BufferDescriptor {
+            size: index_buffer_size,
+            usage: BufferUsage::index(),
+            memory_location: MemoryLocation::GpuOnly,
+            label: Some(label.to_string()),
+        };
+
+        // Create buffer
+        let index_buffer = backend.create_buffer(&index_desc)?;
+
+        // Upload index data
+        let index_data: Vec<u8> = indices.iter().flat_map(|i| i.to_le_bytes()).collect();
+
+        backend.upload_to_buffer(index_buffer.as_ref(), &index_data, 0)?;
+
+        log::info!(
+            "Created index buffer '{}': {} indices",
+            label,
+            indices.len()
+        );
+
+        Ok(index_buffer)
+    }
 }
 
 impl Default for SimplePipeline {
@@ -138,7 +170,7 @@ impl RenderPipeline for SimplePipeline {
         for obj in scene.objects.iter() {
             match obj {
                 SceneObject::Mesh { name, geometry, .. } => match geometry {
-                    GeometryData::Inline { vertices, .. } => {
+                    GeometryData::Inline { vertices, indices } => {
                         let vertex_count = vertices.len();
                         log::info!("  - Mesh '{name}': {vertex_count} vertices");
 
@@ -149,9 +181,28 @@ impl RenderPipeline for SimplePipeline {
                             format!("Failed to create vertex buffer for mesh '{name}'")
                         })?;
 
+                        // Create index buffer if indices are provided
+                        let (index_buffer, draw_count) = if let Some(idx) = indices {
+                            let index_label = format!("{name}_indices");
+                            let ib = Self::create_index_buffer(backend, idx, &index_label)
+                                .with_context(|| {
+                                    format!("Failed to create index buffer for mesh '{name}'")
+                                })?;
+                            let count = idx.len() as u32;
+                            log::info!("  - Mesh '{name}': {count} indices");
+                            (Some(ib), count)
+                        } else {
+                            (None, vertex_count as u32)
+                        };
+
                         // Add render pass for this mesh
-                        let _pass =
-                            VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+                        let _pass = VertexBufferTrianglePass::new(
+                            &mut graph,
+                            color_buffer,
+                            vertex_buffer,
+                            index_buffer,
+                            draw_count,
+                        );
 
                         log::debug!("Added VertexBufferTrianglePass for mesh '{name}'");
                     }

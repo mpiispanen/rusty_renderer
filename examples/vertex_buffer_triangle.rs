@@ -150,7 +150,8 @@ fn main() -> Result<()> {
     let color_buffer = graph.create_resource("color_buffer", color_desc);
 
     // Create vertex buffer triangle pass using the proper pass class (M9)
-    let _pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer);
+    // Draw 3 vertices (one triangle)
+    let _pass = VertexBufferTrianglePass::new(&mut graph, color_buffer, vertex_buffer, None, 3);
 
     println!("\nRender graph built with vertex buffer triangle pass");
 
