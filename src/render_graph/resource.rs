@@ -319,6 +319,8 @@ pub struct Resource {
     pub descriptor: ResourceDescriptor,
     /// Lifetime tracking
     pub lifetime: ResourceLifetime,
+    /// Whether this is an external resource (not managed by render graph)
+    pub external: bool,
 }
 
 impl Resource {
@@ -336,7 +338,18 @@ impl Resource {
             kind,
             descriptor,
             lifetime: ResourceLifetime::new(),
+            external: false,
         }
+    }
+
+    /// Mark this resource as external (not managed by render graph)
+    pub fn mark_external(&mut self) {
+        self.external = true;
+    }
+
+    /// Check if this resource is external
+    pub fn is_external(&self) -> bool {
+        self.external
     }
 
     /// Get the resource name

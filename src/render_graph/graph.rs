@@ -271,6 +271,90 @@ impl RenderGraph {
         self.create_resource(name, ResourceDescriptor::Sampler(descriptor))
     }
 
+    /// Import an external buffer into the render graph
+    ///
+    /// This creates a ResourceId for an existing backend buffer, allowing it to be
+    /// used in declarative passes. The buffer must be kept alive externally.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let camera_buffer = backend.create_buffer(&desc)?;
+    /// let camera_id = graph.import_buffer(
+    ///     "camera_uniform",
+    ///     128,  // size in bytes
+    ///     BufferUsageFlags::new(BufferUsageFlags::UNIFORM)
+    /// );
+    /// ```
+    pub fn import_buffer(
+        &mut self,
+        name: impl Into<String>,
+        size: usize,
+        usage: BufferUsageFlags,
+    ) -> ResourceId {
+        let id = ResourceId(self.next_resource_id);
+        self.next_resource_id += 1;
+
+        let name_str = name.into();
+        let descriptor = ResourceDescriptor::Buffer { size, usage };
+        let mut resource = Resource::new(id, name_str.clone(), descriptor);
+        
+        // Mark as external so the render graph doesn't try to create/destroy it
+        resource.mark_external();
+
+        self.resource_names.insert(name_str, id);
+        self.resources.push(resource);
+
+        id
+    }
+
+    /// Import an external image/texture into the render graph
+    ///
+    /// This creates a ResourceId for an existing backend texture, allowing it to be
+    /// used in declarative passes. The texture must be kept alive externally.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let albedo_texture = backend.create_texture(&desc)?;
+    /// let albedo_id = graph.import_image(
+    ///     "albedo",
+    ///     Format::Rgba8Unorm,
+    ///     Extent3D::new_2d(1024, 1024),
+    ///     ImageUsageFlags::new(ImageUsageFlags::SAMPLED),
+    ///     SampleCount::One,
+    ///     1
+    /// );
+    /// ```
+    pub fn import_image(
+        &mut self,
+        name: impl Into<String>,
+        format: Format,
+        extent: crate::render_graph::resource::Extent3D,
+        usage: ImageUsageFlags,
+        samples: SampleCount,
+        mip_levels: u32,
+    ) -> ResourceId {
+        let id = ResourceId(self.next_resource_id);
+        self.next_resource_id += 1;
+
+        let name_str = name.into();
+        let descriptor = ResourceDescriptor::Image {
+            format,
+            extent: ExtentMode::Absolute(extent),
+            usage,
+            samples,
+            mip_levels,
+        };
+        let mut resource = Resource::new(id, name_str.clone(), descriptor);
+        
+        // Mark as external so the render graph doesn't try to create/destroy it
+        resource.mark_external();
+
+        self.resource_names.insert(name_str, id);
+        self.resources.push(resource);
+
+        id
+    }
+
     /// Get a pass by ID
     pub fn get_pass(&self, id: PassId) -> Option<&RenderPass> {
         self.passes.iter().find(|p| p.id == id)
