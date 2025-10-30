@@ -38,7 +38,13 @@ Continuing the migration of ForwardPass to use the declarative render graph API.
    let albedo_id = graph.import_image("albedo", Format::Rgba8Unorm, ...);
    ```
 
-2. **Created tracking issues**
+2. **Vertex Layout Declaration**
+   - Added complete vertex layout to ForwardSimplePass
+   - Defined all 4 attributes: position, normal, uv, color
+   - Matches Vertex struct (48 bytes total)
+   - Fixes validation errors for pipeline compilation
+
+3. **Created tracking issues**
    - #86: Extract lights from scenes instead of hardcoding
    - #87: Add render graph resource allocation and mapping
 
@@ -57,15 +63,11 @@ Continuing the migration of ForwardPass to use the declarative render graph API.
 
 ## Next Steps
 
-### Immediate (This Session)
-1. **Add vertex layout to ForwardSimplePass**
-   - Define vertex format in `declare_pipeline()`
-   - Match current Vertex struct layout
-
-2. **Test ForwardSimplePass execution**
-   - Ensure pipeline compilation works
-   - Verify shader binding works
-   - Test with simple scene
+### Immediate
+1. **Test ForwardSimplePass with scenes**
+   - Verify rendering works with vertex layout
+   - Check for remaining validation errors
+   - Compare output with ForwardRenderPass
 
 ### Short Term (Issue #87)
 1. **Resource Allocation System**
@@ -117,8 +119,9 @@ Benefits:
 
 ### Transition Strategy
 ```
-Phase 1 (Current):
-  - Add import_buffer/import_image API ✅
+Phase 1 (Current): ✅
+  - Add import_buffer/import_image API
+  - Add vertex layout declaration
   - Keep ForwardRenderPass for now
   - Pipelines import backend resources as ResourceIds
 
@@ -146,6 +149,11 @@ Phase 3 (Issue #85):
    - Added import_buffer() and import_image()
    - Added external flag to Resource
    - Foundation for resource import workflow
+
+2. `feat: Add vertex layout declaration to ForwardSimplePass`
+   - Complete vertex layout with 4 attributes
+   - Fixes validation errors
+   - Enables pipeline compilation
 
 ## References
 
