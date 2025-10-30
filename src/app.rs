@@ -78,6 +78,19 @@ impl App {
         let (width, height) = self.config.window_size();
         let mut graph = RenderGraph::new();
 
+        // Register triangle shaders
+        use crate::render_graph::{ShaderDescriptor, ShaderStage};
+        graph.register_shader(
+            "triangle.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "triangle.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
+
         // Create color buffer resource (represents swapchain image)
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm, // Common swapchain format

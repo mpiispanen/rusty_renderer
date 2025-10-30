@@ -72,6 +72,27 @@ impl TrianglePass {
 struct TrianglePassCallback;
 
 impl PassCallback for TrianglePassCallback {
+    fn declare_pipeline(
+        &self,
+        builder: &mut crate::render_graph::PipelineBuilder,
+        registry: &crate::render_graph::ShaderRegistry,
+    ) {
+        // Load triangle shaders
+        let vs = registry
+            .get_handle("triangle.vert")
+            .expect("Failed to load triangle vertex shader");
+        let fs = registry
+            .get_handle("triangle.frag")
+            .expect("Failed to load triangle fragment shader");
+
+        builder
+            .vertex_shader(vs)
+            .fragment_shader(fs)
+            .depth_test(false)
+            .depth_write(false)
+            .cull_mode(crate::render_graph::CullMode::None);
+    }
+
     fn execute(&self, _context: &mut dyn PassExecutionContext) {
         // The actual drawing is currently handled by the backend's execute_graph
         // In a full implementation, this would:
@@ -185,7 +206,21 @@ mod tests {
 
     #[test]
     fn test_triangle_pass_compiles() {
+        use crate::render_graph::{ShaderDescriptor, ShaderStage};
+
         let mut graph = RenderGraph::new();
+
+        // Register shaders first
+        graph.register_shader(
+            "triangle.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "triangle.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
 
         let color_desc = ResourceDescriptor::Image {
             format: Format::Bgra8Unorm,
@@ -201,5 +236,7 @@ mod tests {
         // Graph should compile successfully
         let compiled = graph.compile().unwrap();
         assert_eq!(compiled.execution_order.len(), 1);
+        // Should have pipeline description for triangle pass
+        assert_eq!(compiled.pipeline_descriptions.len(), 1);
     }
 }

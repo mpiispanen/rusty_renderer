@@ -21,3 +21,9 @@ GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.
 ("texture.png")
 GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1None, texture_path=
 Some("texture.png")
+GpuMaterial created: base_color=[1GpuMaterial created: base_color=[.000., 700., 500.70, 0.70], has_texture=0, texture_path=, None
+0.25], has_texture=1, texture_path=Some("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
+("texture.png")
+GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
+("texture.png")

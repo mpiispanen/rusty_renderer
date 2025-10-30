@@ -892,7 +892,6 @@ impl VulkanBackend {
     /// This function takes a declarative pipeline description and creates the corresponding
     /// Vulkan pipeline object. It handles shader module compilation, vertex layouts,
     /// rasterizer state, depth testing, and blending configuration.
-    #[allow(dead_code)] // Will be used when migrating passes to declarative API (Issue #85)
     fn compile_pipeline_from_builder(
         &mut self,
         builder: &crate::render_graph::PipelineBuilder,
@@ -2778,6 +2777,16 @@ impl GraphicsBackend for VulkanBackend {
         graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
+        // Compile pipelines if not already cached (first frame or after pipeline changes)
+        for (pass_id, builder) in &compiled.pipeline_descriptions {
+            if !self.pipeline_cache.contains_key(pass_id) {
+                log::debug!("Compiling pipeline for pass {:?}", pass_id);
+                let pipeline =
+                    self.compile_pipeline_from_builder(builder, graph.shader_registry())?;
+                self.pipeline_cache.insert(*pass_id, pipeline);
+            }
+        }
+
         // Get raw pointers before any borrows to avoid borrow checker issues
         let device_ptr = self
             .device
@@ -2839,7 +2848,7 @@ impl GraphicsBackend for VulkanBackend {
                 vk::SubpassContents::INLINE,
             );
 
-            // Bind pipeline
+            // Bind default pipeline (will be overridden per pass if needed)
             device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -2851,20 +2860,16 @@ impl GraphicsBackend for VulkanBackend {
         for pass_id in &compiled.execution_order {
             log::debug!("Executing pass: {pass_id:?}");
 
-            // Check if we have a pipeline description for this pass (Phase 4)
-            if let Some(pipeline_desc) = compiled.pipeline_descriptions.get(pass_id) {
-                log::debug!("Pass has pipeline description:");
-                let shaders = pipeline_desc.shaders();
-                if !shaders.is_empty() {
-                    log::debug!("  - {} shader(s) declared", shaders.len());
+            // Bind pipeline for this pass if available in cache
+            if let Some(&pipeline) = self.pipeline_cache.get(pass_id) {
+                log::debug!("Binding pipeline from cache for pass {:?}", pass_id);
+                unsafe {
+                    device.cmd_bind_pipeline(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        pipeline,
+                    );
                 }
-                let depth = pipeline_desc.get_depth_state();
-                log::debug!(
-                    "  - Depth test: {}, write: {}",
-                    depth.test_enable,
-                    depth.write_enable
-                );
-                // TODO: Compile and bind pipeline from description instead of hardcoded one
             }
 
             // Find barriers before this pass
