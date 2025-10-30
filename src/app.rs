@@ -278,7 +278,6 @@ impl App {
             // Create lighting uniforms
             let lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
 
-            // TODO: This is temporarily hardcoded - should come from scene
             #[repr(C)]
             #[derive(Clone, Copy)]
             struct LightingUniforms {
@@ -292,13 +291,27 @@ impl App {
             unsafe impl bytemuck::Pod for LightingUniforms {}
             unsafe impl bytemuck::Zeroable for LightingUniforms {}
 
+            // Extract first directional light from scene, or use default
+            let (light_dir, light_color, light_intensity) = lighting
+                .lights
+                .iter()
+                .find_map(|light| match light {
+                    crate::scene::Light::Directional {
+                        direction,
+                        color,
+                        intensity,
+                    } => Some((*direction, *color, *intensity)),
+                    _ => None,
+                })
+                .unwrap_or(([-0.5, -1.0, -0.3], [1.0, 1.0, 1.0], 1.0));
+
             let _lighting_uniforms = LightingUniforms {
                 ambient: lighting.ambient,
                 _padding1: 0.0,
-                light_dir: [-0.5, -1.0, -0.3], // TODO: Get from scene lights
+                light_dir,
                 _padding2: 0.0,
-                light_color: [1.0, 1.0, 1.0],
-                light_intensity: 1.0,
+                light_color,
+                light_intensity,
             };
 
             let lighting_buffer_desc = ResourceDescriptor::Buffer {
