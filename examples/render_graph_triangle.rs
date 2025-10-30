@@ -115,6 +115,19 @@ fn main() -> Result<()> {
     // Build render graph
     let mut graph = RenderGraph::new();
 
+    // Register shaders
+    use rusty_renderer::render_graph::{ShaderDescriptor, ShaderStage};
+    graph.register_shader(
+        "triangle.vert",
+        ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+            .with_entry_point("VSMain"),
+    );
+    graph.register_shader(
+        "triangle.frag",
+        ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+            .with_entry_point("PSMain"),
+    );
+
     // Create color attachment
     let color_buffer = graph.create_resource(
         "color_output",

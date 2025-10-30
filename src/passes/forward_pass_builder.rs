@@ -24,12 +24,13 @@ use std::sync::Arc;
 /// ```no_run
 /// use rusty_renderer::passes::ForwardRenderPass;
 /// use rusty_renderer::render_graph::RenderGraph;
+/// use std::sync::Arc;
 /// # fn example(
 /// #     graph: &mut RenderGraph,
 /// #     color_output: rusty_renderer::render_graph::ResourceId,
 /// #     vertex_buffer: Box<dyn rusty_renderer::backends::Buffer>,
-/// #     camera_buffer: Box<dyn rusty_renderer::backends::Buffer>,
-/// #     lighting_buffer: Box<dyn rusty_renderer::backends::Buffer>,
+/// #     camera_buffer: Arc<Box<dyn rusty_renderer::backends::Buffer>>,
+/// #     lighting_buffer: Arc<Box<dyn rusty_renderer::backends::Buffer>>,
 /// # ) {
 /// use rusty_renderer::scene::Transform;
 /// let pass = ForwardRenderPass::builder()
