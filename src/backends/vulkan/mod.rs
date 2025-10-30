@@ -2704,6 +2704,20 @@ impl GraphicsBackend for VulkanBackend {
             // Destroy pipeline
             self.destroy_pipeline();
 
+            // Destroy pipeline cache (render graph pipelines)
+            if let Some(device) = &self.device {
+                for (_pass_id, pipeline) in self.pipeline_cache.drain() {
+                    device.destroy_pipeline(pipeline, None);
+                }
+            }
+
+            // Destroy shader module cache
+            if let Some(device) = &self.device {
+                for (_handle, module) in self.shader_module_cache.drain() {
+                    device.destroy_shader_module(module, None);
+                }
+            }
+
             // Destroy offscreen resources (headless mode)
             if self.headless {
                 if let Some(device) = &self.device {
