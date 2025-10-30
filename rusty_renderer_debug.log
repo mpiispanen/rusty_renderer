@@ -6,24 +6,14 @@ Running application
 Shutdown complete
  called
 Backend type: Vulkan, headless: true
-ForwardPipeline::build_graph ENTERED for scene 'Textured GLTF Cube'
+ForwardPipeline::build_graph ENTERED for scene 'Simple Cube'
 About to create camera uniform buffer
 Camera view_proj matrix:
-  row0: [1.5066, -0.6496, -0.4856, -0.4851]
-  row1: [0.0000, 2.1112, -0.4856, -0.4851]
-  row2: [-1.0044, -0.9744, -0.7283, -0.7276]
-  row3: [0.0000, 0.0000, 4.0271, 4.1231]
+  row0: [1.2990, 0.0000, 0.0000, 0.0000]
+  row1: [0.0000, 1.7321, 0.0000, 0.0000]
+  row2: [0.0000, 0.0000, -1.0010, -1.0000]
+  row3: [0.0000, 0.0000, 4.9049, 5.0000]
 Camera uniform buffer created
-GpuMaterial created: base_color=[1.00, 1.00, 1.00], has_texture=1, texture_path=Some("/var/home/matpii01/rusty_renderer/assets/models/.gltf_cache/textured_cube_mat0_basecolor.png")
-Uploading material to buffer: base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.10, 0.70, 1.00, 0.00]
-Creating ForwardDeclarativePass for 'TexturedCube' with material buffer at 0x55cbda01fc20
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
-("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1None, texture_path=
-Some("texture.png")
-GpuMaterial created: base_color=[1GpuMaterial created: base_color=[.000., 700., 500.70, 0.70], has_texture=0, texture_path=, None
-0.25], has_texture=1, texture_path=Some("texture.png")
-GpuMaterial created: base_color=[GpuMaterial created: base_color=[0.170., 000., 700., 500., 700.], has_texture=250], has_texture=, texture_path=1, texture_path=NoneSome
-("texture.png")
+Creating ForwardDeclarativePass for 'cube' with material buffer at 0x55c720fe24d0
 GpuMaterial created: base_color=[GpuMaterial created: base_color=[10..7000, , 0.0.7050, , 0.0.7025], has_texture=], has_texture=01, texture_path=, texture_path=NoneSome
 ("texture.png")

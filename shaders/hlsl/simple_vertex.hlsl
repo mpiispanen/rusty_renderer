@@ -1,8 +1,16 @@
 // Simple vertex-colored shader that reads from vertex buffers
 // Used for basic vertex buffer rendering
 
+// Push constants for transformation matrices
+struct PushConstants {
+    float4x4 mvp;
+};
+
+[[vk::push_constant]]
+PushConstants pushConstants;
+
 struct VSInput {
-    float2 position : POSITION;
+    float3 position : POSITION;
     float3 color : COLOR;
 };
 
@@ -13,12 +21,11 @@ struct VSOutput {
 
 VSOutput VSMain(VSInput input) {
     VSOutput output;
-#ifdef VULKAN
-    output.position = float4(input.position, 0.0, 1.0);
-#else
-    // Flip Y for DirectX coordinate system
-    output.position = float4(input.position.x, -input.position.y, 0.0, 1.0);
-#endif
+    
+    // Transform position by MVP matrix
+    float4 worldPos = float4(input.position, 1.0);
+    output.position = mul(pushConstants.mvp, worldPos);
+    
     output.color = input.color;
     return output;
 }

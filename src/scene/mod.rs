@@ -101,14 +101,24 @@ pub struct VertexData {
     pub position: [f32; 3],
     #[serde(default = "default_vertex_color")]
     pub color: [f32; 3],
-    #[serde(default)]
-    pub normal: Option<[f32; 3]>,
-    #[serde(default)]
-    pub uv: Option<[f32; 2]>,
+    #[serde(default = "default_normal")]
+    pub normal: [f32; 3],
+    #[serde(default = "default_uv")]
+    pub uv: [f32; 2],
 }
+
+pub type Vertex = VertexData;
 
 fn default_vertex_color() -> [f32; 3] {
     [1.0, 1.0, 1.0] // White - neutral for multiplying with texture/material colors
+}
+
+fn default_normal() -> [f32; 3] {
+    [0.0, 0.0, 1.0] // Default to forward
+}
+
+fn default_uv() -> [f32; 2] {
+    [0.0, 0.0]
 }
 
 /// Transform (position, rotation, scale)
@@ -300,6 +310,43 @@ fn default_pitch() -> f32 {
     0.0
 }
 
+impl Camera {
+    pub fn position(&self) -> [f32; 3] {
+        match self {
+            Camera::Perspective { position, .. } => *position,
+            Camera::FreeFly { position, .. } => *position,
+        }
+    }
+
+    pub fn target(&self) -> [f32; 3] {
+        match self {
+            Camera::Perspective { target, .. } => *target,
+            Camera::FreeFly { .. } => [0.0, 0.0, -1.0], // Default forward
+        }
+    }
+
+    pub fn fov(&self) -> f32 {
+        match self {
+            Camera::Perspective { fov, .. } => *fov,
+            Camera::FreeFly { fov, .. } => *fov,
+        }
+    }
+
+    pub fn near(&self) -> f32 {
+        match self {
+            Camera::Perspective { near, .. } => *near,
+            Camera::FreeFly { .. } => 0.1, // Default
+        }
+    }
+
+    pub fn far(&self) -> f32 {
+        match self {
+            Camera::Perspective { far, .. } => *far,
+            Camera::FreeFly { .. } => 1000.0, // Default
+        }
+    }
+}
+
 /// Lighting configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Lighting {
@@ -349,6 +396,49 @@ fn default_white() -> [f32; 3] {
 
 fn default_intensity() -> f32 {
     1.0
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LightType {
+    Directional,
+    Point,
+}
+
+impl Light {
+    pub fn light_type(&self) -> LightType {
+        match self {
+            Light::Directional { .. } => LightType::Directional,
+            Light::Point { .. } => LightType::Point,
+        }
+    }
+
+    pub fn direction(&self) -> Option<[f32; 3]> {
+        match self {
+            Light::Directional { direction, .. } => Some(*direction),
+            Light::Point { .. } => None,
+        }
+    }
+
+    pub fn position(&self) -> Option<[f32; 3]> {
+        match self {
+            Light::Directional { .. } => None,
+            Light::Point { position, .. } => Some(*position),
+        }
+    }
+
+    pub fn color(&self) -> [f32; 3] {
+        match self {
+            Light::Directional { color, .. } => *color,
+            Light::Point { color, .. } => *color,
+        }
+    }
+
+    pub fn intensity(&self) -> f32 {
+        match self {
+            Light::Directional { intensity, .. } => *intensity,
+            Light::Point { intensity, .. } => *intensity,
+        }
+    }
 }
 
 /// Material definition

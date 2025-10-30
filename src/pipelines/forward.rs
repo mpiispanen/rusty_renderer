@@ -50,8 +50,8 @@ impl ForwardPipeline {
     /// Convert scene vertex data to backend vertex format with normals
     fn convert_vertex(vertex: &VertexData) -> BackendVertex {
         // Use provided normal or calculate default
-        let normal = vertex.normal.unwrap_or([0.0, 0.0, 1.0]);
-        let uv = vertex.uv.unwrap_or([0.0, 0.0]);
+        let normal = vertex.normal;
+        let uv = vertex.uv;
 
         BackendVertex::new(
             vertex.position,
@@ -256,17 +256,7 @@ impl ForwardPipeline {
     fn calculate_normals(vertices: &[VertexData]) -> Vec<VertexData> {
         // For now, just return vertices with default normals
         // TODO: Calculate per-face normals for triangles
-        vertices
-            .iter()
-            .map(|v| {
-                let mut vertex = *v;
-                if vertex.normal.is_none() {
-                    // Simple default: pointing up
-                    vertex.normal = Some([0.0, 1.0, 0.0]);
-                }
-                vertex
-            })
-            .collect()
+        vertices.to_vec()
     }
 }
 
@@ -641,8 +631,8 @@ mod tests {
         let vertex = VertexData {
             position: [1.0, 2.0, 3.0],
             color: [1.0, 0.0, 0.0],
-            normal: Some([0.0, 1.0, 0.0]),
-            uv: Some([0.5, 0.5]),
+            normal: [0.0, 1.0, 0.0],
+            uv: [0.5, 0.5],
         };
 
         let backend_vertex = ForwardPipeline::convert_vertex(&vertex);
@@ -656,8 +646,8 @@ mod tests {
         let vertex = VertexData {
             position: [1.0, 2.0, 3.0],
             color: [1.0, 0.0, 0.0],
-            normal: None,
-            uv: None,
+            normal: [0.0, 0.0, 1.0],
+            uv: [0.0, 0.0],
         };
 
         let backend_vertex = ForwardPipeline::convert_vertex(&vertex);

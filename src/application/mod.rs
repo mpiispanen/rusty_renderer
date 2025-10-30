@@ -24,7 +24,7 @@ pub struct ApplicationArgs {
     pub scene: Option<PathBuf>,
 
     /// Pipeline to use (simple, forward, deferred, etc.)
-    #[arg(short, long, default_value = "simple")]
+    #[arg(short, long, default_value = "forward")]
     pub pipeline: String,
 
     /// Graphics backend to use

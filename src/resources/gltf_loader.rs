@@ -116,8 +116,8 @@ impl GltfLoader {
         for (i, &position) in positions.iter().enumerate() {
             vertices.push(VertexData {
                 position,
-                normal: Some(normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0])),
-                uv: Some(uvs.get(i).copied().unwrap_or([0.0, 0.0])),
+                normal: normals.get(i).copied().unwrap_or([0.0, 1.0, 0.0]),
+                uv: uvs.get(i).copied().unwrap_or([0.0, 0.0]),
                 color: colors.get(i).copied().unwrap_or([1.0, 1.0, 1.0]),
             });
         }

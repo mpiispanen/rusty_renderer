@@ -116,10 +116,11 @@ impl PassCallback for VertexBufferTriangleCallback {
             .expect("Failed to load simple fragment shader");
 
         // Define vertex layout (position + color)
+        // Vertex format: position (3 floats) + color (3 floats) = 24 bytes
         let mut layout = VertexLayout::new();
         layout.add_binding(VertexBinding {
             binding: 0,
-            stride: std::mem::size_of::<crate::backends::Vertex>() as u32,
+            stride: 24, // 6 floats * 4 bytes each
             input_rate: InputRate::Vertex,
         });
         layout.add_attribute(VertexAttribute {
@@ -140,7 +141,7 @@ impl PassCallback for VertexBufferTriangleCallback {
             .vertex_layout(layout)
             .depth_test(false)
             .depth_write(false)
-            .cull_mode(crate::render_graph::CullMode::None);
+            .cull_mode(crate::render_graph::CullMode::Back);
     }
 
     fn prepare(&self, _context: &mut dyn crate::render_graph::PassPreparationContext) {
@@ -152,6 +153,94 @@ impl PassCallback for VertexBufferTriangleCallback {
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::debug!("Executing vertex buffer pass");
+
+        // Create MVP matrix (Model-View-Projection)
+        // Simple perspective projection looking at a cube from an angle
+        let aspect = 800.0 / 600.0;
+        let fov = 60.0f32.to_radians();
+        let near = 0.1;
+        let far = 100.0;
+
+        // Perspective projection matrix
+        let f = 1.0 / (fov / 2.0).tan();
+        let projection = [
+            f / aspect,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            f,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            (far + near) / (near - far),
+            -1.0,
+            0.0,
+            0.0,
+            (2.0 * far * near) / (near - far),
+            0.0,
+        ];
+
+        // View matrix (camera at [2, 2, 3] looking at origin)
+        let eye = [2.0f32, 2.0, 3.0];
+        let center = [0.0f32, 0.0, 0.0];
+        let up = [0.0f32, 1.0, 0.0];
+
+        // Simple lookAt calculation
+        let f_x = center[0] - eye[0];
+        let f_y = center[1] - eye[1];
+        let f_z = center[2] - eye[2];
+        let f_len = (f_x * f_x + f_y * f_y + f_z * f_z).sqrt();
+        let f = [f_x / f_len, f_y / f_len, f_z / f_len];
+
+        let s_x = f[1] * up[2] - f[2] * up[1];
+        let s_y = f[2] * up[0] - f[0] * up[2];
+        let s_z = f[0] * up[1] - f[1] * up[0];
+        let s_len = (s_x * s_x + s_y * s_y + s_z * s_z).sqrt();
+        let s = [s_x / s_len, s_y / s_len, s_z / s_len];
+
+        let u_x = s[1] * f[2] - s[2] * f[1];
+        let u_y = s[2] * f[0] - s[0] * f[2];
+        let u_z = s[0] * f[1] - s[1] * f[0];
+
+        let view = [
+            s[0],
+            u_x,
+            -f[0],
+            0.0,
+            s[1],
+            u_y,
+            -f[1],
+            0.0,
+            s[2],
+            u_z,
+            -f[2],
+            0.0,
+            -(s[0] * eye[0] + s[1] * eye[1] + s[2] * eye[2]),
+            -(u_x * eye[0] + u_y * eye[1] + u_z * eye[2]),
+            f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2],
+            1.0,
+        ];
+
+        // MVP = Projection * View (no model transform for now)
+        // Matrix multiply: projection * view
+        let mut mvp = [0.0f32; 16];
+        for i in 0..4 {
+            for j in 0..4 {
+                for k in 0..4 {
+                    mvp[i * 4 + j] += projection[i * 4 + k] * view[k * 4 + j];
+                }
+            }
+        }
+
+        // Push the MVP matrix as push constants (vertex shader stage)
+        let mvp_bytes = unsafe { std::slice::from_raw_parts(mvp.as_ptr() as *const u8, 64) };
+        // VERTEX_SHADER = 0x01
+        if let Err(e) = context.push_constants(0x01, 0, mvp_bytes) {
+            log::error!("Failed to push MVP matrix: {e}");
+            return;
+        }
 
         // Get raw pointer from the buffer for backend API
         // Arc<Box<dyn Buffer>> -> &dyn Buffer -> *const dyn Buffer -> *const c_void
