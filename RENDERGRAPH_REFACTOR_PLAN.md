@@ -1,16 +1,16 @@
 # Rendergraph Refactoring Plan
 
-**Status:** 🚧 Phase 4 - Migration 75% Complete  
-**Last Updated:** 2025-10-29  
+**Status:** 🚧 Phase 4 - Migration 85% Complete  
+**Last Updated:** 2025-10-30  
 **Completed Phases:** 1, 2, 3 ✅  
-**Current Phase:** 4 - Migrating to declarative API (pipeline compilation next)
+**Current Phase:** 4 - ForwardSimplePass created (target architecture), pipeline compilation in progress
 
 ## Progress Summary
 
 - ✅ Phase 1: Resource descriptors and registry complete
 - ✅ Phase 2: DeclarativePass trait and PassBuilder complete
 - ✅ Phase 3: ShaderRegistry and PipelineBuilder complete
-- 🚧 Phase 4: ForwardDeclarativePass integrated, pipeline descriptions collected, compilation next
+- 🚧 Phase 4: ForwardSimplePass (target architecture) created, pipeline compilation next
 - ⏳ Phase 5: Automatic execution planned
 
 ## Current State
@@ -91,19 +91,22 @@ RenderGraph
 - [x] Pipeline state declared in pass (PipelineBuilder)
 - [x] Declarative pipeline configuration
 
-### Phase 4: Migration 🚧 IN PROGRESS (75% Complete)
-- [x] Implement ForwardDeclarativePass
+### Phase 4: Migration 🚧 IN PROGRESS (85% Complete)
+- [x] Implement ForwardDeclarativePass (transition state)
 - [x] Migrate ForwardPipeline to use declarative API
 - [x] Register shaders in ShaderRegistry during app initialization
 - [x] Add pipeline description collection (declare_pipeline in PassCallback)
 - [x] Collect pipeline descriptions in CompiledGraph
 - [x] Add pipeline cache infrastructure to backends
 - [x] Verify pipeline descriptions are collected and logged
+- [x] **NEW**: Create ForwardSimplePass with full graph integration (target architecture)
+- [ ] Add external/imported resource support (CPU uploads)
 - [ ] Implement shader module compilation from descriptors
 - [ ] Create backend pipelines from pipeline descriptions
 - [ ] Use compiled pipelines during execution (per-pass binding)
 - [ ] Test rendering with new declarative system
-- [ ] Deprecate/remove old ForwardPass
+- [ ] Migrate examples to use ForwardSimplePass
+- [ ] Deprecate/remove old ForwardPass and ForwardDeclarativePass
 
 ### Phase 5: Execution (PLANNED)
 - [ ] Implement automatic barrier insertion
