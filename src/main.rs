@@ -45,9 +45,9 @@ fn main() -> Result<()> {
         let _ = writeln!(f, "Parsing arguments");
         let _ = f.flush();
     }
-    
+
     let config = Config::parse_args();
-    
+
     if let Err(e) = config.validate() {
         eprintln!("Invalid configuration: {e}");
         if let Some(ref mut f) = log_file {
@@ -69,7 +69,7 @@ fn main() -> Result<()> {
         let _ = writeln!(f, "Running application");
         let _ = f.flush();
     }
-    
+
     if let Err(e) = App::run(config) {
         eprintln!("Error running application: {e}");
         if let Some(ref mut f) = log_file {

@@ -247,8 +247,45 @@ impl ShaderDescriptor {
 
     #[cfg(windows)]
     fn compile_hlsl_to_spirv(&self, path: &str) -> Result<Vec<u32>> {
-        // On Windows, use the same DXC approach
-        self.compile_hlsl_to_spirv(path)
+        // On Windows, use DXC to compile HLSL to SPIR-V
+        use std::process::Command;
+
+        let output_path = format!("{}.spv", path);
+
+        let output = Command::new("dxc")
+            .args(&[
+                "-spirv",
+                "-T",
+                "vs_6_0", // Will need to determine this from shader type
+                "-E",
+                "main",
+                path,
+                "-Fo",
+                &output_path,
+            ])
+            .output()
+            .map_err(|e| ShaderError::CompilationError(format!("Failed to execute dxc: {}", e)))?;
+
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            return Err(ShaderError::CompilationError(format!(
+                "DXC compilation failed: {}",
+                error
+            )));
+        }
+
+        // Read the compiled SPIR-V
+        let spirv_bytes = std::fs::read(&output_path).map_err(|e| {
+            ShaderError::LoadError(format!("Failed to read compiled SPIR-V: {}", e))
+        })?;
+
+        // Convert bytes to u32 words
+        let spirv = spirv_bytes
+            .chunks_exact(4)
+            .map(|chunk| u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
+            .collect();
+
+        Ok(spirv)
     }
 }
 

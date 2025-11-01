@@ -704,7 +704,12 @@ impl RenderGraph {
 
                 // Skip validation for external resources or resources with init data
                 // (they act as implicit producers)
-                if resource.external || !matches!(resource.init_data, crate::render_graph::ResourceInitData::None) {
+                if resource.external
+                    || !matches!(
+                        resource.init_data,
+                        crate::render_graph::ResourceInitData::None
+                    )
+                {
                     continue;
                 }
 

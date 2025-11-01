@@ -1399,7 +1399,7 @@ impl DirectXBackendImpl {
                     };
 
                     // Create the texture
-                    let texture = self.device_wrapper.create_texture(&desc)?;
+                    let texture = self.create_texture(&desc)?;
 
                     log::debug!(
                         "Created texture '{}': {}x{}, format {:?}, {} mip levels{}",
@@ -1431,7 +1431,7 @@ impl DirectXBackendImpl {
                     };
 
                     // Create the buffer
-                    let buffer = self.device_wrapper.create_buffer(&desc)?;
+                    let buffer = self.create_buffer(&desc)?;
 
                     // Upload initial data if present
                     use crate::render_graph::ResourceInitData;
@@ -1442,8 +1442,7 @@ impl DirectXBackendImpl {
                                 data.len(),
                                 resource.name
                             );
-                            self.device_wrapper
-                                .upload_to_buffer(buffer.as_ref(), data, 0)?;
+                            self.upload_to_buffer(buffer.as_ref(), data, 0)?;
                         }
                         ResourceInitData::None => {
                             // No initial data
