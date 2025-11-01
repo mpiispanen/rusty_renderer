@@ -3,7 +3,7 @@
 //! This is the main entry point for the Rusty Renderer application.
 
 use anyhow::Result;
-use rusty_renderer::application::ApplicationRunner;
+use rusty_renderer::{app::App, config::Config};
 
 fn main() -> Result<()> {
     // Write to file for debugging under Wine
@@ -39,37 +39,38 @@ fn main() -> Result<()> {
     eprintln!("Logging initialized");
     log::info!("Rusty Renderer v{}", env!("CARGO_PKG_VERSION"));
 
-    // Create and run the application
+    // Parse and validate configuration
     eprintln!("Parsing arguments...");
     if let Some(ref mut f) = log_file {
         let _ = writeln!(f, "Parsing arguments");
         let _ = f.flush();
     }
-    let runner = match ApplicationRunner::from_args() {
-        Ok(r) => {
-            eprintln!("Arguments parsed successfully");
-            if let Some(ref mut f) = log_file {
-                let _ = writeln!(f, "Arguments parsed successfully");
-                let _ = f.flush();
-            }
-            r
+    
+    let config = Config::parse_args();
+    
+    if let Err(e) = config.validate() {
+        eprintln!("Invalid configuration: {e}");
+        if let Some(ref mut f) = log_file {
+            let _ = writeln!(f, "Invalid configuration: {e}");
+            let _ = f.flush();
         }
-        Err(e) => {
-            eprintln!("Error creating application: {e}");
-            if let Some(ref mut f) = log_file {
-                let _ = writeln!(f, "Error creating application: {e}");
-                let _ = f.flush();
-            }
-            return Err(e);
-        }
-    };
+        return Err(e);
+    }
 
+    eprintln!("Arguments parsed successfully");
+    if let Some(ref mut f) = log_file {
+        let _ = writeln!(f, "Arguments parsed successfully");
+        let _ = f.flush();
+    }
+
+    // Run the application
     eprintln!("Running application...");
     if let Some(ref mut f) = log_file {
         let _ = writeln!(f, "Running application");
         let _ = f.flush();
     }
-    if let Err(e) = runner.run() {
+    
+    if let Err(e) = App::run(config) {
         eprintln!("Error running application: {e}");
         if let Some(ref mut f) = log_file {
             let _ = writeln!(f, "Error running application: {e}");

@@ -698,19 +698,23 @@ impl RenderGraph {
         // Check that all input resources have exactly one producer
         for pass in &self.passes {
             for input in &pass.inputs {
+                let resource = self.get_resource(input.resource).ok_or_else(|| {
+                    RenderGraphError::ResourceNotFound(format!("{}", input.resource))
+                })?;
+
+                // Skip validation for external resources or resources with init data
+                // (they act as implicit producers)
+                if resource.external || !matches!(resource.init_data, crate::render_graph::ResourceInitData::None) {
+                    continue;
+                }
+
                 let count = producer_count.get(&input.resource).copied().unwrap_or(0);
 
                 if count == 0 {
-                    let resource = self.get_resource(input.resource).ok_or_else(|| {
-                        RenderGraphError::ResourceNotFound(format!("{}", input.resource))
-                    })?;
                     return Err(RenderGraphError::NoProducer(resource.name.clone()));
                 }
 
                 if count > 1 {
-                    let resource = self.get_resource(input.resource).ok_or_else(|| {
-                        RenderGraphError::ResourceNotFound(format!("{}", input.resource))
-                    })?;
                     return Err(RenderGraphError::MultipleProducers(resource.name.clone()));
                 }
             }
