@@ -225,6 +225,41 @@ impl RenderGraph {
         )
     }
 
+    /// Declare an image resource with initial data
+    ///
+    /// This creates an image and uploads the provided pixel data to it during resource allocation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let pixel_data = vec![255u8; 800 * 600 * 4]; // White RGBA image
+    /// let texture_id = graph.declare_image_with_data(
+    ///     "texture",
+    ///     pixel_data,
+    ///     ResourceDescriptor::Image {
+    ///         format: Format::Rgba8Unorm,
+    ///         extent: ExtentMode::Absolute(Extent3D::new_2d(800, 600)),
+    ///         usage: ImageUsageFlags::new(ImageUsageFlags::SAMPLED),
+    ///         samples: SampleCount::One,
+    ///         mip_levels: 1,
+    ///     }
+    /// );
+    /// ```
+    pub fn declare_image_with_data(
+        &mut self,
+        name: impl Into<String>,
+        data: Vec<u8>,
+        descriptor: ResourceDescriptor,
+    ) -> ResourceId {
+        let id = self.create_resource(name, descriptor);
+
+        // Set initial data
+        if let Some(resource) = self.get_resource_mut(id) {
+            resource.set_init_data(data);
+        }
+
+        id
+    }
+
     /// Declare a buffer resource with the given descriptor
     ///
     /// This is a convenience method for creating buffer resources with a clean API.
@@ -241,6 +276,36 @@ impl RenderGraph {
         usage: BufferUsageFlags,
     ) -> ResourceId {
         self.create_resource(name, ResourceDescriptor::Buffer { size, usage })
+    }
+
+    /// Declare a buffer resource with initial data
+    ///
+    /// This creates a buffer and uploads the provided data to it during resource allocation.
+    ///
+    /// # Example
+    /// ```ignore
+    /// let vertex_data = vec![0u8; 1024];
+    /// let vertex_buffer = graph.declare_buffer_with_data(
+    ///     "vertices",
+    ///     vertex_data,
+    ///     BufferUsageFlags::new(BufferUsageFlags::VERTEX)
+    /// );
+    /// ```
+    pub fn declare_buffer_with_data(
+        &mut self,
+        name: impl Into<String>,
+        data: Vec<u8>,
+        usage: BufferUsageFlags,
+    ) -> ResourceId {
+        let size = data.len();
+        let id = self.create_resource(name, ResourceDescriptor::Buffer { size, usage });
+
+        // Set initial data
+        if let Some(resource) = self.get_resource_mut(id) {
+            resource.set_init_data(data);
+        }
+
+        id
     }
 
     /// Declare a sampler resource
@@ -1067,5 +1132,63 @@ mod tests {
         let pipeline_desc = &compiled.pipeline_descriptions[&pass_id];
         let shaders = pipeline_desc.shaders();
         assert_eq!(shaders.len(), 2); // Vertex and fragment shader
+    }
+
+    #[test]
+    fn test_buffer_with_initial_data() {
+        let mut graph = RenderGraph::new();
+
+        // Create buffer with initial data
+        let data = vec![1u8, 2, 3, 4, 5, 6, 7, 8];
+        let buffer_id = graph.declare_buffer_with_data(
+            "test_buffer",
+            data.clone(),
+            BufferUsageFlags::new(BufferUsageFlags::VERTEX),
+        );
+
+        let resource = graph.get_resource(buffer_id).unwrap();
+        assert_eq!(resource.name(), "test_buffer");
+
+        // Verify initial data is set
+        match &resource.init_data {
+            crate::render_graph::ResourceInitData::Buffer(init_data) => {
+                assert_eq!(init_data, &data);
+            }
+            _ => panic!("Expected buffer init data"),
+        }
+    }
+
+    #[test]
+    fn test_image_with_initial_data() {
+        let mut graph = RenderGraph::new();
+
+        // Create 2x2 RGBA image
+        let pixel_data = vec![
+            255u8, 0, 0, 255, // Red pixel
+            0, 255, 0, 255, // Green pixel
+            0, 0, 255, 255, // Blue pixel
+            255, 255, 0, 255, // Yellow pixel
+        ];
+
+        let descriptor = ResourceDescriptor::Image {
+            format: Format::Rgba8Unorm,
+            extent: ExtentMode::Absolute(Extent3D::new_2d(2, 2)),
+            usage: ImageUsageFlags::new(ImageUsageFlags::SAMPLED),
+            samples: SampleCount::One,
+            mip_levels: 1,
+        };
+
+        let texture_id = graph.declare_image_with_data("test_texture", pixel_data.clone(), descriptor);
+
+        let resource = graph.get_resource(texture_id).unwrap();
+        assert_eq!(resource.name(), "test_texture");
+
+        // Verify initial data is set
+        match &resource.init_data {
+            crate::render_graph::ResourceInitData::Buffer(init_data) => {
+                assert_eq!(init_data, &pixel_data);
+            }
+            _ => panic!("Expected buffer init data"),
+        }
     }
 }

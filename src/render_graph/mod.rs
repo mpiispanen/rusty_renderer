@@ -25,8 +25,8 @@ pub use pipeline::{
 };
 pub use resource::{
     AddressMode, BufferUsageFlags, Extent3D, ExtentMode, FilterMode, Format, ImageUsageFlags,
-    Resource, ResourceDescriptor, ResourceId, ResourceKind, ResourceLifetime, SampleCount,
-    SamplerDescriptor,
+    Resource, ResourceDescriptor, ResourceId, ResourceInitData, ResourceKind, ResourceLifetime,
+    SampleCount, SamplerDescriptor,
 };
 pub use shader::{
     CompiledShader, ShaderDescriptor, ShaderError, ShaderHandle, ShaderRegistry, ShaderSource,

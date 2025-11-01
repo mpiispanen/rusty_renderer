@@ -2290,6 +2290,14 @@ impl VulkanBackend {
                     let backend_format = Self::convert_format(*format);
                     let backend_usage = Self::convert_image_usage(*usage);
 
+                    // Check for initial data
+                    let initial_data = match &resource.init_data {
+                        crate::render_graph::ResourceInitData::Buffer(data) => {
+                            Some(data.as_slice())
+                        }
+                        crate::render_graph::ResourceInitData::None => None,
+                    };
+
                     // Create texture descriptor
                     let desc = TextureDescriptor {
                         width: resolved_extent.width,
@@ -2297,7 +2305,7 @@ impl VulkanBackend {
                         format: backend_format,
                         usage: backend_usage,
                         mip_levels: *mip_levels,
-                        initial_data: None,
+                        initial_data,
                         label: Some(resource.name.clone()),
                     };
 
@@ -2305,12 +2313,17 @@ impl VulkanBackend {
                     let texture = self.create_texture(&desc)?;
 
                     log::debug!(
-                        "Created texture '{}': {}x{}, format {:?}, {} mip levels",
+                        "Created texture '{}': {}x{}, format {:?}, {} mip levels{}",
                         resource.name,
                         resolved_extent.width,
                         resolved_extent.height,
                         backend_format,
                         mip_levels,
+                        if initial_data.is_some() {
+                            " (with initial data)"
+                        } else {
+                            ""
+                        }
                     );
 
                     // Store in resource map
@@ -2330,6 +2343,22 @@ impl VulkanBackend {
 
                     // Create the buffer
                     let buffer = self.create_buffer(&desc)?;
+
+                    // Upload initial data if present
+                    use crate::render_graph::ResourceInitData;
+                    match &resource.init_data {
+                        ResourceInitData::Buffer(data) => {
+                            log::debug!(
+                                "Uploading {} bytes of initial data to buffer '{}'",
+                                data.len(),
+                                resource.name
+                            );
+                            self.upload_to_buffer(buffer.as_ref(), data, 0)?;
+                        }
+                        ResourceInitData::None => {
+                            // No initial data
+                        }
+                    }
 
                     log::debug!(
                         "Created buffer '{}': {} bytes, usage {:?}",

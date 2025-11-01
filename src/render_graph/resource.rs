@@ -306,6 +306,23 @@ impl Default for ResourceLifetime {
     }
 }
 
+/// Resource initialization data
+///
+/// Used to upload initial data to a resource after allocation.
+#[derive(Debug, Clone)]
+pub enum ResourceInitData {
+    /// No initial data - resource will be uninitialized
+    None,
+    /// Upload data from a buffer
+    Buffer(Vec<u8>),
+}
+
+impl Default for ResourceInitData {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
 /// A resource in the render graph
 #[derive(Debug, Clone)]
 pub struct Resource {
@@ -321,6 +338,8 @@ pub struct Resource {
     pub lifetime: ResourceLifetime,
     /// Whether this is an external resource (not managed by render graph)
     pub external: bool,
+    /// Initial data to upload to the resource
+    pub init_data: ResourceInitData,
 }
 
 impl Resource {
@@ -339,7 +358,19 @@ impl Resource {
             descriptor,
             lifetime: ResourceLifetime::new(),
             external: false,
+            init_data: ResourceInitData::None,
         }
+    }
+
+    /// Set initial data for this resource
+    pub fn with_init_data(mut self, data: Vec<u8>) -> Self {
+        self.init_data = ResourceInitData::Buffer(data);
+        self
+    }
+
+    /// Set initial data for this resource (mutable)
+    pub fn set_init_data(&mut self, data: Vec<u8>) {
+        self.init_data = ResourceInitData::Buffer(data);
     }
 
     /// Mark this resource as external (not managed by render graph)
