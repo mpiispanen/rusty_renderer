@@ -1178,7 +1178,8 @@ mod tests {
             mip_levels: 1,
         };
 
-        let texture_id = graph.declare_image_with_data("test_texture", pixel_data.clone(), descriptor);
+        let texture_id =
+            graph.declare_image_with_data("test_texture", pixel_data.clone(), descriptor);
 
         let resource = graph.get_resource(texture_id).unwrap();
         assert_eq!(resource.name(), "test_texture");

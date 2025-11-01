@@ -4,7 +4,7 @@
 //! It's only compiled on Windows platforms.
 
 use super::*;
-use crate::render_graph::{PassExecutionContext, PassPreparationContext};
+use crate::render_graph::{PassExecutionContext, PassPreparationContext, ResourceId};
 use anyhow::{Context, Result};
 use std::io::Write;
 use windows::{
@@ -1379,6 +1379,14 @@ impl DirectXBackendImpl {
                     let backend_format = Self::convert_format(*format);
                     let backend_usage = Self::convert_image_usage(*usage);
 
+                    // Check for initial data
+                    let initial_data = match &resource.init_data {
+                        crate::render_graph::ResourceInitData::Buffer(data) => {
+                            Some(data.as_slice())
+                        }
+                        crate::render_graph::ResourceInitData::None => None,
+                    };
+
                     // Create texture descriptor
                     let desc = TextureDescriptor {
                         width: resolved_extent.width,
@@ -1386,7 +1394,7 @@ impl DirectXBackendImpl {
                         format: backend_format,
                         usage: backend_usage,
                         mip_levels: *mip_levels,
-                        initial_data: None,
+                        initial_data,
                         label: Some(resource.name.clone()),
                     };
 
@@ -1394,12 +1402,17 @@ impl DirectXBackendImpl {
                     let texture = self.device_wrapper.create_texture(&desc)?;
 
                     log::debug!(
-                        "Created texture '{}': {}x{}, format {:?}, {} mip levels",
+                        "Created texture '{}': {}x{}, format {:?}, {} mip levels{}",
                         resource.name,
                         resolved_extent.width,
                         resolved_extent.height,
                         backend_format,
                         mip_levels,
+                        if initial_data.is_some() {
+                            " (with initial data)"
+                        } else {
+                            ""
+                        }
                     );
 
                     // Store in resource map
@@ -1419,6 +1432,23 @@ impl DirectXBackendImpl {
 
                     // Create the buffer
                     let buffer = self.device_wrapper.create_buffer(&desc)?;
+
+                    // Upload initial data if present
+                    use crate::render_graph::ResourceInitData;
+                    match &resource.init_data {
+                        ResourceInitData::Buffer(data) => {
+                            log::debug!(
+                                "Uploading {} bytes of initial data to buffer '{}'",
+                                data.len(),
+                                resource.name
+                            );
+                            self.device_wrapper
+                                .upload_to_buffer(buffer.as_ref(), data, 0)?;
+                        }
+                        ResourceInitData::None => {
+                            // No initial data
+                        }
+                    }
 
                     log::debug!(
                         "Created buffer '{}': {} bytes, usage {:?}",
@@ -3301,5 +3331,29 @@ impl PassExecutionContext for DirectXPassContext {
         }
 
         Ok(())
+    }
+
+    fn get_buffer_ptr(&self, resource_id: ResourceId) -> anyhow::Result<*const std::ffi::c_void> {
+        let backend = unsafe { &*self.backend };
+
+        backend
+            .resource_buffers
+            .get(&resource_id)
+            .map(|buffer| {
+                buffer.as_ref() as *const dyn super::super::Buffer as *const std::ffi::c_void
+            })
+            .ok_or_else(|| anyhow::anyhow!("Buffer resource {:?} not found", resource_id))
+    }
+
+    fn get_texture_ptr(&self, resource_id: ResourceId) -> anyhow::Result<*const std::ffi::c_void> {
+        let backend = unsafe { &*self.backend };
+
+        backend
+            .resource_textures
+            .get(&resource_id)
+            .map(|texture| {
+                texture.as_ref() as *const dyn super::super::Texture as *const std::ffi::c_void
+            })
+            .ok_or_else(|| anyhow::anyhow!("Texture resource {:?} not found", resource_id))
     }
 }

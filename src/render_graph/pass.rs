@@ -493,6 +493,32 @@ pub trait PassExecutionContext {
         binding: u32,
         texture_ptr: *const std::ffi::c_void,
     ) -> anyhow::Result<()>;
+
+    /// Get a buffer pointer from a resource ID
+    ///
+    /// Returns a pointer to the buffer implementation for the given resource ID.
+    /// The buffer must have been allocated by the render graph.
+    ///
+    /// # Arguments
+    /// * `resource_id` - The resource ID of the buffer
+    ///
+    /// # Returns
+    /// A pointer to the buffer implementation, or an error if the resource doesn't exist
+    /// or is not a buffer.
+    fn get_buffer_ptr(&self, resource_id: ResourceId) -> anyhow::Result<*const std::ffi::c_void>;
+
+    /// Get a texture pointer from a resource ID
+    ///
+    /// Returns a pointer to the texture implementation for the given resource ID.
+    /// The texture must have been allocated by the render graph.
+    ///
+    /// # Arguments
+    /// * `resource_id` - The resource ID of the texture
+    ///
+    /// # Returns
+    /// A pointer to the texture implementation, or an error if the resource doesn't exist
+    /// or is not a texture.
+    fn get_texture_ptr(&self, resource_id: ResourceId) -> anyhow::Result<*const std::ffi::c_void>;
 }
 
 /// Index buffer data type (re-exported for pass callbacks)

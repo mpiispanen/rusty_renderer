@@ -9,6 +9,7 @@ mod resources;
 mod shaders;
 
 use super::*;
+use crate::render_graph::ResourceId;
 use anyhow::{Context, Result};
 use std::ffi::CStr;
 use std::os::raw::c_void;
@@ -3948,6 +3949,26 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
 
         log::debug!("VulkanPassContext: Texture bound successfully");
         Ok(())
+    }
+
+    fn get_buffer_ptr(&self, resource_id: ResourceId) -> Result<*const std::ffi::c_void> {
+        let backend = unsafe { &*self.backend };
+
+        backend
+            .resource_buffers
+            .get(&resource_id)
+            .map(|buffer| buffer.as_ref() as *const dyn super::Buffer as *const std::ffi::c_void)
+            .ok_or_else(|| anyhow::anyhow!("Buffer resource {:?} not found", resource_id))
+    }
+
+    fn get_texture_ptr(&self, resource_id: ResourceId) -> Result<*const std::ffi::c_void> {
+        let backend = unsafe { &*self.backend };
+
+        backend
+            .resource_textures
+            .get(&resource_id)
+            .map(|texture| texture.as_ref() as *const dyn super::Texture as *const std::ffi::c_void)
+            .ok_or_else(|| anyhow::anyhow!("Texture resource {:?} not found", resource_id))
     }
 }
 

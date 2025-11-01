@@ -356,20 +356,68 @@ impl PassCallback for ForwardSimplePassCallback {
         log::trace!("Preparing forward simple pass");
     }
 
-    fn execute(&self, _context: &mut dyn PassExecutionContext) {
-        // TODO: Full execution implementation
-        // For now, the backend's execute_graph handles the actual rendering
-        // Once we have proper context methods, this will:
-        // 1. Bind pipeline
-        // 2. Push model+normal matrices as push constants
-        // 3. Bind descriptor sets (camera, lighting, material, texture)
-        // 4. Bind vertex buffer
-        // 5. Draw vertices
-
+    fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::info!(
             "Executing forward simple pass ({} vertices)",
             self.vertex_count
         );
+
+        // Get buffer pointers from resource IDs
+        let vertex_buffer_ptr = context
+            .get_buffer_ptr(self.vertex_buffer)
+            .expect("Failed to get vertex buffer");
+        let camera_buffer_ptr = context
+            .get_buffer_ptr(self.camera_buffer)
+            .expect("Failed to get camera buffer");
+        let lighting_buffer_ptr = context
+            .get_buffer_ptr(self.lighting_buffer)
+            .expect("Failed to get lighting buffer");
+
+        // Bind vertex buffer
+        context
+            .bind_vertex_buffer(0, vertex_buffer_ptr, 0)
+            .expect("Failed to bind vertex buffer");
+
+        // Bind uniforms
+        context
+            .bind_uniform_buffer(0, 0, camera_buffer_ptr, 0, 64 + 64 + 16) // CameraUniforms size
+            .expect("Failed to bind camera uniforms");
+        context
+            .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 16 + 16) // LightingUniforms size
+            .expect("Failed to bind lighting uniforms");
+
+        // Push model matrix as push constants
+        let model_matrix = self.transform.matrix();
+        let normal_matrix = self.transform.normal_matrix();
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct PushConstants {
+            model: [[f32; 4]; 4],
+            normal: [[f32; 4]; 4],
+        }
+        unsafe impl bytemuck::Pod for PushConstants {}
+        unsafe impl bytemuck::Zeroable for PushConstants {}
+
+        let push_data = PushConstants {
+            model: model_matrix,
+            normal: normal_matrix,
+        };
+
+        context
+            .push_constants(
+                0x1 | 0x10, // VERTEX | FRAGMENT stages
+                0,
+                bytemuck::bytes_of(&push_data),
+            )
+            .expect("Failed to push constants");
+
+        // Draw
+        context
+            .draw(self.vertex_count, 1, 0, 0)
+            .expect("Failed to draw");
+
+        log::debug!("Forward simple pass execution complete");
     }
 }
 

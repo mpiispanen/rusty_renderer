@@ -197,7 +197,7 @@ impl App {
                 index_count
             );
 
-            // Create vertex buffer
+            // Create vertex buffer with data via render graph
             use crate::render_graph::BufferUsageFlags;
             // Prepare vertex data
             let vertex_data: Vec<u8> = all_vertices
@@ -212,28 +212,10 @@ impl App {
                 })
                 .collect();
 
-            // Create backend vertex buffer
-            use crate::backends::{
-                BufferDescriptor as BackendBufferDesc, BufferUsage, MemoryLocation,
-            };
-            let vb_desc = BackendBufferDesc {
-                size: vertex_data.len() as u64,
-                usage: BufferUsage::vertex(),
-                memory_location: MemoryLocation::CpuToGpu,
-                label: Some("vertex_buffer".to_string()),
-            };
-            let backend_vertex_buffer = self.backend.as_mut().unwrap().create_buffer(&vb_desc)?;
-            self.backend.as_mut().unwrap().upload_to_buffer(
-                backend_vertex_buffer.as_ref(),
-                &vertex_data,
-                0,
-            )?;
-            self.external_buffers.push(backend_vertex_buffer);
-
-            // Import into render graph
-            let vertex_buffer = graph.import_buffer(
+            // Declare vertex buffer with initial data - render graph will allocate and upload
+            let vertex_buffer = graph.declare_buffer_with_data(
                 "vertex_buffer",
-                vertex_data.len(),
+                vertex_data,
                 BufferUsageFlags::new(BufferUsageFlags::VERTEX),
             );
 
@@ -269,25 +251,10 @@ impl App {
                 _padding: 0.0,
             };
 
-            // Create backend camera buffer
-            let cb_desc = BackendBufferDesc {
-                size: std::mem::size_of::<CameraUniforms>() as u64,
-                usage: BufferUsage::uniform(),
-                memory_location: MemoryLocation::CpuToGpu,
-                label: Some("camera_uniforms".to_string()),
-            };
-            let backend_camera_buffer = self.backend.as_mut().unwrap().create_buffer(&cb_desc)?;
-            self.backend.as_mut().unwrap().upload_to_buffer(
-                backend_camera_buffer.as_ref(),
-                bytemuck::bytes_of(&camera_uniforms),
-                0,
-            )?;
-            self.external_buffers.push(backend_camera_buffer);
-
-            // Import into render graph
-            let camera_buffer = graph.import_buffer(
+            // Declare camera buffer with initial data - render graph will allocate and upload
+            let camera_buffer = graph.declare_buffer_with_data(
                 "camera_uniforms",
-                std::mem::size_of::<CameraUniforms>(),
+                bytemuck::bytes_of(&camera_uniforms).to_vec(),
                 BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
             );
 
@@ -330,25 +297,10 @@ impl App {
                 light_intensity,
             };
 
-            // Create backend lighting buffer
-            let lb_desc = BackendBufferDesc {
-                size: std::mem::size_of::<LightingUniforms>() as u64,
-                usage: BufferUsage::uniform(),
-                memory_location: MemoryLocation::CpuToGpu,
-                label: Some("lighting_uniforms".to_string()),
-            };
-            let backend_lighting_buffer = self.backend.as_mut().unwrap().create_buffer(&lb_desc)?;
-            self.backend.as_mut().unwrap().upload_to_buffer(
-                backend_lighting_buffer.as_ref(),
-                bytemuck::bytes_of(&lighting_uniforms),
-                0,
-            )?;
-            self.external_buffers.push(backend_lighting_buffer);
-
-            // Import into render graph
-            let lighting_buffer = graph.import_buffer(
+            // Declare lighting buffer with initial data - render graph will allocate and upload
+            let lighting_buffer = graph.declare_buffer_with_data(
                 "lighting_uniforms",
-                std::mem::size_of::<LightingUniforms>(),
+                bytemuck::bytes_of(&lighting_uniforms).to_vec(),
                 BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
             );
 
