@@ -2250,22 +2250,153 @@ impl VulkanBackend {
     /// Allocate resources from the render graph
     fn allocate_graph_resources(
         &mut self,
-        _graph: &crate::render_graph::graph::RenderGraph,
+        graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
-        log::debug!(
-            "Resource allocation from render graph: {} resources declared (stub implementation)",
+        use crate::render_graph::ResourceDescriptor;
+
+        log::info!(
+            "Allocating {} resources from render graph",
             compiled.resources_to_allocate.len()
         );
-        // TODO #87: Implement actual resource allocation
+
+        // Get swapchain dimensions for resolving extent modes
+        let swapchain_width = self.swapchain_extent.width;
+        let swapchain_height = self.swapchain_extent.height;
+
+        for &resource_id in &compiled.resources_to_allocate {
+            let resource = graph
+                .get_resource(resource_id)
+                .context("Resource not found in graph")?;
+
+            log::debug!(
+                "Allocating resource '{}' ({:?})",
+                resource.name,
+                resource.kind
+            );
+
+            match &resource.descriptor {
+                ResourceDescriptor::Image {
+                    format,
+                    extent,
+                    usage,
+                    samples: _samples,
+                    mip_levels,
+                } => {
+                    // Resolve extent based on mode
+                    let resolved_extent = extent.resolve(swapchain_width, swapchain_height);
+
+                    // Convert render graph types to backend types
+                    let backend_format = Self::convert_format(*format);
+                    let backend_usage = Self::convert_image_usage(*usage);
+
+                    // Create texture descriptor
+                    let desc = TextureDescriptor {
+                        width: resolved_extent.width,
+                        height: resolved_extent.height,
+                        format: backend_format,
+                        usage: backend_usage,
+                        mip_levels: *mip_levels,
+                        initial_data: None,
+                        label: Some(resource.name.clone()),
+                    };
+
+                    // Create the texture
+                    let texture = self.create_texture(&desc)?;
+
+                    log::debug!(
+                        "Created texture '{}': {}x{}, format {:?}, {} mip levels",
+                        resource.name,
+                        resolved_extent.width,
+                        resolved_extent.height,
+                        backend_format,
+                        mip_levels,
+                    );
+
+                    // Store in resource map
+                    self.resource_textures.insert(resource_id, texture);
+                }
+                ResourceDescriptor::Buffer { size, usage } => {
+                    // Convert usage flags
+                    let backend_usage = Self::convert_buffer_usage(*usage);
+
+                    // Create buffer descriptor
+                    let desc = BufferDescriptor {
+                        size: *size as u64,
+                        usage: backend_usage,
+                        memory_location: MemoryLocation::GpuOnly, // Default to GPU memory
+                        label: Some(resource.name.clone()),
+                    };
+
+                    // Create the buffer
+                    let buffer = self.create_buffer(&desc)?;
+
+                    log::debug!(
+                        "Created buffer '{}': {} bytes, usage {:?}",
+                        resource.name,
+                        size,
+                        backend_usage
+                    );
+
+                    // Store in resource map
+                    self.resource_buffers.insert(resource_id, buffer);
+                }
+                ResourceDescriptor::Sampler(_sampler_desc) => {
+                    // Samplers are handled separately and don't need allocation
+                    // They are created when bind groups are set up
+                    log::debug!("Skipping sampler '{}' (created on demand)", resource.name);
+                }
+            }
+        }
+
+        log::info!(
+            "Resource allocation complete: {} textures, {} buffers",
+            self.resource_textures.len(),
+            self.resource_buffers.len()
+        );
+
         Ok(())
     }
 
     /// Convert render graph format to backend format
-    #[allow(dead_code)] // TODO #87: Will be used when resource allocation is implemented
-    fn convert_format(_format: crate::render_graph::Format) -> TextureFormat {
-        // TODO #87: Implement format conversion
-        TextureFormat::Rgba8Unorm
+    fn convert_format(format: crate::render_graph::Format) -> TextureFormat {
+        use crate::render_graph::Format;
+        match format {
+            Format::Rgba8Unorm => TextureFormat::Rgba8Unorm,
+            Format::Bgra8Unorm => TextureFormat::Bgra8Unorm,
+            Format::Rgba16Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
+            Format::Rgba32Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
+            Format::Depth24Stencil8 => TextureFormat::Depth24PlusStencil8,
+            Format::Depth32Float => TextureFormat::Depth32Float,
+        }
+    }
+
+    /// Convert render graph image usage to backend usage
+    fn convert_image_usage(usage: crate::render_graph::ImageUsageFlags) -> TextureUsage {
+        use crate::render_graph::ImageUsageFlags;
+
+        TextureUsage {
+            sampled: usage.contains(ImageUsageFlags::SAMPLED),
+            render_target: usage.contains(ImageUsageFlags::COLOR_ATTACHMENT),
+            depth_stencil: usage.contains(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
+            transfer_src: usage.contains(ImageUsageFlags::TRANSFER_SRC),
+            transfer_dst: usage.contains(ImageUsageFlags::TRANSFER_DST),
+        }
+    }
+
+    /// Convert render graph buffer usage to backend usage
+    fn convert_buffer_usage(usage: crate::render_graph::BufferUsageFlags) -> BufferUsage {
+        use crate::render_graph::BufferUsageFlags;
+
+        BufferUsage {
+            vertex: usage.contains(BufferUsageFlags::VERTEX),
+            index: usage.contains(BufferUsageFlags::INDEX),
+            uniform: usage.contains(BufferUsageFlags::UNIFORM),
+            staging: false, // Not directly mappable from render graph
+            storage: usage.contains(BufferUsageFlags::STORAGE),
+            transfer_src: usage.contains(BufferUsageFlags::TRANSFER_SRC),
+            transfer_dst: usage.contains(BufferUsageFlags::TRANSFER_DST),
+        }
     }
 }
 

@@ -68,6 +68,10 @@ pub struct DirectXBackendImpl {
     // Trait implementations
     device_wrapper: DirectXDevice,
     swapchain_wrapper: DirectXSwapchain,
+
+    // Render graph resource management (M10 Phase 1)
+    resource_buffers: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Buffer>>,
+    resource_textures: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Texture>>,
 }
 
 // SAFETY: DirectX 12 objects are thread-safe once created
@@ -122,6 +126,8 @@ impl DirectXBackendImpl {
                 height: 600,
                 frame_index: 0,
             },
+            resource_buffers: std::collections::HashMap::new(),
+            resource_textures: std::collections::HashMap::new(),
         })
     }
 
@@ -1330,6 +1336,158 @@ impl DirectXBackendImpl {
         &self.swapchain_wrapper
     }
 
+    /// Allocate resources from the render graph
+    fn allocate_graph_resources(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        compiled: &crate::render_graph::graph::CompiledGraph,
+    ) -> Result<()> {
+        use crate::render_graph::ResourceDescriptor;
+
+        log::info!(
+            "Allocating {} resources from render graph",
+            compiled.resources_to_allocate.len()
+        );
+
+        // Get swapchain dimensions for resolving extent modes
+        let swapchain_width = self.width;
+        let swapchain_height = self.height;
+
+        for &resource_id in &compiled.resources_to_allocate {
+            let resource = graph
+                .get_resource(resource_id)
+                .context("Resource not found in graph")?;
+
+            log::debug!(
+                "Allocating resource '{}' ({:?})",
+                resource.name,
+                resource.kind
+            );
+
+            match &resource.descriptor {
+                ResourceDescriptor::Image {
+                    format,
+                    extent,
+                    usage,
+                    samples: _samples,
+                    mip_levels,
+                } => {
+                    // Resolve extent based on mode
+                    let resolved_extent = extent.resolve(swapchain_width, swapchain_height);
+
+                    // Convert render graph types to backend types
+                    let backend_format = Self::convert_format(*format);
+                    let backend_usage = Self::convert_image_usage(*usage);
+
+                    // Create texture descriptor
+                    let desc = TextureDescriptor {
+                        width: resolved_extent.width,
+                        height: resolved_extent.height,
+                        format: backend_format,
+                        usage: backend_usage,
+                        mip_levels: *mip_levels,
+                        initial_data: None,
+                        label: Some(resource.name.clone()),
+                    };
+
+                    // Create the texture
+                    let texture = self.device_wrapper.create_texture(&desc)?;
+
+                    log::debug!(
+                        "Created texture '{}': {}x{}, format {:?}, {} mip levels",
+                        resource.name,
+                        resolved_extent.width,
+                        resolved_extent.height,
+                        backend_format,
+                        mip_levels,
+                    );
+
+                    // Store in resource map
+                    self.resource_textures.insert(resource_id, texture);
+                }
+                ResourceDescriptor::Buffer { size, usage } => {
+                    // Convert usage flags
+                    let backend_usage = Self::convert_buffer_usage(*usage);
+
+                    // Create buffer descriptor
+                    let desc = BufferDescriptor {
+                        size: *size as u64,
+                        usage: backend_usage,
+                        memory_location: MemoryLocation::GpuOnly, // Default to GPU memory
+                        label: Some(resource.name.clone()),
+                    };
+
+                    // Create the buffer
+                    let buffer = self.device_wrapper.create_buffer(&desc)?;
+
+                    log::debug!(
+                        "Created buffer '{}': {} bytes, usage {:?}",
+                        resource.name,
+                        size,
+                        backend_usage
+                    );
+
+                    // Store in resource map
+                    self.resource_buffers.insert(resource_id, buffer);
+                }
+                ResourceDescriptor::Sampler(_sampler_desc) => {
+                    // Samplers are handled separately and don't need allocation
+                    // They are created when bind groups are set up
+                    log::debug!("Skipping sampler '{}' (created on demand)", resource.name);
+                }
+            }
+        }
+
+        log::info!(
+            "Resource allocation complete: {} textures, {} buffers",
+            self.resource_textures.len(),
+            self.resource_buffers.len()
+        );
+
+        Ok(())
+    }
+
+    /// Convert render graph format to backend format
+    fn convert_format(format: crate::render_graph::Format) -> TextureFormat {
+        use crate::render_graph::Format;
+        match format {
+            Format::Rgba8Unorm => TextureFormat::Rgba8Unorm,
+            Format::Bgra8Unorm => TextureFormat::Bgra8Unorm,
+            Format::Rgba16Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
+            Format::Rgba32Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
+            Format::Depth24Stencil8 => TextureFormat::Depth24PlusStencil8,
+            Format::Depth32Float => TextureFormat::Depth32Float,
+        }
+    }
+
+    /// Convert render graph image usage to backend usage
+    fn convert_image_usage(usage: crate::render_graph::ImageUsageFlags) -> TextureUsage {
+        use crate::render_graph::ImageUsageFlags;
+
+        TextureUsage {
+            sampled: usage.contains(ImageUsageFlags::SAMPLED),
+            render_target: usage.contains(ImageUsageFlags::COLOR_ATTACHMENT),
+            depth_stencil: usage.contains(ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT),
+            transfer_src: usage.contains(ImageUsageFlags::TRANSFER_SRC),
+            transfer_dst: usage.contains(ImageUsageFlags::TRANSFER_DST),
+        }
+    }
+
+    /// Convert render graph buffer usage to backend usage
+    fn convert_buffer_usage(usage: crate::render_graph::BufferUsageFlags) -> BufferUsage {
+        use crate::render_graph::BufferUsageFlags;
+
+        BufferUsage {
+            vertex: usage.contains(BufferUsageFlags::VERTEX),
+            index: usage.contains(BufferUsageFlags::INDEX),
+            uniform: usage.contains(BufferUsageFlags::UNIFORM),
+            staging: false, // Not directly mappable from render graph
+            storage: usage.contains(BufferUsageFlags::STORAGE),
+            transfer_src: usage.contains(BufferUsageFlags::TRANSFER_SRC),
+            transfer_dst: usage.contains(BufferUsageFlags::TRANSFER_DST),
+        }
+    }
+
     /// Execute a compiled render graph
     pub fn execute_graph(
         &mut self,
@@ -1337,6 +1495,12 @@ impl DirectXBackendImpl {
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
         use crate::render_graph::*;
+
+        // Allocate resources if this is the first execution or resources changed
+        // TODO: Add smarter resource lifecycle management (issue #87)
+        if self.resource_buffers.is_empty() && self.resource_textures.is_empty() {
+            self.allocate_graph_resources(graph, compiled)?;
+        }
 
         log::debug!(
             "Executing render graph with {} passes, {} barriers",
