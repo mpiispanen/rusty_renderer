@@ -21,7 +21,6 @@ VKD3D_DEBUG_LEVEL="warn"
 APP_ARGS=()
 DEFAULT_SCENE="scenes/gltf_textured.toml"
 DEFAULT_MAX_FRAMES=""  # No frame limit by default
-DEFAULT_PIPELINE="forward"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -48,11 +47,6 @@ if [[ ! " ${APP_ARGS[@]} " =~ " --max-frames " ]] && [[ -n "$DEFAULT_MAX_FRAMES"
     APP_ARGS+=("--max-frames" "$DEFAULT_MAX_FRAMES")
 fi
 
-# If no --pipeline argument was provided, add the default
-if [[ ! " ${APP_ARGS[@]} " =~ " --pipeline " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -p " ]]; then
-    APP_ARGS+=("--pipeline" "$DEFAULT_PIPELINE")
-fi
-
 # Check if Proton exists
 if [ ! -f "$PROTON_DIR/proton" ]; then
     echo "Error: Proton not found at $PROTON_DIR"
@@ -61,27 +55,48 @@ if [ ! -f "$PROTON_DIR/proton" ]; then
     exit 1
 fi
 
-# Check if test directory exists
-if [ ! -d "$TEST_DIR" ]; then
-    echo "Error: Test directory $TEST_DIR not found"
-    echo "Please build the Windows binary first:"
-    echo "  cargo build --release --target x86_64-pc-windows-msvc"
+# Create test directory if it doesn't exist
+mkdir -p "$TEST_DIR"
+
+# Copy the latest binary and required directories automatically
+echo "Syncing binary and assets..."
+
+# Try both Windows targets
+BINARY_COPIED=false
+for TARGET in x86_64-pc-windows-gnu x86_64-pc-windows-msvc; do
+    if [ -f "target/$TARGET/release/rusty_renderer.exe" ]; then
+        cp "target/$TARGET/release/rusty_renderer.exe" "$TEST_DIR/"
+        echo "  ✓ Binary copied (from $TARGET)"
+        BINARY_COPIED=true
+        break
+    fi
+done
+
+if [ "$BINARY_COPIED" = false ]; then
+    echo "  ✗ Binary not found - please build first:"
+    echo "    cargo build --release --target x86_64-pc-windows-gnu"
     exit 1
 fi
 
-# Copy the latest binary and shaders automatically
-echo "Syncing binary and shaders..."
-if [ -f "target/x86_64-pc-windows-msvc/release/rusty_renderer.exe" ]; then
-    cp target/x86_64-pc-windows-msvc/release/rusty_renderer.exe "$TEST_DIR/"
-    echo "  ✓ Binary copied"
-else
-    echo "  ✗ Binary not found - build may be needed"
+# Sync shaders
+if [ -d "shaders" ]; then
+    mkdir -p "$TEST_DIR/shaders"
+    cp -r shaders/* "$TEST_DIR/shaders/"
+    echo "  ✓ Shaders synced"
 fi
 
-if [ -d "shaders/hlsl" ]; then
-    mkdir -p "$TEST_DIR/shaders/hlsl"
-    cp -r shaders/hlsl/* "$TEST_DIR/shaders/hlsl/"
-    echo "  ✓ Shaders synced"
+# Sync assets (required for textures, models, etc.)
+if [ -d "assets" ]; then
+    mkdir -p "$TEST_DIR/assets"
+    cp -r assets/* "$TEST_DIR/assets/"
+    echo "  ✓ Assets synced"
+fi
+
+# Sync scenes (required for scene files)
+if [ -d "scenes" ]; then
+    mkdir -p "$TEST_DIR/scenes"
+    cp -r scenes/* "$TEST_DIR/scenes/"
+    echo "  ✓ Scenes synced"
 fi
 
 # Change to test directory

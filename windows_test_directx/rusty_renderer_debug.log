@@ -1,3 +1,22 @@
 Starting Rusty Renderer v0.1.0
 Initializing logging
 Parsing arguments
+Arguments parsed successfully
+Running application
+Error running application: Call failed. (0x80004005)
+{ vertex: true, index: false, uniform: false, staging: false, storage: false, transfer_src: false, transfer_dst: false }, memory: GpuOnly
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 1056 bytes, heap type D3D12_HEAP_TYPE(1)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 1056 bytes, usage: BufferUsage { vertex: false, index: false, uniform: false, staging: true, storage: false, transfer_src: true, transfer_dst: false }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 1056 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!

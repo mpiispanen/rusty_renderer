@@ -82,7 +82,12 @@ impl App {
 
     /// Load the scene based on config
     fn load_scene(&mut self) -> Result<()> {
-        let scene_path = PathBuf::from(format!("scenes/{}.toml", self.config.scene));
+        // If scene already has a path separator or .toml extension, use it as is
+        let scene_path = if self.config.scene.contains('/') || self.config.scene.ends_with(".toml") {
+            PathBuf::from(&self.config.scene)
+        } else {
+            PathBuf::from(format!("scenes/{}.toml", self.config.scene))
+        };
         log::info!("Loading scene: {}", scene_path.display());
 
         let scene = SceneLoader::load_from_file_static(&scene_path)

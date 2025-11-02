@@ -11,6 +11,7 @@ pub enum Backend {
     Vulkan,
     /// DirectX 12 backend (Windows only)
     #[cfg(target_os = "windows")]
+    #[value(name = "directx")]
     DirectX,
 }
 
