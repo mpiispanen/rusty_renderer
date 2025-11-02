@@ -59,15 +59,19 @@ impl ForwardSimplePass {
     pub fn register_shaders(graph: &mut RenderGraph) {
         use crate::render_graph::{ShaderDescriptor, ShaderStage};
 
+        // Use pre-compiled SPIR-V shaders generated from unified HLSL source
         graph.register_shader(
             "forward_simple.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Vertex)
+            ShaderDescriptor::from_compiled("shaders/forward_simple.vert.spv", ShaderStage::Vertex)
                 .with_entry_point("VSMain"),
         );
         graph.register_shader(
             "forward_simple.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
+            ShaderDescriptor::from_compiled(
+                "shaders/forward_simple.frag.spv",
+                ShaderStage::Fragment,
+            )
+            .with_entry_point("PSMain"),
         );
     }
 
@@ -354,7 +358,7 @@ impl PassCallback for ForwardSimplePassCallback {
             .vertex_layout(vertex_layout)
             .depth_test(true)
             .depth_write(true)
-            .cull_mode(CullMode::Back);
+            .cull_mode(CullMode::None); // Disable culling for debugging
     }
 
     fn prepare(&self, _context: &mut dyn PassPreparationContext) {
@@ -427,6 +431,8 @@ impl PassCallback for ForwardSimplePassCallback {
         };
 
         log::info!("Pushing constants");
+        log::info!("  Model matrix row 0: {:?}", model_matrix[0]);
+        log::info!("  Model matrix row 3: {:?}", model_matrix[3]);
         context
             .push_constants(
                 0x1, // VERTEX stage only

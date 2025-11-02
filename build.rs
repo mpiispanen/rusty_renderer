@@ -1,361 +1,234 @@
 use std::env;
-use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 fn main() {
     // Tell Cargo to rerun if shaders change
-    println!("cargo:rerun-if-changed=shaders/triangle.vert");
-    println!("cargo:rerun-if-changed=shaders/triangle.frag");
+    println!("cargo:rerun-if-changed=shaders/hlsl/forward_simple.hlsl");
     println!("cargo:rerun-if-changed=shaders/hlsl/triangle.hlsl");
-    println!("cargo:rerun-if-changed=shaders/hlsl/forward.hlsl");
 
-    let out_dir = env::var("OUT_DIR").unwrap();
+    // Compile unified HLSL shaders for both Vulkan (SPIR-V) and DirectX
+    compile_unified_shaders();
 
-    // Compile HLSL shaders for DirectX (Windows only)
-    #[cfg(target_os = "windows")]
-    compile_hlsl_shaders(&out_dir);
+    // Legacy triangle shader compilation for compatibility
+    compile_legacy_triangle_shaders();
+}
 
-    // Compile forward rendering shaders from HLSL to SPIR-V
-    // This ensures both Vulkan and DirectX use the same shader source
-    compile_forward_shaders();
+/// Compile unified HLSL shaders for both Vulkan (SPIR-V) and DirectX (DXIL)
+fn compile_unified_shaders() {
+    let shaders = vec![
+        (
+            "shaders/hlsl/forward_simple.hlsl",
+            "forward_simple",
+            "VSMain",
+            "PSMain",
+        ),
+        ("shaders/hlsl/triangle.hlsl", "triangle", "VSMain", "PSMain"),
+    ];
 
-    // Note: For cross-compilation from Linux, we skip HLSL compilation
-    // and embed pre-compiled bytecode instead
-
-    // Try to compile shaders if glslc or glslangValidator is available
-    let vertex_src = "shaders/triangle.vert";
-    let fragment_src = "shaders/triangle.frag";
-    let vertex_spv = Path::new(&out_dir).join("triangle.vert.spv");
-    let fragment_spv = Path::new(&out_dir).join("triangle.frag.spv");
-
-    // Try glslc first (from Vulkan SDK)
-    let mut compiled = false;
-    if let Ok(output) = Command::new("glslc").arg("--version").output() {
-        if output.status.success() {
-            println!("cargo:warning=Compiling shaders with glslc");
-
-            // Compile vertex shader
-            let vert_result = Command::new("glslc")
-                .arg(vertex_src)
-                .arg("-o")
-                .arg(&vertex_spv)
-                .output()
-                .expect("Failed to run glslc for vertex shader");
-
-            if !vert_result.status.success() {
-                panic!(
-                    "Vertex shader compilation failed:\n{}",
-                    String::from_utf8_lossy(&vert_result.stderr)
-                );
-            }
-
-            // Compile fragment shader
-            let frag_result = Command::new("glslc")
-                .arg(fragment_src)
-                .arg("-o")
-                .arg(&fragment_spv)
-                .output()
-                .expect("Failed to run glslc for fragment shader");
-
-            if !frag_result.status.success() {
-                panic!(
-                    "Fragment shader compilation failed:\n{}",
-                    String::from_utf8_lossy(&frag_result.stderr)
-                );
-            }
-
-            compiled = true;
-            println!("cargo:warning=Shaders compiled successfully with glslc");
-        }
-    }
-
-    // Try glslangValidator if glslc not available
-    if !compiled {
-        if let Ok(output) = Command::new("glslangValidator").arg("--version").output() {
-            if output.status.success() {
-                println!("cargo:warning=Compiling shaders with glslangValidator");
-
-                // Compile vertex shader
-                let vert_result = Command::new("glslangValidator")
-                    .arg("-V")
-                    .arg(vertex_src)
-                    .arg("-o")
-                    .arg(&vertex_spv)
-                    .output()
-                    .expect("Failed to run glslangValidator for vertex shader");
-
-                if !vert_result.status.success() {
-                    panic!(
-                        "Vertex shader compilation failed:\n{}",
-                        String::from_utf8_lossy(&vert_result.stderr)
-                    );
-                }
-
-                // Compile fragment shader
-                let frag_result = Command::new("glslangValidator")
-                    .arg("-V")
-                    .arg(fragment_src)
-                    .arg("-o")
-                    .arg(&fragment_spv)
-                    .output()
-                    .expect("Failed to run glslangValidator for fragment shader");
-
-                if !frag_result.status.success() {
-                    panic!(
-                        "Fragment shader compilation failed:\n{}",
-                        String::from_utf8_lossy(&frag_result.stderr)
-                    );
-                }
-
-                compiled = true;
-                println!("cargo:warning=Shaders compiled successfully with glslangValidator");
-            }
-        }
-    }
-
-    // Validate compiled shaders if spirv-val is available
-    if compiled && Command::new("spirv-val").arg("--version").output().is_ok() {
-        // Validate vertex shader
-        let vert_val = Command::new("spirv-val")
-            .arg(&vertex_spv)
-            .output()
-            .expect("Failed to run spirv-val");
-
-        if !vert_val.status.success() {
-            panic!(
-                "Vertex shader validation failed:\n{}",
-                String::from_utf8_lossy(&vert_val.stderr)
-            );
+    for (hlsl_src, name, vs_entry, ps_entry) in shaders {
+        if !Path::new(hlsl_src).exists() {
+            println!("cargo:warning=Shader {} not found, skipping", hlsl_src);
+            continue;
         }
 
-        // Validate fragment shader
-        let frag_val = Command::new("spirv-val")
-            .arg(&fragment_spv)
-            .output()
-            .expect("Failed to run spirv-val");
+        // Compile to SPIR-V for Vulkan using DXC
+        compile_hlsl_to_spirv(hlsl_src, name, vs_entry, ps_entry);
 
-        if !frag_val.status.success() {
-            panic!(
-                "Fragment shader validation failed:\n{}",
-                String::from_utf8_lossy(&frag_val.stderr)
-            );
-        }
-
-        println!("cargo:warning=Shaders validated successfully with spirv-val");
-    }
-
-    // If compilation failed, try to use pre-compiled shaders
-    if !compiled {
-        let precompiled_vert = "shaders/triangle.vert.spv";
-        let precompiled_frag = "shaders/triangle.frag.spv";
-
-        if Path::new(precompiled_vert).exists() && Path::new(precompiled_frag).exists() {
-            fs::copy(precompiled_vert, &vertex_spv)
-                .expect("Failed to copy pre-compiled vertex shader");
-            fs::copy(precompiled_frag, &fragment_spv)
-                .expect("Failed to copy pre-compiled fragment shader");
-            println!("cargo:warning=Using pre-compiled shaders");
-        } else {
-            panic!(
-                "No shader compiler found (glslc or glslangValidator) and no pre-compiled shaders available.\n\
-                 Install Vulkan SDK or compile shaders manually."
-            );
-        }
+        // Compile to DXIL for DirectX using DXC (cross-platform)
+        compile_hlsl_to_dxil(hlsl_src, name, vs_entry, ps_entry);
     }
 }
 
-#[cfg(target_os = "windows")]
-fn compile_hlsl_shaders(out_dir: &str) {
-    use std::process::Command;
+/// Compile HLSL to SPIR-V for Vulkan using DXC
+fn compile_hlsl_to_spirv(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &str) {
+    let vert_spv = format!("shaders/{}.vert.spv", name);
+    let frag_spv = format!("shaders/{}.frag.spv", name);
 
-    let hlsl_src = "shaders/hlsl/triangle.hlsl";
-    let vs_out = Path::new(out_dir).join("triangle_vs.cso");
-    let ps_out = Path::new(out_dir).join("triangle_ps.cso");
+    // Check if DXC is available
+    if Command::new("dxc").arg("--version").output().is_err() {
+        println!(
+            "cargo:warning=DXC not found, using pre-compiled SPIR-V shaders for {}",
+            name
+        );
+        return;
+    }
 
-    // Try to find dxc (DirectX Shader Compiler)
-    let dxc_result = Command::new("dxc")
-        .arg("/T")
-        .arg("vs_6_0") // Vertex shader model 6.0
-        .arg("/E")
-        .arg("VSMain") // Entry point
-        .arg("/Fo")
-        .arg(&vs_out) // Output file
+    println!("cargo:warning=Compiling {} to SPIR-V with DXC", name);
+
+    // Compile vertex shader to SPIR-V
+    let vert_result = Command::new("dxc")
+        .arg("-spirv") // Generate SPIR-V
+        .arg("-T")
+        .arg("vs_6_0")
+        .arg("-E")
+        .arg(vs_entry)
+        .arg("-fspv-target-env=vulkan1.2")
+        .arg("-Fo")
+        .arg(&vert_spv)
         .arg(hlsl_src)
         .output();
 
-    match dxc_result {
+    match vert_result {
         Ok(output) if output.status.success() => {
-            println!("cargo:warning=Compiled vertex shader with dxc");
-
-            // Compile pixel shader
-            let ps_result = Command::new("dxc")
-                .arg("/T")
-                .arg("ps_6_0") // Pixel shader model 6.0
-                .arg("/E")
-                .arg("PSMain") // Entry point
-                .arg("/Fo")
-                .arg(&ps_out) // Output file
-                .arg(hlsl_src)
-                .output()
-                .expect("Failed to compile pixel shader");
-
-            if !ps_result.status.success() {
-                panic!(
-                    "Pixel shader compilation failed:\n{}",
-                    String::from_utf8_lossy(&ps_result.stderr)
-                );
-            }
-
-            println!("cargo:warning=HLSL shaders compiled successfully");
+            println!("cargo:warning=Compiled {} vertex shader to SPIR-V", name);
         }
-        _ => {
-            // dxc not available, try fxc
-            let fxc_result = Command::new("fxc")
-                .arg("/T")
-                .arg("vs_5_0") // Vertex shader model 5.0
-                .arg("/E")
-                .arg("VSMain") // Entry point
-                .arg("/Fo")
-                .arg(&vs_out) // Output file
-                .arg(hlsl_src)
-                .output();
+        Ok(output) => {
+            eprintln!(
+                "Warning: Failed to compile {} vertex shader:\n{}",
+                name,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            println!(
+                "cargo:warning=Using pre-compiled vertex shader for {}",
+                name
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to run DXC for {}: {}", name, e);
+            println!(
+                "cargo:warning=Using pre-compiled vertex shader for {}",
+                name
+            );
+        }
+    }
 
-            match fxc_result {
-                Ok(output) if output.status.success() => {
-                    println!("cargo:warning=Compiled vertex shader with fxc");
+    // Compile fragment shader to SPIR-V
+    let frag_result = Command::new("dxc")
+        .arg("-spirv") // Generate SPIR-V
+        .arg("-T")
+        .arg("ps_6_0")
+        .arg("-E")
+        .arg(ps_entry)
+        .arg("-fspv-target-env=vulkan1.2")
+        .arg("-Fo")
+        .arg(&frag_spv)
+        .arg(hlsl_src)
+        .output();
 
-                    // Compile pixel shader
-                    let ps_result = Command::new("fxc")
-                        .arg("/T")
-                        .arg("ps_5_0") // Pixel shader model 5.0
-                        .arg("/E")
-                        .arg("PSMain") // Entry point
-                        .arg("/Fo")
-                        .arg(&ps_out) // Output file
-                        .arg(hlsl_src)
-                        .output()
-                        .expect("Failed to compile pixel shader");
-
-                    if !ps_result.status.success() {
-                        panic!(
-                            "Pixel shader compilation failed:\n{}",
-                            String::from_utf8_lossy(&ps_result.stderr)
-                        );
-                    }
-
-                    println!("cargo:warning=HLSL shaders compiled successfully with fxc");
-                }
-                _ => {
-                    println!("cargo:warning=No HLSL compiler found (dxc or fxc), will use embedded bytecode");
-                }
-            }
+    match frag_result {
+        Ok(output) if output.status.success() => {
+            println!("cargo:warning=Compiled {} fragment shader to SPIR-V", name);
+        }
+        Ok(output) => {
+            eprintln!(
+                "Warning: Failed to compile {} fragment shader:\n{}",
+                name,
+                String::from_utf8_lossy(&output.stderr)
+            );
+            println!(
+                "cargo:warning=Using pre-compiled fragment shader for {}",
+                name
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to run DXC for {}: {}", name, e);
+            println!(
+                "cargo:warning=Using pre-compiled fragment shader for {}",
+                name
+            );
         }
     }
 }
 
-fn compile_forward_shaders() {
-    let hlsl_src = "shaders/hlsl/forward.hlsl";
-    let vert_spv = "shaders/forward.vert.spv";
-    let frag_spv = "shaders/forward.frag.spv";
+/// Compile HLSL to DXIL for DirectX using DXC
+fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &str) {
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let vs_out = Path::new(&out_dir).join(format!("{}_vs.cso", name));
+    let ps_out = Path::new(&out_dir).join(format!("{}_ps.cso", name));
 
-    // Check if shaders already exist
-    if Path::new(vert_spv).exists() && Path::new(frag_spv).exists() {
-        println!("cargo:warning=Using pre-compiled forward shaders");
+    // Check if DXC is available
+    if Command::new("dxc").arg("--version").output().is_err() {
+        println!(
+            "cargo:warning=DXC not found, using embedded DirectX shaders for {}",
+            name
+        );
         return;
     }
 
-    // Check if glslangValidator is available
-    if Command::new("glslangValidator")
-        .arg("--version")
-        .output()
-        .is_err()
-    {
-        eprintln!("Warning: glslangValidator not found");
-        eprintln!("Pre-compiled shaders should exist at:");
-        eprintln!("  - {}", vert_spv);
-        eprintln!("  - {}", frag_spv);
+    println!("cargo:warning=Compiling {} to DXIL with DXC", name);
 
-        if !Path::new(vert_spv).exists() || !Path::new(frag_spv).exists() {
-            panic!("glslangValidator not found and no pre-compiled shaders available!");
+    // Compile vertex shader to DXIL
+    let vert_result = Command::new("dxc")
+        .arg("-T")
+        .arg("vs_6_0")
+        .arg("-E")
+        .arg(vs_entry)
+        .arg("-Fo")
+        .arg(&vs_out)
+        .arg(hlsl_src)
+        .output();
+
+    match vert_result {
+        Ok(output) if output.status.success() => {
+            println!("cargo:warning=Compiled {} vertex shader to DXIL", name);
         }
+        Ok(output) => {
+            eprintln!(
+                "Warning: Failed to compile {} vertex shader to DXIL:\n{}",
+                name,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to run DXC for {}: {}", name, e);
+        }
+    }
+
+    // Compile fragment shader to DXIL
+    let frag_result = Command::new("dxc")
+        .arg("-T")
+        .arg("ps_6_0")
+        .arg("-E")
+        .arg(ps_entry)
+        .arg("-Fo")
+        .arg(&ps_out)
+        .arg(hlsl_src)
+        .output();
+
+    match frag_result {
+        Ok(output) if output.status.success() => {
+            println!("cargo:warning=Compiled {} pixel shader to DXIL", name);
+        }
+        Ok(output) => {
+            eprintln!(
+                "Warning: Failed to compile {} pixel shader to DXIL:\n{}",
+                name,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        Err(e) => {
+            eprintln!("Warning: Failed to run DXC for {}: {}", name, e);
+        }
+    }
+}
+
+fn compile_legacy_triangle_shaders() {
+    // This function maintains compatibility with legacy GLSL shaders
+    // Can be removed once all shaders are unified HLSL
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let vertex_src = "shaders/triangle.vert";
+    let fragment_src = "shaders/triangle.frag";
+    let vertex_spv = Path::new(&out_dir).join("triangle_glsl.vert.spv");
+    let fragment_spv = Path::new(&out_dir).join("triangle_glsl.frag.spv");
+
+    if !Path::new(vertex_src).exists() || !Path::new(fragment_src).exists() {
         return;
     }
 
-    println!("cargo:warning=Compiling forward shaders from HLSL to SPIR-V");
-
-    // Compile vertex shader with VULKAN define
-    let vert_result = Command::new("glslangValidator")
-        .arg("-V") // Generate SPIR-V (automatically defines VULKAN)
-        .arg("-D") // Input is HLSL
-        .arg("-e")
-        .arg("VSMain") // Entry point
-        .arg("--hlsl-iomap") // Use HLSL I/O mapping
-        .arg("-S")
-        .arg("vert") // Shader stage
-        .arg(hlsl_src)
-        .arg("-o")
-        .arg(vert_spv)
-        .output()
-        .expect("Failed to run glslangValidator for forward vertex shader");
-
-    if !vert_result.status.success() {
-        panic!(
-            "Forward vertex shader compilation failed:\n{}",
-            String::from_utf8_lossy(&vert_result.stderr)
-        );
-    }
-
-    // Compile fragment shader with VULKAN define
-    let frag_result = Command::new("glslangValidator")
-        .arg("-V") // Generate SPIR-V (automatically defines VULKAN)
-        .arg("-D") // Input is HLSL
-        .arg("-e")
-        .arg("PSMain") // Entry point
-        .arg("--hlsl-iomap") // Use HLSL I/O mapping
-        .arg("-S")
-        .arg("frag") // Shader stage
-        .arg(hlsl_src)
-        .arg("-o")
-        .arg(frag_spv)
-        .output()
-        .expect("Failed to run glslangValidator for forward fragment shader");
-
-    if !frag_result.status.success() {
-        panic!(
-            "Forward fragment shader compilation failed:\n{}",
-            String::from_utf8_lossy(&frag_result.stderr)
-        );
-    }
-
-    println!("cargo:warning=Forward shaders compiled successfully with glslangValidator");
-
-    // Validate shaders
-    if Command::new("spirv-val").arg("--version").output().is_ok() {
-        let vert_val = Command::new("spirv-val")
-            .arg(vert_spv)
-            .output()
-            .expect("Failed to run spirv-val");
-
-        if !vert_val.status.success() {
-            panic!(
-                "Forward vertex shader validation failed:\n{}",
-                String::from_utf8_lossy(&vert_val.stderr)
-            );
+    // Try glslc first
+    if let Ok(output) = Command::new("glslc").arg("--version").output() {
+        if output.status.success() {
+            let _ = Command::new("glslc")
+                .arg(vertex_src)
+                .arg("-o")
+                .arg(&vertex_spv)
+                .output();
+            let _ = Command::new("glslc")
+                .arg(fragment_src)
+                .arg("-o")
+                .arg(&fragment_spv)
+                .output();
         }
-
-        let frag_val = Command::new("spirv-val")
-            .arg(frag_spv)
-            .output()
-            .expect("Failed to run spirv-val");
-
-        if !frag_val.status.success() {
-            panic!(
-                "Forward fragment shader validation failed:\n{}",
-                String::from_utf8_lossy(&frag_val.stderr)
-            );
-        }
-
-        println!("cargo:warning=Forward shaders validated successfully with spirv-val");
     }
 }

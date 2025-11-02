@@ -3,7 +3,7 @@
 //! This is the main entry point for the Rusty Renderer application.
 
 use anyhow::Result;
-use rusty_renderer::{app::App, config::Config};
+use rusty_renderer::application::{ApplicationArgs, ApplicationRunner};
 
 fn main() -> Result<()> {
     // Write to file for debugging under Wine
@@ -46,9 +46,9 @@ fn main() -> Result<()> {
         let _ = f.flush();
     }
 
-    let config = Config::parse_args();
+    let args = ApplicationArgs::parse_args();
 
-    if let Err(e) = config.validate() {
+    if let Err(e) = args.validate() {
         eprintln!("Invalid configuration: {e}");
         if let Some(ref mut f) = log_file {
             let _ = writeln!(f, "Invalid configuration: {e}");
@@ -70,7 +70,8 @@ fn main() -> Result<()> {
         let _ = f.flush();
     }
 
-    if let Err(e) = App::run(config) {
+    let mut runner = ApplicationRunner::new(args);
+    if let Err(e) = runner.run() {
         eprintln!("Error running application: {e:?}");
         if let Some(ref mut f) = log_file {
             let _ = writeln!(f, "Error running application: {e:?}");

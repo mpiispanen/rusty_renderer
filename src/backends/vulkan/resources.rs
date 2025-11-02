@@ -161,6 +161,7 @@ impl Drop for VulkanBuffer {
             self.size,
             self.buffer
         );
+        log::debug!("Drop backtrace: {}", std::backtrace::Backtrace::capture());
         unsafe {
             self.device.destroy_buffer(self.buffer, None);
             self.device.free_memory(self.memory, None);

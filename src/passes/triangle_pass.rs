@@ -39,14 +39,15 @@ impl TrianglePass {
     pub fn register_shaders(graph: &mut RenderGraph) {
         use crate::render_graph::{ShaderDescriptor, ShaderStage};
 
+        // Use pre-compiled SPIR-V shaders generated from unified HLSL source
         graph.register_shader(
             "triangle.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+            ShaderDescriptor::from_compiled("shaders/triangle.vert.spv", ShaderStage::Vertex)
                 .with_entry_point("VSMain"),
         );
         graph.register_shader(
             "triangle.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+            ShaderDescriptor::from_compiled("shaders/triangle.frag.spv", ShaderStage::Fragment)
                 .with_entry_point("PSMain"),
         );
     }

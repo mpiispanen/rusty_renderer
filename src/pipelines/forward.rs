@@ -47,6 +47,14 @@ impl ForwardPipeline {
         }
     }
 
+    /// Expand indexed geometry into non-indexed triangles
+    fn expand_indexed_geometry(vertices: &[VertexData], indices: &[u32]) -> Vec<VertexData> {
+        indices
+            .iter()
+            .map(|&idx| vertices[idx as usize].clone())
+            .collect()
+    }
+
     /// Convert scene vertex data to backend vertex format with normals
     fn convert_vertex(vertex: &VertexData) -> BackendVertex {
         // Use provided normal or calculate default
@@ -302,28 +310,55 @@ impl RenderPipeline for ForwardPipeline {
 
         // Register shaders needed by this pipeline
         use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
-        
-        graph.shader_registry_mut().register(
-            "forward.vert",
-            ShaderDescriptor {
-                source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
-                entry_point: "VSMain",
-                stage: ShaderStage::Vertex,
-                backend_compile: true,
-            },
-        );
-        
-        graph.shader_registry_mut().register(
-            "forward.frag",
-            ShaderDescriptor {
-                source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
-                entry_point: "PSMain",
-                stage: ShaderStage::Fragment,
-                backend_compile: true,
-            },
-        );
-        
-        log::info!("Using pre-registered forward shaders from shader registry");
+
+        // Use backend-specific shaders
+        #[cfg(target_os = "windows")]
+        {
+            graph.shader_registry_mut().register(
+                "forward.vert",
+                ShaderDescriptor {
+                    source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
+                    entry_point: "VSMain",
+                    stage: ShaderStage::Vertex,
+                    backend_compile: true,
+                },
+            );
+
+            graph.shader_registry_mut().register(
+                "forward.frag",
+                ShaderDescriptor {
+                    source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
+                    entry_point: "PSMain",
+                    stage: ShaderStage::Fragment,
+                    backend_compile: true,
+                },
+            );
+            log::info!("Using HLSL shaders for DirectX backend");
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            graph.shader_registry_mut().register(
+                "forward.vert",
+                ShaderDescriptor {
+                    source: ShaderSource::Compiled("shaders/forward_simple_glsl.vert.spv"),
+                    entry_point: "main",
+                    stage: ShaderStage::Vertex,
+                    backend_compile: false,
+                },
+            );
+
+            graph.shader_registry_mut().register(
+                "forward.frag",
+                ShaderDescriptor {
+                    source: ShaderSource::Compiled("shaders/forward_simple_glsl.frag.spv"),
+                    entry_point: "main",
+                    stage: ShaderStage::Fragment,
+                    backend_compile: false,
+                },
+            );
+            log::info!("Using GLSL shaders (pre-compiled SPIR-V) for Vulkan backend");
+        }
 
         // Get dimensions from backend (or use defaults)
         let (width, height) = (800, 600); // TODO: Get from backend or args
@@ -469,12 +504,27 @@ impl RenderPipeline for ForwardPipeline {
                     transform,
                     material,
                 } => match geometry {
-                    GeometryData::Inline { vertices, .. } => {
-                        let vertex_count = vertices.len();
-                        log::info!("  - Mesh '{name}': {vertex_count} vertices");
+                    GeometryData::Inline { vertices, indices } => {
+                        log::info!(
+                            "  - Mesh '{name}': {} vertices, {} indices",
+                            vertices.len(),
+                            indices.as_ref().map_or(0, |i| i.len())
+                        );
+
+                        // Expand indexed geometry if indices are present
+                        let expanded_vertices = if let Some(idx) = indices {
+                            log::info!(
+                                "    Expanding indexed geometry ({} indices -> {} vertices)",
+                                idx.len(),
+                                idx.len()
+                            );
+                            Self::expand_indexed_geometry(vertices, idx)
+                        } else {
+                            vertices.clone()
+                        };
 
                         // Ensure vertices have normals
-                        let vertices_with_normals = Self::calculate_normals(vertices);
+                        let vertices_with_normals = Self::calculate_normals(&expanded_vertices);
 
                         // Create vertex buffer
                         let label = format!("{name}_vertices");

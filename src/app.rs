@@ -4,6 +4,7 @@
 //! and window management using winit.
 
 use crate::backends::{self, BackendType, GraphicsBackend};
+use crate::camera::CameraController;
 use crate::config::{Backend, Config};
 use crate::passes::{ForwardSimplePass, TrianglePass};
 use crate::render_graph::{
@@ -217,6 +218,17 @@ impl App {
                 vertex_count
             );
 
+            // Log first few vertices for debugging
+            for (i, v) in all_vertices.iter().take(3).enumerate() {
+                log::info!(
+                    "  Vertex {}: pos={:?}, normal={:?}, color={:?}",
+                    i,
+                    v.position,
+                    v.normal,
+                    v.color
+                );
+            }
+
             // Create vertex buffer with data via render graph
             use crate::render_graph::BufferUsageFlags;
             // Prepare vertex data matching shader layout: position (3), normal (3), uv (2), color (4)
@@ -241,19 +253,32 @@ impl App {
                 BufferUsageFlags::new(BufferUsageFlags::VERTEX),
             );
 
-            // Create camera uniforms
+            // Create camera controller and get uniforms
             let aspect = width as f32 / height as f32;
-            let view = self.calculate_view_matrix(&scene.camera);
-            let proj = self.calculate_projection_matrix(&scene.camera, aspect);
+            let camera_ctrl = CameraController::from_scene_camera(&scene.camera, width, height);
+            let camera_uniforms_glam = camera_ctrl.uniforms();
 
             log::info!("Camera setup:");
+            log::info!("  Position: {:?}", scene.camera.position());
+            log::info!("  Target: {:?}", scene.camera.target());
+            log::info!("  FOV: {} degrees", scene.camera.fov());
+            log::info!(
+                "  Near/Far: {} / {}",
+                scene.camera.near(),
+                scene.camera.far()
+            );
             log::info!("  Aspect: {}", aspect);
-
-            // Multiply view and proj to get viewProj (proj * view)
-            let view_proj = Self::mul_mat4(proj, view);
-
-            log::info!("  ViewProj[0]: {:?}", view_proj[0]);
-            log::info!("  ViewProj[3]: {:?}", view_proj[3]);
+            log::info!("  ViewProj matrix (from CameraController):");
+            for (i, row) in camera_uniforms_glam.view_proj.iter().enumerate() {
+                log::info!(
+                    "    Row {}: [{:.4}, {:.4}, {:.4}, {:.4}]",
+                    i,
+                    row[0],
+                    row[1],
+                    row[2],
+                    row[3]
+                );
+            }
 
             #[repr(C)]
             #[derive(Clone, Copy)]
@@ -263,7 +288,9 @@ impl App {
             unsafe impl bytemuck::Pod for CameraUniforms {}
             unsafe impl bytemuck::Zeroable for CameraUniforms {}
 
-            let camera_uniforms = CameraUniforms { view_proj };
+            let camera_uniforms = CameraUniforms {
+                view_proj: camera_uniforms_glam.view_proj,
+            };
 
             // Declare camera buffer with initial data - render graph will allocate and upload
             let camera_buffer = graph.declare_buffer_with_data(
@@ -384,120 +411,6 @@ impl App {
         Ok(())
     }
 
-    /// Calculate view matrix from camera
-    fn calculate_view_matrix(&self, camera: &crate::scene::Camera) -> [[f32; 4]; 4] {
-        use crate::scene::Camera;
-
-        match camera {
-            Camera::Perspective {
-                position,
-                target,
-                up,
-                ..
-            } => Self::look_at(position, target, up),
-            Camera::FreeFly {
-                position,
-                yaw,
-                pitch,
-                ..
-            } => {
-                use std::f32::consts::PI;
-
-                let yaw_rad = yaw * PI / 180.0;
-                let pitch_rad = pitch * PI / 180.0;
-
-                let target = [
-                    position[0] + yaw_rad.cos() * pitch_rad.cos(),
-                    position[1] + pitch_rad.sin(),
-                    position[2] + yaw_rad.sin() * pitch_rad.cos(),
-                ];
-
-                Self::look_at(position, &target, &[0.0, 1.0, 0.0])
-            }
-        }
-    }
-
-    /// Calculate projection matrix from camera
-    fn calculate_projection_matrix(
-        &self,
-        camera: &crate::scene::Camera,
-        aspect: f32,
-    ) -> [[f32; 4]; 4] {
-        use std::f32::consts::PI;
-
-        let fov = camera.fov() * PI / 180.0;
-        let near = camera.near();
-        let far = camera.far();
-
-        Self::perspective(fov, aspect, near, far)
-    }
-
-    /// Create a look-at view matrix
-    fn look_at(eye: &[f32; 3], target: &[f32; 3], up: &[f32; 3]) -> [[f32; 4]; 4] {
-        // Forward vector (normalized)
-        let f = {
-            let dx = target[0] - eye[0];
-            let dy = target[1] - eye[1];
-            let dz = target[2] - eye[2];
-            let len = (dx * dx + dy * dy + dz * dz).sqrt();
-            [dx / len, dy / len, dz / len]
-        };
-
-        // Right vector (normalized)
-        let r = {
-            let x = up[1] * f[2] - up[2] * f[1];
-            let y = up[2] * f[0] - up[0] * f[2];
-            let z = up[0] * f[1] - up[1] * f[0];
-            let len = (x * x + y * y + z * z).sqrt();
-            [x / len, y / len, z / len]
-        };
-
-        // Up vector (normalized)
-        let u = [
-            f[1] * r[2] - f[2] * r[1],
-            f[2] * r[0] - f[0] * r[2],
-            f[0] * r[1] - f[1] * r[0],
-        ];
-
-        [
-            [r[0], u[0], -f[0], 0.0],
-            [r[1], u[1], -f[1], 0.0],
-            [r[2], u[2], -f[2], 0.0],
-            [
-                -(r[0] * eye[0] + r[1] * eye[1] + r[2] * eye[2]),
-                -(u[0] * eye[0] + u[1] * eye[1] + u[2] * eye[2]),
-                f[0] * eye[0] + f[1] * eye[1] + f[2] * eye[2],
-                1.0,
-            ],
-        ]
-    }
-
-    /// Create a perspective projection matrix
-    /// This uses Vulkan conventions with Y flipped and Z range [0, 1]
-    fn perspective(fov: f32, aspect: f32, near: f32, far: f32) -> [[f32; 4]; 4] {
-        let tan_half_fov = (fov / 2.0).tan();
-
-        [
-            [1.0 / (aspect * tan_half_fov), 0.0, 0.0, 0.0],
-            [0.0, -1.0 / tan_half_fov, 0.0, 0.0], // Negative Y for Vulkan
-            [0.0, 0.0, far / (near - far), -1.0],
-            [0.0, 0.0, (near * far) / (near - far), 0.0],
-        ]
-    }
-
-    /// Multiply two 4x4 matrices
-    fn mul_mat4(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
-        let mut result = [[0.0; 4]; 4];
-        for i in 0..4 {
-            for j in 0..4 {
-                for (k, b_row) in b.iter().enumerate() {
-                    result[i][j] += a[i][k] * b_row[j];
-                }
-            }
-        }
-        result
-    }
-
     /// Build the render graph for triangle rendering
     /// Run the application in headless mode (no window)
     pub fn run_headless(&mut self) -> Result<()> {
@@ -528,6 +441,7 @@ impl App {
 
                 backend.begin_frame()?;
                 backend.execute_graph(&graph, &compiled)?;
+                log::debug!("After execute_graph, backend still exists");
                 backend.end_frame()?;
 
                 // Put graph back

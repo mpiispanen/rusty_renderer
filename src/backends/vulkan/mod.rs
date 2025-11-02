@@ -184,7 +184,7 @@ impl VulkanBackend {
             .application_version(vk::make_version(0, 1, 0))
             .engine_name(b"No Engine\0")
             .engine_version(vk::make_version(0, 1, 0))
-            .api_version(vk::make_version(1, 0, 0));
+            .api_version(vk::make_version(1, 2, 0));
 
         // Get required extensions from window
         let mut extensions = vk_window::get_required_instance_extensions(window)
@@ -1608,7 +1608,7 @@ impl VulkanBackend {
             .application_version(vk::make_version(0, 1, 0))
             .engine_name(b"No Engine\0")
             .engine_version(vk::make_version(0, 1, 0))
-            .api_version(vk::make_version(1, 0, 0));
+            .api_version(vk::make_version(1, 2, 0));
 
         // Minimal extensions for headless
         let mut extensions = Vec::new();
@@ -2424,14 +2424,27 @@ impl VulkanBackend {
                     }
 
                     log::debug!(
-                        "Created buffer '{}': {} bytes, usage {:?}",
+                        "Created buffer '{}': {} bytes, usage {:?}, handle: {:p}",
                         resource.name,
                         size,
-                        backend_usage
+                        backend_usage,
+                        buffer.as_ref()
                     );
 
                     // Store in resource map
-                    self.resource_buffers.insert(resource_id, buffer);
+                    log::debug!(
+                        "Inserting buffer for resource {:?} into map (handle: {:p})",
+                        resource_id,
+                        buffer.as_ref()
+                    );
+                    let old_value = self.resource_buffers.insert(resource_id, buffer);
+                    if old_value.is_some() {
+                        log::warn!("Replaced existing buffer for resource {:?}", resource_id);
+                    }
+                    log::debug!(
+                        "resource_buffers now has {} entries",
+                        self.resource_buffers.len()
+                    );
                 }
                 ResourceDescriptor::Sampler(_sampler_desc) => {
                     // Samplers are handled separately and don't need allocation
@@ -2446,6 +2459,9 @@ impl VulkanBackend {
             self.resource_textures.len(),
             self.resource_buffers.len()
         );
+
+        log::debug!("resource_buffers address: {:p}", &self.resource_buffers);
+        log::debug!("resource_textures address: {:p}", &self.resource_textures);
 
         Ok(())
     }
@@ -2645,6 +2661,10 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn end_frame(&mut self) -> Result<()> {
+        log::debug!(
+            "end_frame called - resource_buffers count: {}",
+            self.resource_buffers.len()
+        );
         let device = match self.device.as_ref() {
             Some(d) => d,
             None => return Ok(()), // Not initialized yet
@@ -3067,10 +3087,23 @@ impl GraphicsBackend for VulkanBackend {
         // Allocate resources if this is the first execution or resources changed
         // TODO: Add smarter resource lifecycle management (issue #87)
         if self.resource_buffers.is_empty() && self.resource_textures.is_empty() {
+            log::debug!(
+                "Before allocation - resource_buffers address: {:p}",
+                &self.resource_buffers
+            );
             self.allocate_graph_resources(graph, compiled)?;
+            log::debug!(
+                "After allocation - resource_buffers address: {:p}, count: {}",
+                &self.resource_buffers,
+                self.resource_buffers.len()
+            );
         }
 
         // Compile pipelines if not already cached (first frame or after pipeline changes)
+        log::debug!(
+            "After allocate, before compile - resource_buffers count: {}",
+            self.resource_buffers.len()
+        );
         log::debug!(
             "Checking {} pipeline descriptions",
             compiled.pipeline_descriptions.len()
@@ -3242,6 +3275,10 @@ impl GraphicsBackend for VulkanBackend {
         }
 
         log::debug!("Render graph execution complete");
+        log::debug!(
+            "Before return - resource_buffers count: {}",
+            self.resource_buffers.len()
+        );
         Ok(())
     }
 
@@ -3259,6 +3296,15 @@ impl GraphicsBackend for VulkanBackend {
 
         let buffer =
             resources::VulkanBuffer::new(device.clone(), desc, self.physical_device, instance)?;
+
+        if !desc.label.as_ref().is_some_and(|l| l.contains("Staging")) {
+            log::debug!(
+                "create_buffer: Created buffer {} bytes ({}), handle {:p}",
+                desc.size,
+                desc.label.as_ref().unwrap_or(&"unnamed".to_string()),
+                &buffer as *const _
+            );
+        }
 
         Ok(Box::new(buffer))
     }
