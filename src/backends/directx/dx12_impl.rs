@@ -925,7 +925,7 @@ impl DirectXBackendImpl {
 
         // Try different shader variants
         let shader_names = vec!["forward_simple", "forward", "triangle"];
-        
+
         for name in shader_names {
             let path = format!("shaders/compiled/{}_{}.cso", name, shader_type);
             if let Ok(bytecode) = std::fs::read(&path) {
@@ -953,8 +953,12 @@ impl DirectXBackendImpl {
             }
 
             // Fall back to runtime compilation
-            log::info!("Attempting runtime compilation for {} ({})", entry_point, target);
-            
+            log::info!(
+                "Attempting runtime compilation for {} ({})",
+                entry_point,
+                target
+            );
+
             // Load shader source
             let shader_source_string = self.load_shader_source()?;
 
@@ -1985,11 +1989,17 @@ impl DirectXBackendImpl {
 
                 unsafe {
                     let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-                    log::debug!("DX: Mapping staging buffer for upload (size: {})", data.len());
-                    staging_dx.resource.Map(0, None, Some(&mut mapped_ptr)).map_err(|e| {
-                        log::error!("DX: Failed to map staging buffer: {:?}", e);
-                        e
-                    })?;
+                    log::debug!(
+                        "DX: Mapping staging buffer for upload (size: {})",
+                        data.len()
+                    );
+                    staging_dx
+                        .resource
+                        .Map(0, None, Some(&mut mapped_ptr))
+                        .map_err(|e| {
+                            log::error!("DX: Failed to map staging buffer: {:?}", e);
+                            e
+                        })?;
                     std::ptr::copy_nonoverlapping(data.as_ptr(), mapped_ptr as *mut u8, data.len());
                     staging_dx.resource.Unmap(0, None);
                 }
@@ -2012,12 +2022,12 @@ impl DirectXBackendImpl {
                         .command_queue
                         .as_ref()
                         .context("Command queue not initialized")?;
-                    
+
                     // Close the command list if it's currently recording
                     // This can happen if we're called during resource allocation in execute_graph
                     // after begin_frame has already reset the command list
                     let _ = cmd_list.Close(); // Ignore error if already closed
-                    
+
                     // If there are pending operations, wait for them
                     if fence.GetCompletedValue() < self.fence_value - 1 {
                         fence.SetEventOnCompletion(self.fence_value - 1, self.fence_event)?;
@@ -2073,11 +2083,18 @@ impl DirectXBackendImpl {
 
                 unsafe {
                     let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-                    log::debug!("DX: Mapping CPU-accessible buffer for upload (size: {}, offset: {})", data.len(), offset);
-                    dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr)).map_err(|e| {
-                        log::error!("DX: Failed to map CPU-accessible buffer: {:?}", e);
-                        e
-                    })?;
+                    log::debug!(
+                        "DX: Mapping CPU-accessible buffer for upload (size: {}, offset: {})",
+                        data.len(),
+                        offset
+                    );
+                    dx_buffer
+                        .resource
+                        .Map(0, None, Some(&mut mapped_ptr))
+                        .map_err(|e| {
+                            log::error!("DX: Failed to map CPU-accessible buffer: {:?}", e);
+                            e
+                        })?;
 
                     let dst = (mapped_ptr as *mut u8).add(offset as usize);
                     std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());

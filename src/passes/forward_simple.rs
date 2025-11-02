@@ -157,19 +157,7 @@ impl ForwardSimplePassBuilder {
 
     /// Build the pass and add it to the render graph
     pub fn build(self, graph: &mut RenderGraph) -> Result<ForwardSimplePass> {
-        use crate::render_graph::{ShaderDescriptor, ShaderStage};
-
-        // Register shaders
-        graph.register_shader(
-            "forward.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Vertex)
-                .with_entry_point("VSMain"),
-        );
-        graph.register_shader(
-            "forward.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/forward.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
-        );
+        // Shaders should be registered by App::register_shaders() before building passes
 
         // Validate required resources
         let color_output = self
@@ -305,11 +293,11 @@ impl PassCallback for ForwardSimplePassCallback {
 
         // Get shaders from registry
         let vs_handle = registry
-            .get_handle("forward.vert")
-            .expect("forward.vert not found in shader registry");
+            .get_handle("forward_simple.vert")
+            .expect("forward_simple.vert not found in shader registry");
         let fs_handle = registry
-            .get_handle("forward.frag")
-            .expect("forward.frag not found in shader registry");
+            .get_handle("forward_simple.frag")
+            .expect("forward_simple.frag not found in shader registry");
 
         // Define vertex layout matching our Vertex struct:
         // position (3xf32 = 12 bytes) + normal (3xf32 = 12 bytes) + uv (2xf32 = 8 bytes) + color (4xf32 = 16 bytes) = 48 bytes
@@ -363,25 +351,40 @@ impl PassCallback for ForwardSimplePassCallback {
         );
 
         // Get buffer pointers from resource IDs
+        log::info!(
+            "Getting vertex buffer ptr for resource {:?}",
+            self.vertex_buffer
+        );
         let vertex_buffer_ptr = context
             .get_buffer_ptr(self.vertex_buffer)
             .expect("Failed to get vertex buffer");
+        log::info!(
+            "Getting camera buffer ptr for resource {:?}",
+            self.camera_buffer
+        );
         let camera_buffer_ptr = context
             .get_buffer_ptr(self.camera_buffer)
             .expect("Failed to get camera buffer");
+        log::info!(
+            "Getting lighting buffer ptr for resource {:?}",
+            self.lighting_buffer
+        );
         let lighting_buffer_ptr = context
             .get_buffer_ptr(self.lighting_buffer)
             .expect("Failed to get lighting buffer");
 
         // Bind vertex buffer
+        log::info!("Binding vertex buffer");
         context
             .bind_vertex_buffer(0, vertex_buffer_ptr, 0)
             .expect("Failed to bind vertex buffer");
 
         // Bind uniforms
+        log::info!("Binding camera uniforms");
         context
             .bind_uniform_buffer(0, 0, camera_buffer_ptr, 0, 64 + 64 + 16) // CameraUniforms size
             .expect("Failed to bind camera uniforms");
+        log::info!("Binding lighting uniforms");
         context
             .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 16 + 16) // LightingUniforms size
             .expect("Failed to bind lighting uniforms");
@@ -404,6 +407,7 @@ impl PassCallback for ForwardSimplePassCallback {
             normal: normal_matrix,
         };
 
+        log::info!("Pushing constants");
         context
             .push_constants(
                 0x1 | 0x10, // VERTEX | FRAGMENT stages
@@ -413,11 +417,12 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Failed to push constants");
 
         // Draw
+        log::info!("Drawing {} vertices", self.vertex_count);
         context
             .draw(self.vertex_count, 1, 0, 0)
             .expect("Failed to draw");
 
-        log::debug!("Forward simple pass execution complete");
+        log::info!("Forward simple pass execution complete");
     }
 }
 

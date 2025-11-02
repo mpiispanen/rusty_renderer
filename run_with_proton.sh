@@ -25,6 +25,7 @@ VKD3D_DEBUG_LEVEL="warn"
 APP_ARGS=()
 DEFAULT_SCENE="scenes/gltf_textured.toml"
 DEFAULT_MAX_FRAMES=""  # No frame limit by default
+SCENE_PROVIDED=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -37,6 +38,17 @@ while [[ $# -gt 0 ]]; do
             # Skip backend argument since we always use DirectX
             shift 2
             ;;
+        --scene|-s)
+            SCENE_PROVIDED=true
+            APP_ARGS+=("$1" "$2")
+            shift 2
+            ;;
+        triangle|cube|gltf_textured|simple)
+            # Scene name shortcut - convert to full path
+            SCENE_PROVIDED=true
+            APP_ARGS+=("--scene" "scenes/${1}.toml")
+            shift
+            ;;
         *)
             # Forward all other arguments to the application
             APP_ARGS+=("$1")
@@ -46,7 +58,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # If no --scene argument was provided, add the default
-if [[ ! " ${APP_ARGS[@]} " =~ " --scene " ]] && [[ ! " ${APP_ARGS[@]} " =~ " -s " ]]; then
+if [[ "$SCENE_PROVIDED" == "false" ]]; then
     APP_ARGS+=("--scene" "$DEFAULT_SCENE")
 fi
 

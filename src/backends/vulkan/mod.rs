@@ -2332,7 +2332,15 @@ impl VulkanBackend {
                 }
                 ResourceDescriptor::Buffer { size, usage } => {
                     // Convert usage flags
-                    let backend_usage = Self::convert_buffer_usage(*usage);
+                    let mut backend_usage = Self::convert_buffer_usage(*usage);
+
+                    // If we have initial data, we need TRANSFER_DST to upload it
+                    if matches!(
+                        resource.init_data,
+                        crate::render_graph::ResourceInitData::Buffer(_)
+                    ) {
+                        backend_usage.transfer_dst = true;
+                    }
 
                     // Create buffer descriptor
                     let desc = BufferDescriptor {

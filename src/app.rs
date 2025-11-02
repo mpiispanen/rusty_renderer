@@ -83,7 +83,8 @@ impl App {
     /// Load the scene based on config
     fn load_scene(&mut self) -> Result<()> {
         // If scene already has a path separator or .toml extension, use it as is
-        let scene_path = if self.config.scene.contains('/') || self.config.scene.ends_with(".toml") {
+        let scene_path = if self.config.scene.contains('/') || self.config.scene.ends_with(".toml")
+        {
             PathBuf::from(&self.config.scene)
         } else {
             PathBuf::from(format!("scenes/{}.toml", self.config.scene))
@@ -101,6 +102,37 @@ impl App {
     }
 
     /// Build the render graph based on loaded scene
+    /// Register all shaders used by the renderer
+    ///
+    /// This centralizes shader registration so backends can access them uniformly
+    fn register_shaders(graph: &mut RenderGraph) {
+        use crate::render_graph::{ShaderDescriptor, ShaderStage};
+
+        // Register forward rendering shaders (used for 3D objects)
+        graph.register_shader(
+            "forward_simple.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "forward_simple.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
+
+        // Register triangle shaders (used for debug rendering)
+        graph.register_shader(
+            "triangle.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "triangle.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
+    }
+
     fn build_render_graph(&mut self) -> Result<()> {
         let scene = self
             .scene
@@ -109,6 +141,9 @@ impl App {
 
         let (width, height) = self.config.window_size();
         let mut graph = RenderGraph::new();
+
+        // Register all shaders upfront
+        Self::register_shaders(&mut graph);
 
         // Clear external buffers from previous graph
         self.external_buffers.clear();
@@ -160,8 +195,9 @@ impl App {
             };
             let depth_buffer = graph.create_resource("depth_buffer", depth_desc);
 
-            // Build vertex and index data from scene
+            // Build vertex data from scene (expanding indices into vertices)
             let mut all_vertices = Vec::new();
+            let mut indexed_vertices = Vec::new();
             let mut all_indices = Vec::new();
             let mut total_vertices = 0u32;
 
@@ -170,7 +206,7 @@ impl App {
                     SceneObject::Mesh { geometry, .. } => {
                         match geometry {
                             GeometryData::Inline { vertices, indices } => {
-                                all_vertices.extend_from_slice(vertices);
+                                indexed_vertices.extend_from_slice(vertices);
 
                                 if let Some(idx) = indices {
                                     // Offset indices by current vertex count
@@ -195,24 +231,33 @@ impl App {
                 }
             }
 
-            let index_count = all_indices.len() as u32;
+            // Expand indexed vertices into linear vertex array for now
+            // TODO: Use index buffer for efficiency
+            for &index in &all_indices {
+                all_vertices.push(indexed_vertices[index as usize]);
+            }
+
+            let vertex_count = all_vertices.len() as u32;
             log::info!(
-                "Total vertices: {}, indices: {}",
+                "Total indexed vertices: {}, indices: {}, expanded to: {} vertices",
                 total_vertices,
-                index_count
+                all_indices.len(),
+                vertex_count
             );
 
             // Create vertex buffer with data via render graph
             use crate::render_graph::BufferUsageFlags;
-            // Prepare vertex data
+            // Prepare vertex data matching shader layout: position (3), normal (3), uv (2), color (4)
             let vertex_data: Vec<u8> = all_vertices
                 .iter()
                 .flat_map(|v| {
                     let mut data = Vec::new();
-                    data.extend_from_slice(bytemuck::bytes_of(&v.position));
-                    data.extend_from_slice(bytemuck::bytes_of(&v.color));
-                    data.extend_from_slice(bytemuck::bytes_of(&v.normal));
-                    data.extend_from_slice(bytemuck::bytes_of(&v.uv));
+                    data.extend_from_slice(bytemuck::bytes_of(&v.position)); // 12 bytes
+                    data.extend_from_slice(bytemuck::bytes_of(&v.normal)); // 12 bytes
+                    data.extend_from_slice(bytemuck::bytes_of(&v.uv)); // 8 bytes
+                                                                       // Extend color from 3 to 4 components (RGB -> RGBA)
+                    data.extend_from_slice(bytemuck::bytes_of(&v.color)); // 12 bytes
+                    data.extend_from_slice(bytemuck::bytes_of(&1.0f32)); // 4 bytes (alpha)
                     data
                 })
                 .collect();
@@ -223,15 +268,6 @@ impl App {
                 vertex_data,
                 BufferUsageFlags::new(BufferUsageFlags::VERTEX),
             );
-
-            // Create index buffer
-            let index_data: Vec<u8> = all_indices.iter().flat_map(|i| i.to_le_bytes()).collect();
-
-            let index_buffer_desc = ResourceDescriptor::Buffer {
-                size: index_data.len(),
-                usage: BufferUsageFlags::new(BufferUsageFlags::INDEX),
-            };
-            let _index_buffer = graph.create_resource("index_buffer", index_buffer_desc);
 
             // Create camera uniforms
             let aspect = width as f32 / height as f32;
@@ -327,7 +363,7 @@ impl App {
                 .camera_buffer(camera_buffer)
                 .lighting_buffer(lighting_buffer)
                 .transform(transform)
-                .vertex_count(index_count)
+                .vertex_count(vertex_count)
                 .with_name("forward_simple")
                 .build(&mut graph)?;
         }
