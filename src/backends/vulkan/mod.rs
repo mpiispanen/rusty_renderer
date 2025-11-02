@@ -3133,7 +3133,7 @@ impl GraphicsBackend for VulkanBackend {
         let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.0, 0.0, 0.0, 1.0],
+                    float32: [0.2, 0.3, 0.5, 1.0], // Blue background to see if cube renders
                 },
             },
             vk::ClearValue {

@@ -205,6 +205,8 @@ impl ShaderDescriptor {
         // Run DXC to compile HLSL to SPIR-V
         let output = Command::new("dxc")
             .arg("-spirv")
+            .arg("-fspv-target-env=vulkan1.2")
+            .arg("-fvk-use-gl-layout")
             .arg("-T")
             .arg(profile)
             .arg("-E")
