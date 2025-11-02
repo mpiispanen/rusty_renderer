@@ -347,25 +347,26 @@ impl PassCallback for ForwardRenderPassCallback {
         }
 
         // Bind material uniforms (set 0, binding 3) if available
-        if let Some(ref material_buffer) = self.material_buffer {
-            let material_ptr =
-                material_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
-            let material_size = 32u64; // GpuMaterial size
-
-            if let Err(e) = context.bind_uniform_buffer(0, 3, material_ptr, 0, material_size) {
-                log::error!("Failed to bind material uniforms: {e}");
-            }
-        }
-
-        // Bind texture (set 0, binding 2) if available
-        if let Some(ref texture) = self.texture {
-            let texture_ptr =
-                texture.as_ref().as_ref() as *const dyn Texture as *const std::ffi::c_void;
-
-            if let Err(e) = context.bind_texture(0, 2, texture_ptr) {
-                log::error!("Failed to bind texture: {e}");
-            }
-        }
+        // TODO: Re-enable when shader supports materials and textures
+        // if let Some(ref material_buffer) = self.material_buffer {
+        //     let material_ptr =
+        //         material_buffer.as_ref().as_ref() as *const dyn Buffer as *const std::ffi::c_void;
+        //     let material_size = 32u64; // GpuMaterial size
+        //
+        //     if let Err(e) = context.bind_uniform_buffer(0, 3, material_ptr, 0, material_size) {
+        //         log::error!("Failed to bind material uniforms: {e}");
+        //     }
+        // }
+        //
+        // // Bind texture (set 0, binding 2) if available
+        // if let Some(ref texture) = self.texture {
+        //     let texture_ptr =
+        //         texture.as_ref().as_ref() as *const dyn Texture as *const std::ffi::c_void;
+        //
+        //     if let Err(e) = context.bind_texture(0, 2, texture_ptr) {
+        //         log::error!("Failed to bind texture: {e}");
+        //     }
+        // }
 
         // Bind vertex buffer
         let vertex_ptr =

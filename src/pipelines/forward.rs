@@ -272,7 +272,7 @@ impl RenderPipeline for ForwardPipeline {
     }
 
     fn setup(&mut self, _backend: &mut dyn crate::backends::GraphicsBackend) -> Result<()> {
-        log::info!("Forward pipeline setup complete");
+        log::info!("Forward pipeline setup complete (shaders registered during build_graph)");
         Ok(())
     }
 
@@ -300,8 +300,29 @@ impl RenderPipeline for ForwardPipeline {
 
         let mut graph = RenderGraph::new();
 
-        // Note: Shaders are registered centrally in App::register_shaders()
-        // before this method is called. We just reference them by name.
+        // Register shaders needed by this pipeline
+        use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
+        
+        graph.shader_registry_mut().register(
+            "forward.vert",
+            ShaderDescriptor {
+                source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
+                entry_point: "VSMain",
+                stage: ShaderStage::Vertex,
+                backend_compile: true,
+            },
+        );
+        
+        graph.shader_registry_mut().register(
+            "forward.frag",
+            ShaderDescriptor {
+                source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
+                entry_point: "PSMain",
+                stage: ShaderStage::Fragment,
+                backend_compile: true,
+            },
+        );
+        
         log::info!("Using pre-registered forward shaders from shader registry");
 
         // Get dimensions from backend (or use defaults)
