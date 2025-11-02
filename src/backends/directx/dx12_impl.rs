@@ -1985,7 +1985,11 @@ impl DirectXBackendImpl {
 
                 unsafe {
                     let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-                    staging_dx.resource.Map(0, None, Some(&mut mapped_ptr))?;
+                    log::debug!("DX: Mapping staging buffer for upload (size: {})", data.len());
+                    staging_dx.resource.Map(0, None, Some(&mut mapped_ptr)).map_err(|e| {
+                        log::error!("DX: Failed to map staging buffer: {:?}", e);
+                        e
+                    })?;
                     std::ptr::copy_nonoverlapping(data.as_ptr(), mapped_ptr as *mut u8, data.len());
                     staging_dx.resource.Unmap(0, None);
                 }
@@ -2001,6 +2005,25 @@ impl DirectXBackendImpl {
                     .context("Command list not initialized")?;
 
                 unsafe {
+                    // Wait for any pending operations on this command allocator to complete
+                    // before resetting it (DirectX 12 requirement)
+                    let fence = self.fence.as_ref().context("Fence not initialized")?;
+                    let command_queue = self
+                        .command_queue
+                        .as_ref()
+                        .context("Command queue not initialized")?;
+                    
+                    // Close the command list if it's currently recording
+                    // This can happen if we're called during resource allocation in execute_graph
+                    // after begin_frame has already reset the command list
+                    let _ = cmd_list.Close(); // Ignore error if already closed
+                    
+                    // If there are pending operations, wait for them
+                    if fence.GetCompletedValue() < self.fence_value - 1 {
+                        fence.SetEventOnCompletion(self.fence_value - 1, self.fence_event)?;
+                        WaitForSingleObject(self.fence_event, INFINITE);
+                    }
+
                     cmd_allocator.Reset()?;
                     cmd_list.Reset(cmd_allocator, None)?;
 
@@ -2015,14 +2038,9 @@ impl DirectXBackendImpl {
                     cmd_list.Close()?;
 
                     // Execute command list
-                    let command_queue = self
-                        .command_queue
-                        .as_ref()
-                        .context("Command queue not initialized")?;
                     command_queue.ExecuteCommandLists(&[Some(cmd_list.cast()?)]);
 
                     // Wait for copy to complete
-                    let fence = self.fence.as_ref().context("Fence not initialized")?;
                     let fence_value = self.fence_value;
                     command_queue.Signal(fence, fence_value)?;
                     self.fence_value += 1;
@@ -2031,6 +2049,11 @@ impl DirectXBackendImpl {
                         fence.SetEventOnCompletion(fence_value, self.fence_event)?;
                         WaitForSingleObject(self.fence_event, INFINITE);
                     }
+
+                    // Reset the command list again for the caller
+                    // (execute_graph expects it to be in recording state after uploads)
+                    cmd_allocator.Reset()?;
+                    cmd_list.Reset(cmd_allocator, None)?;
                 }
 
                 Ok(())
@@ -2050,7 +2073,11 @@ impl DirectXBackendImpl {
 
                 unsafe {
                     let mut mapped_ptr: *mut std::ffi::c_void = std::ptr::null_mut();
-                    dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr))?;
+                    log::debug!("DX: Mapping CPU-accessible buffer for upload (size: {}, offset: {})", data.len(), offset);
+                    dx_buffer.resource.Map(0, None, Some(&mut mapped_ptr)).map_err(|e| {
+                        log::error!("DX: Failed to map CPU-accessible buffer: {:?}", e);
+                        e
+                    })?;
 
                     let dst = (mapped_ptr as *mut u8).add(offset as usize);
                     std::ptr::copy_nonoverlapping(data.as_ptr(), dst, data.len());

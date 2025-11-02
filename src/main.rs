@@ -71,9 +71,9 @@ fn main() -> Result<()> {
     }
 
     if let Err(e) = App::run(config) {
-        eprintln!("Error running application: {e}");
+        eprintln!("Error running application: {e:?}");
         if let Some(ref mut f) = log_file {
-            let _ = writeln!(f, "Error running application: {e}");
+            let _ = writeln!(f, "Error running application: {e:?}");
             let _ = f.flush();
         }
         return Err(e);

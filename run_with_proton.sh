@@ -29,6 +29,10 @@ while [[ $# -gt 0 ]]; do
             VKD3D_DEBUG_LEVEL="$2"
             shift 2
             ;;
+        --backend|-b)
+            # Skip backend argument since we always use DirectX
+            shift 2
+            ;;
         *)
             # Forward all other arguments to the application
             APP_ARGS+=("$1")
@@ -115,7 +119,7 @@ echo ""
 STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam" \
 STEAM_COMPAT_DATA_PATH="$COMPAT_DATA" \
 VKD3D_DEBUG="$VKD3D_DEBUG_LEVEL" \
-RUST_LOG="${RUST_LOG:-info}" \
+RUST_LOG="${RUST_LOG:-debug}" \
 RUST_BACKTRACE="${RUST_BACKTRACE:-1}" \
 WINEDEBUG=-all \
 "$PROTON_DIR/proton" run rusty_renderer.exe --backend directx "${APP_ARGS[@]}"
