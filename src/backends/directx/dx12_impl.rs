@@ -913,8 +913,48 @@ impl DirectXBackendImpl {
         }
     }
 
+    fn load_precompiled_shader(&self, entry_point: &str, target: &str) -> Option<Vec<u8>> {
+        // Determine shader type from entry point and target
+        let shader_type = if entry_point == "VSMain" || target.starts_with("vs_") {
+            "vs"
+        } else if entry_point == "PSMain" || target.starts_with("ps_") {
+            "ps"
+        } else {
+            return None;
+        };
+
+        // Try different shader variants
+        let shader_names = vec!["forward_simple", "forward", "triangle"];
+        
+        for name in shader_names {
+            let path = format!("shaders/compiled/{}_{}.cso", name, shader_type);
+            if let Ok(bytecode) = std::fs::read(&path) {
+                log::info!("Loaded pre-compiled shader: {}", path);
+                return Some(bytecode);
+            }
+        }
+
+        None
+    }
+
     fn compile_shader(&self, entry_point: &str, target: &str) -> Result<ID3DBlob> {
         unsafe {
+            // Try to load pre-compiled shader first
+            if let Some(bytecode) = self.load_precompiled_shader(entry_point, target) {
+                use windows::Win32::Graphics::Direct3D::Fxc::D3DCreateBlob;
+                let blob = D3DCreateBlob(bytecode.len())?;
+                let dest = std::slice::from_raw_parts_mut(
+                    blob.GetBufferPointer() as *mut u8,
+                    blob.GetBufferSize(),
+                );
+                dest.copy_from_slice(&bytecode);
+                log::info!("Using pre-compiled shader for {} ({})", entry_point, target);
+                return Ok(blob);
+            }
+
+            // Fall back to runtime compilation
+            log::info!("Attempting runtime compilation for {} ({})", entry_point, target);
+            
             // Load shader source
             let shader_source_string = self.load_shader_source()?;
 
