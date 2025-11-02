@@ -10,7 +10,6 @@ use crate::backends::{
 use crate::passes::VertexBufferTrianglePass;
 use crate::render_graph::{
     Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
-    ShaderDescriptor, ShaderStage,
 };
 use crate::scene::{GeometryData, SceneObject, VertexData};
 use anyhow::Context as _;
@@ -135,17 +134,9 @@ impl RenderPipeline for SimplePipeline {
 
         let mut graph = RenderGraph::new();
 
-        // Register shaders needed for simple pipeline
-        graph.register_shader(
-            "simple_vertex.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/simple_vertex.hlsl", ShaderStage::Vertex)
-                .with_entry_point("VSMain"),
-        );
-        graph.register_shader(
-            "simple_vertex.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/simple_vertex.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
-        );
+        // Note: Shaders are registered centrally in App::register_shaders()
+        // before this method is called. We just reference them by name.
+        log::info!("Using pre-registered simple_vertex shaders from shader registry");
 
         // Get dimensions from backend (or use defaults)
         let (width, height) = (800, 600); // TODO: Get from backend or args

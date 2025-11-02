@@ -3,20 +3,971 @@ Initializing logging
 Parsing arguments
 Arguments parsed successfully
 Running application
-Error running application: Call failed. (0x80004005)
-{ vertex: true, index: false, uniform: false, staging: false, storage: false, transfer_src: false, transfer_dst: false }, memory: GpuOnly
+Shutdown complete
+() ENTERED
+DirectX window size: 1280x720
+DirectX calling create_factory
+DirectX calling create_device
+DirectX calling create_command_queue
+DirectX calling create_swap_chain
+DirectX calling create_render_targets
+DirectX calling create_depth_stencil
+DirectX calling create_srv_heap
+DirectX calling create_command_objects
+DirectX calling create_fence
+DirectX calling create_pipeline
+DirectX initialized successfully!
+create_buffer called: 1728 bytes, usage: BufferUsage { vertex: true, index: false, uniform: false, staging: false, storage: false, transfer_src: false, transfer_dst: false }, memory: GpuOnly
 Checking if device is initialized: true
 Device is initialized, creating buffer
-About to call CreateCommittedResource with size 1056 bytes, heap type D3D12_HEAP_TYPE(1)
+About to call CreateCommittedResource with size 1728 bytes, heap type D3D12_HEAP_TYPE(1)
 CreateCommittedResource returned: Ok(())
 Resource is_some: true
 Checking if resource is Some before context
 Buffer created successfully!
-create_buffer called: 1056 bytes, usage: BufferUsage { vertex: false, index: false, uniform: false, staging: true, storage: false, transfer_src: true, transfer_dst: false }, memory: CpuToGpu
+create_buffer called: 1728 bytes, usage: BufferUsage { vertex: false, index: false, uniform: false, staging: true, storage: false, transfer_src: true, transfer_dst: false }, memory: CpuToGpu
 Checking if device is initialized: true
 Device is initialized, creating buffer
-About to call CreateCommittedResource with size 1056 bytes, heap type D3D12_HEAP_TYPE(2)
+About to call CreateCommittedResource with size 1728 bytes, heap type D3D12_HEAP_TYPE(2)
 CreateCommittedResource returned: Ok(())
 Resource is_some: true
 Checking if resource is Some before context
 Buffer created successfully!
+create_buffer called: 144 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: false }, memory: GpuOnly
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 144 bytes, heap type D3D12_HEAP_TYPE(1)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 144 bytes, usage: BufferUsage { vertex: false, index: false, uniform: false, staging: true, storage: false, transfer_src: true, transfer_dst: false }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 144 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 48 bytes, usage: BufferUsage { vertex: false, index: false, uniform: true, staging: false, storage: false, transfer_src: false, transfer_dst: false }, memory: GpuOnly
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 48 bytes, heap type D3D12_HEAP_TYPE(1)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+create_buffer called: 48 bytes, usage: BufferUsage { vertex: false, index: false, uniform: false, staging: true, storage: false, transfer_src: true, transfer_dst: false }, memory: CpuToGpu
+Checking if device is initialized: true
+Device is initialized, creating buffer
+About to call CreateCommittedResource with size 48 bytes, heap type D3D12_HEAP_TYPE(2)
+CreateCommittedResource returned: Ok(())
+Resource is_some: true
+Checking if resource is Some before context
+Buffer created successfully!
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances
+bind_uniform_buffer called: set=0, binding=0, buffer_ptr=0x893050
+Binding uniform: set=0, binding=0, root_param=0, gpu_addr=0xffff800102410000, size=144
+bind_uniform_buffer called: set=0, binding=1, buffer_ptr=0x893080
+Binding uniform: set=0, binding=1, root_param=1, gpu_addr=0xffff800102420000, size=48
+Push constants: 32 DWORDs (128 bytes) at offset 0
+DirectX Draw: 36 vertices, 1 instances

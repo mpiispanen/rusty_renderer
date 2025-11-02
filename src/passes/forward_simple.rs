@@ -53,6 +53,24 @@ pub struct ForwardSimplePass {
 }
 
 impl ForwardSimplePass {
+    /// Register shaders required by this pass
+    ///
+    /// Should be called before creating any ForwardSimplePass instances
+    pub fn register_shaders(graph: &mut RenderGraph) {
+        use crate::render_graph::{ShaderDescriptor, ShaderStage};
+
+        graph.register_shader(
+            "forward_simple.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "forward_simple.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
+    }
+
     /// Get the pass ID
     pub fn pass_id(&self) -> PassId {
         self.pass_id
@@ -156,9 +174,10 @@ impl ForwardSimplePassBuilder {
     }
 
     /// Build the pass and add it to the render graph
+    ///
+    /// # Note
+    /// Call `ForwardSimplePass::register_shaders(graph)` before building instances
     pub fn build(self, graph: &mut RenderGraph) -> Result<ForwardSimplePass> {
-        // Shaders should be registered by App::register_shaders() before building passes
-
         // Validate required resources
         let color_output = self
             .color_output
@@ -382,11 +401,11 @@ impl PassCallback for ForwardSimplePassCallback {
         // Bind uniforms
         log::info!("Binding camera uniforms");
         context
-            .bind_uniform_buffer(0, 0, camera_buffer_ptr, 0, 64 + 64 + 16) // CameraUniforms size
+            .bind_uniform_buffer(0, 0, camera_buffer_ptr, 0, 64) // CameraUniforms: viewProj (mat4) = 64 bytes
             .expect("Failed to bind camera uniforms");
         log::info!("Binding lighting uniforms");
         context
-            .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 16 + 16) // LightingUniforms size
+            .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 8 * 48) // LightingUniforms: ambient_light_count (16) + 8 lights (8*48 = 384) = 400 bytes
             .expect("Failed to bind lighting uniforms");
 
         // Push model matrix as push constants
@@ -410,7 +429,7 @@ impl PassCallback for ForwardSimplePassCallback {
         log::info!("Pushing constants");
         context
             .push_constants(
-                0x1 | 0x10, // VERTEX | FRAGMENT stages
+                0x1, // VERTEX stage only
                 0,
                 bytemuck::bytes_of(&push_data),
             )

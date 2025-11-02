@@ -102,37 +102,6 @@ impl App {
     }
 
     /// Build the render graph based on loaded scene
-    /// Register all shaders used by the renderer
-    ///
-    /// This centralizes shader registration so backends can access them uniformly
-    fn register_shaders(graph: &mut RenderGraph) {
-        use crate::render_graph::{ShaderDescriptor, ShaderStage};
-
-        // Register forward rendering shaders (used for 3D objects)
-        graph.register_shader(
-            "forward_simple.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Vertex)
-                .with_entry_point("VSMain"),
-        );
-        graph.register_shader(
-            "forward_simple.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/forward_simple.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
-        );
-
-        // Register triangle shaders (used for debug rendering)
-        graph.register_shader(
-            "triangle.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
-                .with_entry_point("VSMain"),
-        );
-        graph.register_shader(
-            "triangle.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
-        );
-    }
-
     fn build_render_graph(&mut self) -> Result<()> {
         let scene = self
             .scene
@@ -141,9 +110,6 @@ impl App {
 
         let (width, height) = self.config.window_size();
         let mut graph = RenderGraph::new();
-
-        // Register all shaders upfront
-        Self::register_shaders(&mut graph);
 
         // Clear external buffers from previous graph
         self.external_buffers.clear();
@@ -157,6 +123,9 @@ impl App {
                 self.config.scene
             );
 
+            // Register shaders needed for triangle pass
+            TrianglePass::register_shaders(&mut graph);
+
             // Create color buffer resource (represents swapchain image)
             let color_desc = ResourceDescriptor::Image {
                 format: Format::Bgra8Unorm,
@@ -167,13 +136,16 @@ impl App {
             };
             let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
-            // Create triangle rendering pass (shaders registered inside)
+            // Create triangle rendering pass
             TrianglePass::new(&mut graph, color_buffer);
         } else {
             log::info!(
                 "Using forward rendering pass for scene: {}",
                 scene.metadata.name
             );
+
+            // Register shaders needed for forward pass
+            ForwardSimplePass::register_shaders(&mut graph);
 
             // Create color buffer
             let color_desc = ResourceDescriptor::Image {
@@ -274,23 +246,24 @@ impl App {
             let view = self.calculate_view_matrix(&scene.camera);
             let proj = self.calculate_projection_matrix(&scene.camera, aspect);
 
+            log::info!("Camera setup:");
+            log::info!("  Aspect: {}", aspect);
+
+            // Multiply view and proj to get viewProj (proj * view)
+            let view_proj = Self::mul_mat4(proj, view);
+
+            log::info!("  ViewProj[0]: {:?}", view_proj[0]);
+            log::info!("  ViewProj[3]: {:?}", view_proj[3]);
+
             #[repr(C)]
             #[derive(Clone, Copy)]
             struct CameraUniforms {
-                view: [[f32; 4]; 4],
-                proj: [[f32; 4]; 4],
-                view_pos: [f32; 3],
-                _padding: f32,
+                view_proj: [[f32; 4]; 4],
             }
             unsafe impl bytemuck::Pod for CameraUniforms {}
             unsafe impl bytemuck::Zeroable for CameraUniforms {}
 
-            let camera_uniforms = CameraUniforms {
-                view,
-                proj,
-                view_pos: scene.camera.position(),
-                _padding: 0.0,
-            };
+            let camera_uniforms = CameraUniforms { view_proj };
 
             // Declare camera buffer with initial data - render graph will allocate and upload
             let camera_buffer = graph.declare_buffer_with_data(
@@ -304,38 +277,76 @@ impl App {
 
             #[repr(C)]
             #[derive(Clone, Copy)]
+            struct Light {
+                light_type: u32,
+                _padding1: u32,
+                _padding2: u32,
+                _padding3: u32,
+                position_or_direction: [f32; 4],
+                color_intensity: [f32; 4],
+            }
+            unsafe impl bytemuck::Pod for Light {}
+            unsafe impl bytemuck::Zeroable for Light {}
+
+            const MAX_LIGHTS: usize = 8;
+
+            #[repr(C)]
+            #[derive(Clone, Copy)]
             struct LightingUniforms {
-                ambient: [f32; 3],
-                _padding1: f32,
-                light_dir: [f32; 3],
-                _padding2: f32,
-                light_color: [f32; 3],
-                light_intensity: f32,
+                ambient_light_count: [f32; 4], // RGB ambient + light count
+                lights: [Light; MAX_LIGHTS],
             }
             unsafe impl bytemuck::Pod for LightingUniforms {}
             unsafe impl bytemuck::Zeroable for LightingUniforms {}
 
-            // Extract first directional light from scene, or use default
-            let (light_dir, light_color, light_intensity) = lighting
-                .lights
-                .iter()
-                .find_map(|light| match light {
+            // Build lights array
+            let mut lights_array = [Light {
+                light_type: 0,
+                _padding1: 0,
+                _padding2: 0,
+                _padding3: 0,
+                position_or_direction: [0.0; 4],
+                color_intensity: [0.0; 4],
+            }; MAX_LIGHTS];
+
+            let light_count = lighting.lights.len().min(MAX_LIGHTS);
+            for (i, scene_light) in lighting.lights.iter().take(MAX_LIGHTS).enumerate() {
+                lights_array[i] = match scene_light {
                     crate::scene::Light::Directional {
                         direction,
                         color,
                         intensity,
-                    } => Some((*direction, *color, *intensity)),
-                    _ => None,
-                })
-                .unwrap_or(([-0.5, -1.0, -0.3], [1.0, 1.0, 1.0], 1.0));
+                    } => Light {
+                        light_type: 0, // LIGHT_DIRECTIONAL
+                        _padding1: 0,
+                        _padding2: 0,
+                        _padding3: 0,
+                        position_or_direction: [direction[0], direction[1], direction[2], 0.0],
+                        color_intensity: [color[0], color[1], color[2], *intensity],
+                    },
+                    crate::scene::Light::Point {
+                        position,
+                        color,
+                        intensity,
+                    } => Light {
+                        light_type: 1, // LIGHT_POINT
+                        _padding1: 0,
+                        _padding2: 0,
+                        _padding3: 0,
+                        position_or_direction: [position[0], position[1], position[2], 1.0],
+                        color_intensity: [color[0], color[1], color[2], *intensity],
+                    },
+                };
+            }
 
             let lighting_uniforms = LightingUniforms {
-                ambient: lighting.ambient,
-                _padding1: 0.0,
-                light_dir,
-                _padding2: 0.0,
-                light_color,
-                light_intensity,
+                ambient_light_count: [
+                    lighting.ambient[0],
+                    lighting.ambient[1],
+                    lighting.ambient[2],
+                    light_count as f32,
+                ],
+                lights: lights_array,
             };
 
             // Declare lighting buffer with initial data - render graph will allocate and upload
@@ -462,15 +473,29 @@ impl App {
     }
 
     /// Create a perspective projection matrix
+    /// This uses Vulkan conventions with Y flipped and Z range [0, 1]
     fn perspective(fov: f32, aspect: f32, near: f32, far: f32) -> [[f32; 4]; 4] {
         let tan_half_fov = (fov / 2.0).tan();
 
         [
             [1.0 / (aspect * tan_half_fov), 0.0, 0.0, 0.0],
-            [0.0, 1.0 / tan_half_fov, 0.0, 0.0],
+            [0.0, -1.0 / tan_half_fov, 0.0, 0.0], // Negative Y for Vulkan
             [0.0, 0.0, far / (near - far), -1.0],
             [0.0, 0.0, (near * far) / (near - far), 0.0],
         ]
+    }
+
+    /// Multiply two 4x4 matrices
+    fn mul_mat4(a: [[f32; 4]; 4], b: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+        let mut result = [[0.0; 4]; 4];
+        for i in 0..4 {
+            for j in 0..4 {
+                for (k, b_row) in b.iter().enumerate() {
+                    result[i][j] += a[i][k] * b_row[j];
+                }
+            }
+        }
+        result
     }
 
     /// Build the render graph for triangle rendering

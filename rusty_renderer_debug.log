@@ -1,64 +1,6 @@
 Starting Rusty Renderer v0.1.0
 Initializing logging
 Parsing arguments
-About to call Config::parse_args()
-In parse_args, about to parse
-Parse failed: A multi-backend 3D renderer supporting Vulkan and DirectX 12
-
-Usage: rusty_renderer [OPTIONS]
-
-Options:
-  -b, --backend <BACKEND>
-          Graphics backend to use
-
-          Possible values:
-          - vulkan: Vulkan backend (using vulkanalia)
-          
-          [default: vulkan]
-
-  -s, --scene <SCENE>
-          Scene to render (triangle, cube, etc.)
-          
-          [default: triangle]
-
-      --width <WIDTH>
-          Window width
-          
-          [default: 1280]
-
-      --height <HEIGHT>
-          Window height
-          
-          [default: 720]
-
-  -d, --debug
-          Enable debug mode and validation layers
-
-      --vsync
-          Enable VSync
-
-      --log-level <LOG_LEVEL>
-          Log level (off, error, warn, info, debug, trace)
-          
-          [default: info]
-
-      --max-frames <MAX_FRAMES>
-          Maximum number of frames to render (for testing)
-
-      --headless
-          Run in headless mode (no window, for CI testing)
-
-      --screenshot <SCREENSHOT>
-          Save screenshot to file path (requires headless or captures last frame)
-
-      --screenshot-interval <SCREENSHOT_INTERVAL>
-          Capture screenshot every N frames (0 = only last frame)
-          
-          [default: 0]
-
-  -h, --help
-          Print help (see a summary with '-h')
-
-  -V, --version
-          Print version
-
+Arguments parsed successfully
+Running application
+Shutdown complete

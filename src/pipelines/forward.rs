@@ -300,32 +300,9 @@ impl RenderPipeline for ForwardPipeline {
 
         let mut graph = RenderGraph::new();
 
-        // Register shaders for the forward rendering pipeline
-        use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
-
-        // For now, use pre-compiled SPIR-V shaders embedded in the binary
-        // TODO: Add runtime HLSL compilation for development mode
-        graph.register_shader(
-            "forward.vert",
-            ShaderDescriptor {
-                source: ShaderSource::Embedded(include_bytes!("../../shaders/forward.vert.spv")),
-                entry_point: "VSMain",
-                stage: ShaderStage::Vertex,
-                backend_compile: false, // Already compiled to SPIR-V
-            },
-        );
-
-        graph.register_shader(
-            "forward.frag",
-            ShaderDescriptor {
-                source: ShaderSource::Embedded(include_bytes!("../../shaders/forward.frag.spv")),
-                entry_point: "PSMain",
-                stage: ShaderStage::Fragment,
-                backend_compile: false, // Already compiled to SPIR-V
-            },
-        );
-
-        log::info!("Registered shaders in render graph");
+        // Note: Shaders are registered centrally in App::register_shaders()
+        // before this method is called. We just reference them by name.
+        log::info!("Using pre-registered forward shaders from shader registry");
 
         // Get dimensions from backend (or use defaults)
         let (width, height) = (800, 600); // TODO: Get from backend or args

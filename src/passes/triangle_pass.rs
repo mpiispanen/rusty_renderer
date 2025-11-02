@@ -33,6 +33,24 @@ pub struct TrianglePass {
 }
 
 impl TrianglePass {
+    /// Register shaders required by this pass
+    ///
+    /// Should be called before creating any TrianglePass instances
+    pub fn register_shaders(graph: &mut RenderGraph) {
+        use crate::render_graph::{ShaderDescriptor, ShaderStage};
+
+        graph.register_shader(
+            "triangle.vert",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
+                .with_entry_point("VSMain"),
+        );
+        graph.register_shader(
+            "triangle.frag",
+            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
+                .with_entry_point("PSMain"),
+        );
+    }
+
     /// Create a new triangle rendering pass
     ///
     /// # Arguments
@@ -41,9 +59,10 @@ impl TrianglePass {
     ///
     /// # Returns
     /// A TrianglePass instance that can be used to configure the pass further
+    ///
+    /// # Note
+    /// Call `TrianglePass::register_shaders(graph)` before creating instances
     pub fn new(graph: &mut RenderGraph, color_output: ResourceId) -> Self {
-        // Shaders should be registered by App::register_shaders() before building passes
-
         let pass_id = graph.next_pass_id();
 
         let mut pass = RenderPass::new(pass_id, "triangle_pass", PassKind::Graphics);
@@ -95,15 +114,14 @@ impl PassCallback for TrianglePassCallback {
             .cull_mode(crate::render_graph::CullMode::None);
     }
 
-    fn execute(&self, _context: &mut dyn PassExecutionContext) {
-        // The actual drawing is currently handled by the backend's execute_graph
-        // In a full implementation, this would:
-        // 1. Downcast context to backend-specific type (e.g., VulkanPassContext)
-        // 2. Bind pipeline
-        // 3. Set viewport/scissor
-        // 4. Issue draw call: cmd_draw(3, 1, 0, 0)
+    fn execute(&self, context: &mut dyn PassExecutionContext) {
+        // For triangle pass, we draw 3 hardcoded vertices from the shader
+        log::info!("Triangle pass: issuing draw call for 3 vertices");
 
-        log::trace!("Triangle pass callback executed");
+        match context.draw(3, 1, 0, 0) {
+            Ok(_) => log::info!("Triangle draw call succeeded"),
+            Err(e) => log::error!("Failed to draw triangle: {}", e),
+        }
     }
 }
 
@@ -137,21 +155,10 @@ impl TrianglePassBuilder {
     }
 
     /// Build the pass and add it to the render graph
+    ///
+    /// # Note
+    /// Call `TrianglePass::register_shaders(graph)` before building instances
     pub fn build(self, graph: &mut RenderGraph) -> Result<TrianglePass> {
-        use crate::render_graph::{ShaderDescriptor, ShaderStage};
-
-        // Register shaders
-        graph.register_shader(
-            "triangle.vert",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Vertex)
-                .with_entry_point("VSMain"),
-        );
-        graph.register_shader(
-            "triangle.frag",
-            ShaderDescriptor::from_file("shaders/hlsl/triangle.hlsl", ShaderStage::Fragment)
-                .with_entry_point("PSMain"),
-        );
-
         let pass_id = graph.next_pass_id();
 
         let mut pass = RenderPass::new(pass_id, &self.name, PassKind::Graphics);

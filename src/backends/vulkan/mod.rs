@@ -95,6 +95,10 @@ pub struct VulkanBackend {
     // Declarative pipeline system (Phase 4)
     #[allow(dead_code)] // Will be used when we compile pipelines from descriptions
     pipeline_cache: std::collections::HashMap<crate::render_graph::PassId, vk::Pipeline>,
+    pipeline_layout_cache:
+        std::collections::HashMap<crate::render_graph::PassId, vk::PipelineLayout>,
+    descriptor_layout_cache:
+        std::collections::HashMap<crate::render_graph::PassId, vk::DescriptorSetLayout>,
     #[allow(dead_code)] // Will be used when we compile shaders from registry
     shader_module_cache:
         std::collections::HashMap<crate::render_graph::ShaderHandle, vk::ShaderModule>,
@@ -160,6 +164,8 @@ impl VulkanBackend {
             descriptor_sets: vec![],
             default_sampler: vk::Sampler::null(),
             pipeline_cache: std::collections::HashMap::new(),
+            pipeline_layout_cache: std::collections::HashMap::new(),
+            descriptor_layout_cache: std::collections::HashMap::new(),
             shader_module_cache: std::collections::HashMap::new(),
             resource_buffers: std::collections::HashMap::new(),
             resource_textures: std::collections::HashMap::new(),
@@ -692,6 +698,7 @@ impl VulkanBackend {
     }
 
     /// Create graphics pipeline
+    #[allow(dead_code)] // Legacy method, will be removed
     fn create_pipeline(&mut self) -> Result<()> {
         log::info!("Creating graphics pipeline");
 
@@ -903,6 +910,7 @@ impl VulkanBackend {
         &mut self,
         builder: &crate::render_graph::PipelineBuilder,
         shader_registry: &crate::render_graph::ShaderRegistry,
+        pass_id: crate::render_graph::PassId,
     ) -> Result<vk::Pipeline> {
         use crate::render_graph::{
             CompareOp, CullMode, FrontFace, InputRate, PolygonMode, ShaderStage, VertexFormat,
@@ -1016,25 +1024,10 @@ impl VulkanBackend {
             .primitive_restart_enable(false);
 
         // Viewport and scissor (use current swapchain extent)
-        let viewport = vk::Viewport::builder()
-            .x(0.0)
-            .y(0.0)
-            .width(self.swapchain_extent.width as f32)
-            .height(self.swapchain_extent.height as f32)
-            .min_depth(0.0)
-            .max_depth(1.0)
-            .build();
-
-        let scissor = vk::Rect2D::builder()
-            .offset(vk::Offset2D { x: 0, y: 0 })
-            .extent(self.swapchain_extent)
-            .build();
-
-        let viewports = vec![viewport];
-        let scissors = vec![scissor];
+        // Viewport state - using dynamic state
         let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
-            .viewports(&viewports)
-            .scissors(&scissors);
+            .viewport_count(1)
+            .scissor_count(1);
 
         // Rasterization state
         let rast_state = builder.get_rasterizer_state();
@@ -1128,6 +1121,64 @@ impl VulkanBackend {
             .logic_op(vk::LogicOp::COPY)
             .attachments(&blend_attachments);
 
+        // Create pipeline layout for this specific pipeline
+        // TODO: This should be derived from shader reflection, not hardcoded
+        // For now, create a simple layout for forward_simple shader:
+        // - Binding 0: Camera uniforms
+        // - Binding 1: Lighting uniforms
+        // - Push constants: model and normal matrices
+        let bindings = [
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+        ];
+
+        let descriptor_layout_info =
+            vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
+        let descriptor_set_layout = unsafe {
+            device
+                .create_descriptor_set_layout(&descriptor_layout_info, None)
+                .context("Failed to create descriptor set layout")?
+        };
+
+        // Push constant range for model and normal matrices (2 * mat4 = 128 bytes)
+        let push_constant_range = vk::PushConstantRange::builder()
+            .stage_flags(vk::ShaderStageFlags::VERTEX) // Only used in vertex shader
+            .offset(0)
+            .size(128) // 2 * sizeof(mat4)
+            .build();
+
+        let set_layouts = [descriptor_set_layout];
+        let push_constant_ranges = [push_constant_range];
+        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(&set_layouts)
+            .push_constant_ranges(&push_constant_ranges);
+
+        let pipeline_layout = unsafe {
+            device
+                .create_pipeline_layout(&pipeline_layout_info, None)
+                .context("Failed to create pipeline layout")?
+        };
+
+        // Cache the layout and descriptor set layout for use in pass execution
+        self.pipeline_layout_cache.insert(pass_id, pipeline_layout);
+        self.descriptor_layout_cache
+            .insert(pass_id, descriptor_set_layout);
+
+        // Configure dynamic states
+        let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
+        let dynamic_state_info =
+            vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_states);
+
         // Create graphics pipeline
         let pipeline_info = vk::GraphicsPipelineCreateInfo::builder()
             .stages(&shader_stages)
@@ -1138,7 +1189,8 @@ impl VulkanBackend {
             .multisample_state(&multisample_info)
             .depth_stencil_state(&depth_stencil_info)
             .color_blend_state(&color_blend_info)
-            .layout(self.pipeline_layout)
+            .dynamic_state(&dynamic_state_info)
+            .layout(pipeline_layout)
             .render_pass(self.render_pass)
             .subpass(0);
 
@@ -1150,7 +1202,7 @@ impl VulkanBackend {
             )?
         };
 
-        log::debug!("Pipeline compiled successfully");
+        log::debug!("Pipeline compiled successfully for pass {:?}", pass_id);
 
         Ok(pipelines[0])
     }
@@ -1191,6 +1243,7 @@ impl VulkanBackend {
     /// - Set 0, Binding 1: Lighting uniforms (Vertex + Fragment)
     /// - Set 0, Binding 2: Diffuse texture sampler (Fragment) - Optional
     /// - Set 0, Binding 3: Material uniforms (Fragment) - Optional
+    #[allow(dead_code)] // Legacy method, will be removed
     fn create_uniform_descriptor_layouts(&mut self) -> Result<Vec<vk::DescriptorSetLayout>> {
         let device = self.device.as_ref().context("Device not initialized")?;
 
@@ -1463,6 +1516,7 @@ impl VulkanBackend {
     }
 
     /// Record command buffer for a specific image index
+    #[allow(dead_code)] // Legacy method, will be removed
     fn record_command_buffer(&self, image_index: usize) -> Result<()> {
         let device = self.device.as_ref().context("Device not initialized")?;
         let command_buffer = self.command_buffers[image_index];
@@ -2483,10 +2537,11 @@ impl GraphicsBackend for VulkanBackend {
         log::info!("Render pass completed successfully");
 
         log::info!("Creating graphics pipeline");
-        // Create graphics pipeline
-        self.create_pipeline()
-            .context("Failed to create graphics pipeline")?;
-        log::info!("Graphics pipeline creation completed");
+        // NOTE: Pipeline creation has been moved to render graph compilation
+        // The hardcoded pipeline is no longer needed as each pass creates its own pipeline
+        // self.create_pipeline()
+        //     .context("Failed to create graphics pipeline")?;
+        log::info!("Graphics pipeline creation skipped (using render graph pipelines)");
 
         // Create depth resources
         self.create_depth_resources()
@@ -2521,16 +2576,20 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Result<()> {
+        log::debug!("begin_frame called");
         let device = match self.device.as_ref() {
             Some(d) => d,
             None => return Ok(()), // Not initialized yet
         };
 
-        // Headless mode: just record command buffer
+        // Headless mode: just prepare for recording
         if self.headless {
-            self.record_command_buffer(0)?;
+            log::debug!("begin_frame: headless mode");
+            // Don't record command buffer here - execute_graph will do it
             return Ok(());
         }
+
+        log::debug!("begin_frame: windowed mode");
 
         // Windowed mode: acquire swapchain image
         // Wait for the current frame's fence
@@ -2580,8 +2639,7 @@ impl GraphicsBackend for VulkanBackend {
             device.reset_fences(&[in_flight_fence])?;
         }
 
-        // Record command buffer
-        self.record_command_buffer(image_index)?;
+        // Don't record command buffer here - execute_graph will do it
 
         Ok(())
     }
@@ -2719,8 +2777,9 @@ impl GraphicsBackend for VulkanBackend {
         // Create render pass (for offscreen)
         self.create_render_pass()?;
 
-        // Create pipeline
-        self.create_pipeline()?;
+        // NOTE: Pipeline creation has been moved to render graph compilation
+        // The hardcoded pipeline is no longer needed
+        // self.create_pipeline()?;
 
         // Create framebuffer for offscreen image
         self.create_framebuffer_offscreen()?;
@@ -2945,6 +3004,14 @@ impl GraphicsBackend for VulkanBackend {
                     device.destroy_sampler(self.default_sampler, None);
                 }
 
+                // Destroy cached pipeline layouts and descriptor layouts
+                for (_pass_id, layout) in self.pipeline_layout_cache.drain() {
+                    device.destroy_pipeline_layout(layout, None);
+                }
+                for (_pass_id, layout) in self.descriptor_layout_cache.drain() {
+                    device.destroy_descriptor_set_layout(layout, None);
+                }
+
                 // Destroy descriptor set layouts
                 for layout in &self.descriptor_set_layouts {
                     device.destroy_descriptor_set_layout(*layout, None);
@@ -2952,6 +3019,10 @@ impl GraphicsBackend for VulkanBackend {
                 self.descriptor_set_layouts.clear();
                 self.descriptor_sets.clear();
             }
+
+            // Clean up render graph resources
+            self.resource_buffers.clear();
+            self.resource_textures.clear();
 
             // Destroy descriptor pool manager
             if let Some(mut pool_manager) = self.descriptor_pool_manager.take() {
@@ -2988,6 +3059,11 @@ impl GraphicsBackend for VulkanBackend {
         graph: &crate::render_graph::graph::RenderGraph,
         compiled: &crate::render_graph::graph::CompiledGraph,
     ) -> Result<()> {
+        log::info!(
+            "execute_graph called with {} passes",
+            compiled.execution_order.len()
+        );
+
         // Allocate resources if this is the first execution or resources changed
         // TODO: Add smarter resource lifecycle management (issue #87)
         if self.resource_buffers.is_empty() && self.resource_textures.is_empty() {
@@ -2995,14 +3071,21 @@ impl GraphicsBackend for VulkanBackend {
         }
 
         // Compile pipelines if not already cached (first frame or after pipeline changes)
+        log::debug!(
+            "Checking {} pipeline descriptions",
+            compiled.pipeline_descriptions.len()
+        );
         for (pass_id, builder) in &compiled.pipeline_descriptions {
             if !self.pipeline_cache.contains_key(pass_id) {
                 log::debug!("Compiling pipeline for pass {:?}", pass_id);
                 let pipeline =
-                    self.compile_pipeline_from_builder(builder, graph.shader_registry())?;
+                    self.compile_pipeline_from_builder(builder, graph.shader_registry(), *pass_id)?;
                 self.pipeline_cache.insert(*pass_id, pipeline);
+            } else {
+                log::debug!("Using cached pipeline for pass {:?}", pass_id);
             }
         }
+        log::info!("Pipelines compiled/cached successfully");
 
         // Get raw pointers before any borrows to avoid borrow checker issues
         let device_ptr = self
@@ -3026,18 +3109,31 @@ impl GraphicsBackend for VulkanBackend {
             self.image_index as usize
         };
         let command_buffer = self.command_buffers[image_index];
+        log::info!("Got command buffer for image index {}", image_index);
 
-        // Begin command buffer if not already begun
+        // Begin command buffer
         let begin_info = vk::CommandBufferBeginInfo::builder();
         unsafe {
             device.begin_command_buffer(command_buffer, &begin_info)?;
         }
+        log::info!("Command buffer begun");
 
-        // Clear values for render pass
-        let clear_values = &[
+        // NOTE: We don't begin a render pass here anymore - passes handle their own rendering
+        // The old approach of having a single render pass for the whole frame doesn't work
+        // with render graph which manages its own resources
+
+        // Execute passes in order
+        log::info!("About to execute {} passes", compiled.execution_order.len());
+
+        // Begin render pass for this frame
+        // TODO: In a full render graph, each pass would manage its own render pass
+        // For now, we use a single render pass for the whole frame
+        let framebuffer = self.framebuffers[image_index];
+
+        let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
-                    float32: [0.1, 0.1, 0.2, 1.0], // Dark blue background (matches DirectX)
+                    float32: [0.0, 0.0, 0.0, 1.0],
                 },
             },
             vk::ClearValue {
@@ -3048,15 +3144,14 @@ impl GraphicsBackend for VulkanBackend {
             },
         ];
 
-        // Begin render pass
         let render_pass_info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.render_pass)
-            .framebuffer(self.framebuffers[image_index])
+            .framebuffer(framebuffer)
             .render_area(vk::Rect2D {
                 offset: vk::Offset2D { x: 0, y: 0 },
                 extent: self.swapchain_extent,
             })
-            .clear_values(clear_values);
+            .clear_values(&clear_values);
 
         unsafe {
             device.cmd_begin_render_pass(
@@ -3064,16 +3159,9 @@ impl GraphicsBackend for VulkanBackend {
                 &render_pass_info,
                 vk::SubpassContents::INLINE,
             );
-
-            // Bind default pipeline (will be overridden per pass if needed)
-            device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline,
-            );
         }
+        log::debug!("Render pass begun");
 
-        // Execute passes in order
         for pass_id in &compiled.execution_order {
             log::debug!("Executing pass: {pass_id:?}");
 
@@ -3086,6 +3174,23 @@ impl GraphicsBackend for VulkanBackend {
                         vk::PipelineBindPoint::GRAPHICS,
                         pipeline,
                     );
+
+                    // Set viewport and scissor
+                    let viewport = vk::Viewport {
+                        x: 0.0,
+                        y: 0.0,
+                        width: self.swapchain_extent.width as f32,
+                        height: self.swapchain_extent.height as f32,
+                        min_depth: 0.0,
+                        max_depth: 1.0,
+                    };
+                    device.cmd_set_viewport(command_buffer, 0, &[viewport]);
+
+                    let scissor = vk::Rect2D {
+                        offset: vk::Offset2D { x: 0, y: 0 },
+                        extent: self.swapchain_extent,
+                    };
+                    device.cmd_set_scissor(command_buffer, 0, &[scissor]);
                 }
             }
 
@@ -3099,24 +3204,40 @@ impl GraphicsBackend for VulkanBackend {
 
             // Execute pass callback (M8.2)
             if let Some(pass) = graph.get_pass(*pass_id) {
+                log::debug!(
+                    "Found pass {:?}, has callback: {}",
+                    pass_id,
+                    pass.callback.is_some()
+                );
                 if let Some(callback) = &pass.callback {
+                    log::info!("Executing pass callback for {:?}", pass_id);
                     // Phase 1: Prepare resources (no-op for Vulkan)
                     let mut prep_context = VulkanPrepContext;
                     callback.prepare(&mut prep_context);
 
                     // Phase 2: Execute rendering
                     // Create execution context (backend_ptr created earlier to avoid borrow issues)
-                    let mut context = VulkanPassContext::new(device, command_buffer, backend_ptr);
+                    let mut context =
+                        VulkanPassContext::new(device, command_buffer, backend_ptr, *pass_id);
 
                     // Execute the pass
                     callback.execute(&mut context);
+                } else {
+                    log::warn!("Pass {:?} has no callback", pass_id);
                 }
+            } else {
+                log::warn!("Could not find pass {:?} in graph", pass_id);
             }
         }
 
-        // End render pass and command buffer
+        // End render pass
         unsafe {
             device.cmd_end_render_pass(command_buffer);
+        }
+        log::debug!("Render pass ended");
+
+        // End command buffer (passes should have ended their own render passes)
+        unsafe {
             device.end_command_buffer(command_buffer)?;
         }
 
@@ -3610,6 +3731,7 @@ struct VulkanPassContext {
     device: *const VkDevice,
     command_buffer: vk::CommandBuffer,
     backend: *mut VulkanBackend,
+    pass_id: crate::render_graph::PassId,
 }
 
 impl VulkanPassContext {
@@ -3617,11 +3739,13 @@ impl VulkanPassContext {
         device: &VkDevice,
         command_buffer: vk::CommandBuffer,
         backend: *mut VulkanBackend,
+        pass_id: crate::render_graph::PassId,
     ) -> Self {
         Self {
             device: device as *const VkDevice,
             command_buffer,
             backend,
+            pass_id,
         }
     }
 
@@ -3767,15 +3891,22 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
         // Get backend info we need and allocate descriptor set
         // Use a scope to limit the borrow
         let (descriptor_set, pipeline_layout) = {
+            let pass_id = self.pass_id; // Copy pass_id before borrowing
             let backend = self.backend();
 
-            if backend.descriptor_set_layouts.is_empty() {
-                log::warn!("No descriptor set layouts created yet");
-                return Ok(());
-            }
+            // Get the descriptor set layout for this pass
+            let layout = backend
+                .descriptor_layout_cache
+                .get(&pass_id)
+                .copied()
+                .context("Descriptor layout not found for pass")?;
 
-            let layout = backend.descriptor_set_layouts[set as usize];
-            let pipeline_layout = backend.pipeline_layout;
+            let pipeline_layout = backend
+                .pipeline_layout_cache
+                .get(&pass_id)
+                .copied()
+                .context("Pipeline layout not found for pass")?;
+
             let current_frame = backend.current_frame;
 
             // Ensure we have descriptor sets for all frames
@@ -3857,9 +3988,14 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
             vk::ShaderStageFlags::VERTEX // Default to vertex
         };
 
-        // Get pipeline layout from backend
+        // Get pipeline layout for this pass
+        let pass_id = self.pass_id; // Copy pass_id before borrowing
         let backend = self.backend();
-        let pipeline_layout = backend.pipeline_layout;
+        let pipeline_layout = backend
+            .pipeline_layout_cache
+            .get(&pass_id)
+            .copied()
+            .context("Pipeline layout not found for pass")?;
 
         // Push constants
         unsafe {
@@ -3889,15 +4025,21 @@ impl crate::render_graph::PassExecutionContext for VulkanPassContext {
 
         // Get backend info
         let (descriptor_set, pipeline_layout, default_sampler) = {
+            let pass_id = self.pass_id; // Copy pass_id before borrowing
             let backend = self.backend();
 
-            if backend.descriptor_set_layouts.is_empty() {
-                log::warn!("No descriptor set layouts created yet");
-                return Ok(());
-            }
+            let layout = backend
+                .descriptor_layout_cache
+                .get(&pass_id)
+                .copied()
+                .context("Descriptor layout not found for pass")?;
 
-            let layout = backend.descriptor_set_layouts[set as usize];
-            let pipeline_layout = backend.pipeline_layout;
+            let pipeline_layout = backend
+                .pipeline_layout_cache
+                .get(&pass_id)
+                .copied()
+                .context("Pipeline layout not found for pass")?;
+
             let current_frame = backend.current_frame;
             let default_sampler = backend.default_sampler;
 
