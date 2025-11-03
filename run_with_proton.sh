@@ -19,6 +19,7 @@
 PROTON_DIR="$HOME/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)"
 COMPAT_DATA="$HOME/.proton_rusty_renderer"
 TEST_DIR="windows_test_directx"
+BUILD_TARGETS=("x86_64-pc-windows-gnu" "x86_64-pc-windows-msvc")
 
 # Default settings
 VKD3D_DEBUG_LEVEL="warn"
@@ -26,6 +27,38 @@ APP_ARGS=()
 DEFAULT_SCENE="scenes/gltf_textured.toml"
 DEFAULT_MAX_FRAMES=""  # No frame limit by default
 SCENE_PROVIDED=false
+FORCE_REBUILD=false
+
+build_windows_binary() {
+    echo "  Binary missing, attempting to build a Windows target..."
+    local built=false
+    for target in "${BUILD_TARGETS[@]}"; do
+        if [ "$target" = "x86_64-pc-windows-msvc" ]; then
+            if ! command -v cargo-xwin >/dev/null 2>&1; then
+                continue
+            fi
+            echo "    -> cargo xwin build --release --target $target"
+            if cargo xwin build --release --target "$target"; then
+                built=true
+                break
+            fi
+        else
+            echo "    -> cargo build --release --target $target"
+            if cargo build --release --target "$target"; then
+                built=true
+                break
+            fi
+        fi
+    done
+
+    if [ "$built" = false ]; then
+        echo "  ✗ Failed to compile a Windows binary automatically"
+        return 1
+    fi
+
+    echo "  ✓ Windows binary built successfully"
+    return 0
+}
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -33,6 +66,10 @@ while [[ $# -gt 0 ]]; do
         --vkd3d-debug)
             VKD3D_DEBUG_LEVEL="$2"
             shift 2
+            ;;
+        --rebuild)
+            FORCE_REBUILD=true
+            shift
             ;;
         --backend|-b)
             # Skip backend argument since we always use DirectX
@@ -81,9 +118,8 @@ mkdir -p "$TEST_DIR"
 # Copy the latest binary and required directories automatically
 echo "Syncing binary and assets..."
 
-# Try both Windows targets
 BINARY_COPIED=false
-for TARGET in x86_64-pc-windows-gnu x86_64-pc-windows-msvc; do
+for TARGET in "${BUILD_TARGETS[@]}"; do
     if [ -f "target/$TARGET/release/rusty_renderer.exe" ]; then
         cp "target/$TARGET/release/rusty_renderer.exe" "$TEST_DIR/"
         echo "  ✓ Binary copied (from $TARGET)"
@@ -92,9 +128,28 @@ for TARGET in x86_64-pc-windows-gnu x86_64-pc-windows-msvc; do
     fi
 done
 
+if [ "$FORCE_REBUILD" = true ]; then
+    BINARY_COPIED=false
+    echo "  --rebuild flag passed: rebuilding Windows binary"
+    build_windows_binary || exit 1
+fi
+
 if [ "$BINARY_COPIED" = false ]; then
-    echo "  ✗ Binary not found - please build first:"
-    echo "    cargo build --release --target x86_64-pc-windows-gnu"
+    if build_windows_binary; then
+        for TARGET in "${BUILD_TARGETS[@]}"; do
+            if [ -f "target/$TARGET/release/rusty_renderer.exe" ]; then
+                cp "target/$TARGET/release/rusty_renderer.exe" "$TEST_DIR/"
+                echo "  ✓ Binary copied (from $TARGET)"
+                BINARY_COPIED=true
+                break
+            fi
+        done
+    fi
+fi
+
+if [ "$BINARY_COPIED" = false ]; then
+    echo "  ✗ Unable to locate a Windows binary after build attempts."
+    echo "    Please install the required toolchains and try again."
     exit 1
 fi
 

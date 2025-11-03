@@ -9,3 +9,4 @@
 - Shifted scene resource preparation into `ForwardSimplePass::prepare_scene_resources`, so `App` just calls the helper and lets the pass/render graph handle geometry, camera, and lighting uploads.
 - Added index buffer support to the forward pass helper so we bind indices and issue `draw_indexed` (Vulkan path already wired; DX12 still to implement).
 - Implemented DirectX 12 `bind_vertex_buffer`/`bind_index_buffer`/`draw[_indexed]` so the backend no longer panics when the render graph executes indexed draws.
+- Updated `run_with_proton.sh` to auto-build the Windows binary (using `cargo build` or `cargo xwin build`) before syncing assets and launching via Proton.
