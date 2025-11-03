@@ -4,13 +4,13 @@
 //! and window management using winit.
 
 use crate::backends::{self, BackendType, GraphicsBackend};
-use crate::camera::{self, CameraBackend, CameraController};
+use crate::camera::{self, CameraBackend};
 use crate::config::{Backend, Config};
-use crate::passes::ForwardSimplePass;
+use crate::passes::{ForwardSimplePass, ForwardSimpleSceneResources};
 use crate::render_graph::{
     Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
-use crate::scene::{GeometryData, Scene, SceneLoader, SceneObject};
+use crate::scene::{Scene, SceneLoader};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 use winit::{
@@ -143,239 +143,29 @@ impl App {
         };
         let depth_buffer = graph.create_resource("depth_buffer", depth_desc);
 
-        // Build vertex data from scene (expanding indices into vertices)
-        let mut all_vertices = Vec::new();
-        let mut indexed_vertices = Vec::new();
-        let mut all_indices = Vec::new();
-        let mut total_vertices = 0u32;
+        let ForwardSimpleSceneResources {
+            vertex_buffer,
+            index_buffer,
+            vertex_count,
+            index_count,
+            camera_buffer,
+            lighting_buffer,
+            transform,
+        } = ForwardSimplePass::prepare_scene_resources(scene, &mut graph, width, height)?;
 
-        for obj in &scene.objects {
-            match obj {
-                SceneObject::Mesh { geometry, .. } => {
-                    match geometry {
-                        GeometryData::Inline { vertices, indices } => {
-                            indexed_vertices.extend_from_slice(vertices);
-
-                            if let Some(idx) = indices {
-                                // Offset indices by current vertex count
-                                all_indices.extend(idx.iter().map(|i| i + total_vertices));
-                            } else {
-                                // Generate sequential indices
-                                all_indices
-                                    .extend((0..vertices.len() as u32).map(|i| i + total_vertices));
-                            }
-
-                            total_vertices += vertices.len() as u32;
-                        }
-                        GeometryData::File { .. } => {
-                            log::warn!("External geometry files not yet supported");
-                        }
-                    }
-                }
-                SceneObject::GltfModel { .. } => {
-                    log::warn!("glTF models not yet supported in render graph");
-                }
-            }
-        }
-
-        // Expand indexed vertices into linear vertex array for now
-        // TODO: Use index buffer for efficiency
-        for &index in &all_indices {
-            all_vertices.push(indexed_vertices[index as usize]);
-        }
-
-        let vertex_count = all_vertices.len() as u32;
-        log::info!(
-            "Total indexed vertices: {}, indices: {}, expanded to: {} vertices",
-            total_vertices,
-            all_indices.len(),
-            vertex_count
-        );
-
-        // Log first few vertices for debugging
-        for (i, v) in all_vertices.iter().take(3).enumerate() {
-            log::info!(
-                "  Vertex {}: pos={:?}, normal={:?}, color={:?}",
-                i,
-                v.position,
-                v.normal,
-                v.color
-            );
-        }
-
-        // Create vertex buffer with data via render graph
-        use crate::render_graph::BufferUsageFlags;
-        // Prepare vertex data matching shader layout: position (3), normal (3), uv (2), color (4)
-        let vertex_data: Vec<u8> = all_vertices
-            .iter()
-            .flat_map(|v| {
-                let mut data = Vec::new();
-                data.extend_from_slice(bytemuck::bytes_of(&v.position)); // 12 bytes
-                data.extend_from_slice(bytemuck::bytes_of(&v.normal)); // 12 bytes
-                data.extend_from_slice(bytemuck::bytes_of(&v.uv)); // 8 bytes
-                                                                   // Extend color from 3 to 4 components (RGB -> RGBA)
-                data.extend_from_slice(bytemuck::bytes_of(&v.color)); // 12 bytes
-                data.extend_from_slice(bytemuck::bytes_of(&1.0f32)); // 4 bytes (alpha)
-                data
-            })
-            .collect();
-
-        // Declare vertex buffer with initial data - render graph will allocate and upload
-        let vertex_buffer = graph.declare_buffer_with_data(
-            "vertex_buffer",
-            vertex_data,
-            BufferUsageFlags::new(BufferUsageFlags::VERTEX),
-        );
-
-        // Create camera controller and get uniforms
-        let aspect = width as f32 / height as f32;
-        let camera_ctrl = CameraController::from_scene_camera(&scene.camera, width, height);
-        let camera_uniforms_glam = camera_ctrl.uniforms();
-
-        log::info!("Camera setup:");
-        log::info!("  Position: {:?}", scene.camera.position());
-        log::info!("  Target: {:?}", scene.camera.target());
-        log::info!("  FOV: {} degrees", scene.camera.fov());
-        log::info!(
-            "  Near/Far: {} / {}",
-            scene.camera.near(),
-            scene.camera.far()
-        );
-        log::info!("  Aspect: {}", aspect);
-        log::info!("  ViewProj matrix (from CameraController):");
-        for (i, row) in camera_uniforms_glam.view_proj.iter().enumerate() {
-            log::info!(
-                "    Row {}: [{:.4}, {:.4}, {:.4}, {:.4}]",
-                i,
-                row[0],
-                row[1],
-                row[2],
-                row[3]
-            );
-        }
-
-        #[repr(C)]
-        #[derive(Clone, Copy)]
-        struct CameraUniforms {
-            view_proj: [[f32; 4]; 4],
-        }
-        unsafe impl bytemuck::Pod for CameraUniforms {}
-        unsafe impl bytemuck::Zeroable for CameraUniforms {}
-
-        let camera_uniforms = CameraUniforms {
-            view_proj: camera_uniforms_glam.view_proj,
-        };
-
-        // Declare camera buffer with initial data - render graph will allocate and upload
-        let camera_buffer = graph.declare_buffer_with_data(
-            "camera_uniforms",
-            bytemuck::bytes_of(&camera_uniforms).to_vec(),
-            BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
-        );
-
-        // Create lighting uniforms
-        let lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
-
-        #[repr(C)]
-        #[derive(Clone, Copy)]
-        struct Light {
-            light_type: u32,
-            _padding1: u32,
-            _padding2: u32,
-            _padding3: u32,
-            position_or_direction: [f32; 4],
-            color_intensity: [f32; 4],
-        }
-        unsafe impl bytemuck::Pod for Light {}
-        unsafe impl bytemuck::Zeroable for Light {}
-
-        const MAX_LIGHTS: usize = 8;
-
-        #[repr(C)]
-        #[derive(Clone, Copy)]
-        struct LightingUniforms {
-            ambient_light_count: [f32; 4], // RGB ambient + light count
-            lights: [Light; MAX_LIGHTS],
-        }
-        unsafe impl bytemuck::Pod for LightingUniforms {}
-        unsafe impl bytemuck::Zeroable for LightingUniforms {}
-
-        // Build lights array
-        let mut lights_array = [Light {
-            light_type: 0,
-            _padding1: 0,
-            _padding2: 0,
-            _padding3: 0,
-            position_or_direction: [0.0; 4],
-            color_intensity: [0.0; 4],
-        }; MAX_LIGHTS];
-
-        let light_count = lighting.lights.len().min(MAX_LIGHTS);
-        for (i, scene_light) in lighting.lights.iter().take(MAX_LIGHTS).enumerate() {
-            lights_array[i] = match scene_light {
-                crate::scene::Light::Directional {
-                    direction,
-                    color,
-                    intensity,
-                } => Light {
-                    light_type: 0, // LIGHT_DIRECTIONAL
-                    _padding1: 0,
-                    _padding2: 0,
-                    _padding3: 0,
-                    position_or_direction: [direction[0], direction[1], direction[2], 0.0],
-                    color_intensity: [color[0], color[1], color[2], *intensity],
-                },
-                crate::scene::Light::Point {
-                    position,
-                    color,
-                    intensity,
-                } => Light {
-                    light_type: 1, // LIGHT_POINT
-                    _padding1: 0,
-                    _padding2: 0,
-                    _padding3: 0,
-                    position_or_direction: [position[0], position[1], position[2], 1.0],
-                    color_intensity: [color[0], color[1], color[2], *intensity],
-                },
-            };
-        }
-
-        let lighting_uniforms = LightingUniforms {
-            ambient_light_count: [
-                lighting.ambient[0],
-                lighting.ambient[1],
-                lighting.ambient[2],
-                light_count as f32,
-            ],
-            lights: lights_array,
-        };
-
-        // Declare lighting buffer with initial data - render graph will allocate and upload
-        let lighting_buffer = graph.declare_buffer_with_data(
-            "lighting_uniforms",
-            bytemuck::bytes_of(&lighting_uniforms).to_vec(),
-            BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
-        );
-
-        // Get transform from first object (for now)
-        let transform = scene
-            .objects
-            .first()
-            .and_then(|obj| match obj {
-                SceneObject::Mesh { transform, .. } => Some(*transform),
-                _ => None,
-            })
-            .unwrap_or_default();
+        log::info!("ForwardSimplePass prepared {vertex_count} vertices");
 
         // Create forward pass
         ForwardSimplePass::builder()
             .color_output(color_buffer)
             .depth_output(depth_buffer)
             .vertex_buffer(vertex_buffer)
+            .index_buffer(index_buffer)
             .camera_buffer(camera_buffer)
             .lighting_buffer(lighting_buffer)
             .transform(transform)
             .vertex_count(vertex_count)
+            .index_count(index_count)
             .with_name("forward_simple")
             .build(&mut graph)?;
         self.render_graph = Some(graph);

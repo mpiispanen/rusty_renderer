@@ -3243,41 +3243,140 @@ impl DirectXBackendImpl {
 
     pub fn bind_vertex_buffer(
         &mut self,
-        _binding: u32,
-        _buffer: &dyn crate::backends::Buffer,
-        _offset: u64,
+        binding: u32,
+        buffer: &dyn crate::backends::Buffer,
+        offset: u64,
     ) -> Result<()> {
-        anyhow::bail!("bind_vertex_buffer not yet implemented for DirectX 12")
+        unsafe {
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("DirectX command list not initialized")?;
+
+            // Downcast buffer implementation
+            let dx_buffer = buffer
+                .as_any()
+                .downcast_ref::<DirectXBuffer>()
+                .context("DirectX backend expected DirectXBuffer")?;
+
+            // TODO: Make stride configurable per buffer; for now assume packed GPU vertex
+            let stride = 48u32;
+            let size_in_bytes: u32 = dx_buffer
+                .size
+                .saturating_sub(offset)
+                .try_into()
+                .context("Vertex buffer slice exceeds u32 range")?;
+
+            let vbv = D3D12_VERTEX_BUFFER_VIEW {
+                BufferLocation: dx_buffer.resource.GetGPUVirtualAddress() + offset,
+                SizeInBytes: size_in_bytes,
+                StrideInBytes: stride,
+            };
+
+            command_list.IASetVertexBuffers(binding, Some(&[vbv]));
+            log::trace!(
+                "DirectX: bound vertex buffer (binding {}, stride {}, size {} bytes)",
+                binding,
+                stride,
+                size_in_bytes
+            );
+        }
+        Ok(())
     }
 
     pub fn bind_index_buffer(
         &mut self,
-        _buffer: &dyn crate::backends::Buffer,
-        _offset: u64,
-        _index_type: crate::backends::IndexType,
+        buffer: &dyn crate::backends::Buffer,
+        offset: u64,
+        index_type: crate::backends::IndexType,
     ) -> Result<()> {
-        anyhow::bail!("bind_index_buffer not yet implemented for DirectX 12")
+        unsafe {
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("DirectX command list not initialized")?;
+
+            let dx_buffer = buffer
+                .as_any()
+                .downcast_ref::<DirectXBuffer>()
+                .context("DirectX backend expected DirectXBuffer")?;
+
+            let format = match index_type {
+                crate::backends::IndexType::U16 => DXGI_FORMAT_R16_UINT,
+                crate::backends::IndexType::U32 => DXGI_FORMAT_R32_UINT,
+            };
+
+            let size_in_bytes: u32 = dx_buffer
+                .size
+                .saturating_sub(offset)
+                .try_into()
+                .context("Index buffer slice exceeds u32 range")?;
+
+            let ibv = D3D12_INDEX_BUFFER_VIEW {
+                BufferLocation: dx_buffer.resource.GetGPUVirtualAddress() + offset,
+                SizeInBytes: size_in_bytes,
+                Format: format,
+            };
+
+            command_list.IASetIndexBuffer(Some(&ibv));
+            log::trace!(
+                "DirectX: bound index buffer (format {:?}, size {} bytes)",
+                format,
+                size_in_bytes
+            );
+        }
+        Ok(())
     }
 
     pub fn draw(
         &mut self,
-        _vertex_count: u32,
-        _instance_count: u32,
-        _first_vertex: u32,
-        _first_instance: u32,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
     ) -> Result<()> {
-        anyhow::bail!("draw not yet implemented for DirectX 12")
+        unsafe {
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("DirectX command list not initialized")?;
+            command_list.DrawInstanced(vertex_count, instance_count, first_vertex, first_instance);
+            log::trace!(
+                "DirectX: draw instanced (vertices {}, instances {})",
+                vertex_count,
+                instance_count
+            );
+        }
+        Ok(())
     }
 
     pub fn draw_indexed(
         &mut self,
-        _index_count: u32,
-        _instance_count: u32,
-        _first_index: u32,
-        _vertex_offset: i32,
-        _first_instance: u32,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
     ) -> Result<()> {
-        anyhow::bail!("draw_indexed not yet implemented for DirectX 12")
+        unsafe {
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("DirectX command list not initialized")?;
+            command_list.DrawIndexedInstanced(
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            );
+            log::trace!(
+                "DirectX: draw indexed (indices {}, instances {})",
+                index_count,
+                instance_count
+            );
+        }
+        Ok(())
     }
 
     // Headless mode helper methods

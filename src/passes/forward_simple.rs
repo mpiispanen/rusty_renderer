@@ -3,12 +3,15 @@
 //! This pass demonstrates the target architecture where ALL resources are
 //! managed by the render graph. No buffers or textures are passed directly.
 
+use crate::camera::CameraController;
+use crate::lighting::Lighting;
+use crate::render_graph::IndexType;
 use crate::render_graph::{
     AccessType, ImageLayout, PassCallback, PassExecutionContext, PassId, PassKind,
     PassPreparationContext, PipelineBuilder, PipelineStage, RenderGraph, RenderPass,
     ResourceAccess, ResourceId, ShaderRegistry,
 };
-use crate::scene::Transform;
+use crate::scene::{GeometryData, Scene, SceneObject, Transform};
 use anyhow::Result;
 
 /// Simplified forward rendering pass
@@ -84,6 +87,137 @@ impl ForwardSimplePass {
     pub fn builder() -> ForwardSimplePassBuilder {
         ForwardSimplePassBuilder::new()
     }
+
+    /// Prepare render graph resources from a scene for the forward pass.
+    ///
+    /// Returns a descriptor with all resource identifiers and metadata that the pass needs.
+    pub fn prepare_scene_resources(
+        scene: &Scene,
+        graph: &mut RenderGraph,
+        width: u32,
+        height: u32,
+    ) -> Result<ForwardSimpleSceneResources> {
+        use crate::render_graph::BufferUsageFlags;
+
+        // Expand inline geometry into vertex list (currently supports single mesh scenes).
+        let mut base_vertices = Vec::new();
+        let mut indices = Vec::new();
+        let mut vertex_offset = 0u32;
+
+        for obj in &scene.objects {
+            match obj {
+                SceneObject::Mesh { geometry, .. } => match geometry {
+                    GeometryData::Inline {
+                        vertices,
+                        indices: mesh_indices,
+                    } => {
+                        // Push vertex data
+                        base_vertices.extend_from_slice(vertices);
+
+                        // Push indices with proper offsets (generate sequential if missing)
+                        if let Some(idx) = mesh_indices {
+                            indices.extend(idx.iter().map(|i| i + vertex_offset));
+                        } else {
+                            indices.extend((0..vertices.len() as u32).map(|i| i + vertex_offset));
+                        }
+                        vertex_offset += vertices.len() as u32;
+                    }
+                    GeometryData::File { .. } => {
+                        log::warn!("ForwardSimplePass: external geometry files not yet supported");
+                    }
+                },
+                SceneObject::GltfModel { .. } => {
+                    log::warn!("ForwardSimplePass: glTF models not yet supported in render graph");
+                }
+            }
+        }
+
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        struct GpuVertex {
+            position: [f32; 3],
+            normal: [f32; 3],
+            uv: [f32; 2],
+            color: [f32; 4],
+        }
+        unsafe impl bytemuck::Pod for GpuVertex {}
+        unsafe impl bytemuck::Zeroable for GpuVertex {}
+
+        let gpu_vertices: Vec<GpuVertex> = base_vertices
+            .iter()
+            .map(|v| GpuVertex {
+                position: v.position,
+                normal: v.normal,
+                uv: v.uv,
+                color: [v.color[0], v.color[1], v.color[2], 1.0],
+            })
+            .collect();
+        let vertex_buffer = graph.declare_buffer_with_data(
+            "forward_simple_vertices",
+            bytemuck::cast_slice(&gpu_vertices).to_vec(),
+            BufferUsageFlags::new(BufferUsageFlags::VERTEX),
+        );
+
+        if indices.is_empty() {
+            log::warn!("ForwardSimplePass: no indices found; generated sequential indices");
+            indices.extend(0..gpu_vertices.len() as u32);
+        }
+
+        let index_buffer = graph.declare_buffer_with_data(
+            "forward_simple_indices",
+            bytemuck::cast_slice(&indices).to_vec(),
+            BufferUsageFlags::new(BufferUsageFlags::INDEX),
+        );
+
+        // Camera uniforms
+        let camera_ctrl = CameraController::from_scene_camera(&scene.camera, width, height);
+        let camera_uniforms = camera_ctrl.uniforms();
+        let camera_buffer = graph.declare_buffer_with_data(
+            "forward_simple_camera",
+            bytemuck::bytes_of(&camera_uniforms).to_vec(),
+            BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+        );
+
+        // Lighting uniforms
+        let scene_lighting = scene.lighting.as_ref().cloned().unwrap_or_default();
+        let lighting = Lighting::new(&scene_lighting);
+        let lighting_buffer = graph.declare_buffer_with_data(
+            "forward_simple_lighting",
+            lighting.buffer_data().to_vec(),
+            BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+        );
+
+        // Current implementation uses transform of the first mesh if available.
+        let transform = scene
+            .objects
+            .first()
+            .and_then(|obj| match obj {
+                SceneObject::Mesh { transform, .. } => Some(*transform),
+                _ => None,
+            })
+            .unwrap_or_default();
+
+        Ok(ForwardSimpleSceneResources {
+            vertex_buffer,
+            index_buffer,
+            vertex_count: gpu_vertices.len() as u32,
+            index_count: indices.len() as u32,
+            camera_buffer,
+            lighting_buffer,
+            transform,
+        })
+    }
+}
+
+/// Prepared resources for the ForwardSimplePass created from a scene.
+pub struct ForwardSimpleSceneResources {
+    pub vertex_buffer: ResourceId,
+    pub index_buffer: ResourceId,
+    pub vertex_count: u32,
+    pub index_count: u32,
+    pub camera_buffer: ResourceId,
+    pub lighting_buffer: ResourceId,
+    pub transform: Transform,
 }
 
 /// Builder for ForwardSimplePass
@@ -91,12 +225,14 @@ pub struct ForwardSimplePassBuilder {
     color_output: Option<ResourceId>,
     depth_output: Option<ResourceId>,
     vertex_buffer: Option<ResourceId>,
+    index_buffer: Option<ResourceId>,
     camera_buffer: Option<ResourceId>,
     lighting_buffer: Option<ResourceId>,
     material_buffer: Option<ResourceId>,
     albedo_texture: Option<ResourceId>,
     transform: Transform,
     vertex_count: u32,
+    index_count: u32,
     name: String,
 }
 
@@ -107,12 +243,14 @@ impl ForwardSimplePassBuilder {
             color_output: None,
             depth_output: None,
             vertex_buffer: None,
+            index_buffer: None,
             camera_buffer: None,
             lighting_buffer: None,
             material_buffer: None,
             albedo_texture: None,
             transform: Transform::default(),
             vertex_count: 0,
+            index_count: 0,
             name: "forward_simple".to_string(),
         }
     }
@@ -132,6 +270,12 @@ impl ForwardSimplePassBuilder {
     /// Set vertex buffer
     pub fn vertex_buffer(mut self, resource: ResourceId) -> Self {
         self.vertex_buffer = Some(resource);
+        self
+    }
+
+    /// Set index buffer
+    pub fn index_buffer(mut self, resource: ResourceId) -> Self {
+        self.index_buffer = Some(resource);
         self
     }
 
@@ -171,6 +315,12 @@ impl ForwardSimplePassBuilder {
         self
     }
 
+    /// Set index count
+    pub fn index_count(mut self, count: u32) -> Self {
+        self.index_count = count;
+        self
+    }
+
     /// Set custom pass name
     pub fn with_name(mut self, name: impl Into<String>) -> Self {
         self.name = name.into();
@@ -195,6 +345,9 @@ impl ForwardSimplePassBuilder {
         let vertex_buffer = self
             .vertex_buffer
             .ok_or_else(|| anyhow::anyhow!("vertex_buffer is required"))?;
+        let index_buffer = self
+            .index_buffer
+            .ok_or_else(|| anyhow::anyhow!("index_buffer is required"))?;
         let camera_buffer = self
             .camera_buffer
             .ok_or_else(|| anyhow::anyhow!("camera_buffer is required"))?;
@@ -204,6 +357,9 @@ impl ForwardSimplePassBuilder {
 
         if self.vertex_count == 0 {
             return Err(anyhow::anyhow!("vertex_count must be greater than 0"));
+        }
+        if self.index_count == 0 {
+            return Err(anyhow::anyhow!("index_count must be greater than 0"));
         }
 
         let pass_id = graph.next_pass_id();
@@ -229,6 +385,14 @@ impl ForwardSimplePassBuilder {
         // Input: Vertex buffer
         pass.add_input(ResourceAccess::new(
             vertex_buffer,
+            AccessType::Read,
+            PipelineStage::new(PipelineStage::VERTEX_INPUT),
+            None,
+        ));
+
+        // Input: Index buffer
+        pass.add_input(ResourceAccess::new(
+            index_buffer,
             AccessType::Read,
             PipelineStage::new(PipelineStage::VERTEX_INPUT),
             None,
@@ -274,7 +438,9 @@ impl ForwardSimplePassBuilder {
         let callback = ForwardSimplePassCallback {
             transform: self.transform,
             vertex_count: self.vertex_count,
+            index_count: self.index_count,
             vertex_buffer,
+            index_buffer,
             camera_buffer,
             lighting_buffer,
             material_buffer: self.material_buffer,
@@ -304,7 +470,9 @@ impl Default for ForwardSimplePassBuilder {
 struct ForwardSimplePassCallback {
     transform: Transform,
     vertex_count: u32,
+    index_count: u32,
     vertex_buffer: ResourceId,
+    index_buffer: ResourceId,
     camera_buffer: ResourceId,
     lighting_buffer: ResourceId,
     material_buffer: Option<ResourceId>,
@@ -372,8 +540,9 @@ impl PassCallback for ForwardSimplePassCallback {
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::info!(
-            "Executing forward simple pass ({} vertices)",
-            self.vertex_count
+            "Executing forward simple pass ({} vertices, {} indices)",
+            self.vertex_count,
+            self.index_count
         );
 
         // Get buffer pointers from resource IDs
@@ -384,6 +553,13 @@ impl PassCallback for ForwardSimplePassCallback {
         let vertex_buffer_ptr = context
             .get_buffer_ptr(self.vertex_buffer)
             .expect("Failed to get vertex buffer");
+        log::info!(
+            "Getting index buffer ptr for resource {:?}",
+            self.index_buffer
+        );
+        let index_buffer_ptr = context
+            .get_buffer_ptr(self.index_buffer)
+            .expect("Failed to get index buffer");
         log::info!(
             "Getting camera buffer ptr for resource {:?}",
             self.camera_buffer
@@ -404,6 +580,9 @@ impl PassCallback for ForwardSimplePassCallback {
         context
             .bind_vertex_buffer(0, vertex_buffer_ptr, 0)
             .expect("Failed to bind vertex buffer");
+        context
+            .bind_index_buffer(index_buffer_ptr, 0, IndexType::U32)
+            .expect("Failed to bind index buffer");
 
         // Bind uniforms
         log::info!("Binding camera uniforms");
@@ -445,10 +624,10 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Failed to push constants");
 
         // Draw
-        log::info!("Drawing {} vertices", self.vertex_count);
+        log::info!("Drawing indexed geometry ({} indices)", self.index_count);
         context
-            .draw(self.vertex_count, 1, 0, 0)
-            .expect("Failed to draw");
+            .draw_indexed(self.index_count, 1, 0, 0, 0)
+            .expect("Failed to draw indexed");
 
         log::info!("Forward simple pass execution complete");
     }

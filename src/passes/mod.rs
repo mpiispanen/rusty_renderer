@@ -14,6 +14,8 @@ pub mod vertex_buffer_triangle;
 pub use forward::ForwardPass;
 pub use forward_declarative::ForwardDeclarativePass;
 pub use forward_pass_builder::{ForwardRenderPass, ForwardRenderPassBuilder};
-pub use forward_simple::{ForwardSimplePass, ForwardSimplePassBuilder};
+pub use forward_simple::{
+    ForwardSimplePass, ForwardSimplePassBuilder, ForwardSimpleSceneResources,
+};
 
 pub use vertex_buffer_triangle::{VertexBufferTrianglePass, VertexBufferTrianglePassBuilder};
