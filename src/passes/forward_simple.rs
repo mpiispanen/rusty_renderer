@@ -182,6 +182,9 @@ impl ForwardSimplePassBuilder {
     /// # Note
     /// Call `ForwardSimplePass::register_shaders(graph)` before building instances
     pub fn build(self, graph: &mut RenderGraph) -> Result<ForwardSimplePass> {
+        // Register shaders before building the pass
+        ForwardSimplePass::register_shaders(graph);
+
         // Validate required resources
         let color_output = self
             .color_output

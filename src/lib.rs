@@ -5,14 +5,12 @@
 
 // Module declarations - public for testing and library use
 pub mod app;
-pub mod application;
 pub mod backends;
 pub mod camera;
 pub mod config;
 pub mod lighting;
 pub mod materials;
 pub mod passes;
-pub mod pipelines;
 pub mod profiling;
 pub mod render_graph;
 pub mod resources;
