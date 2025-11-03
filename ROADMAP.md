@@ -52,12 +52,12 @@ See [CURRENT_STATE.md](CURRENT_STATE.md) for detailed current status.
 ### Render Graph Architecture Completion (CURRENT)
 - [x] Render pass resource declaration
 - [x] Shader registry system
-- [ ] **Remove legacy hardcoded code** (THIS WEEK)
-  - [ ] Remove hardcoded vertices in app.rs
-  - [ ] Move shader registration to render passes
-  - [ ] Extract lights to scene files
-  - [ ] Clean up unused code paths
-- [ ] **Shadow mapping pipeline** (THIS WEEK)
+- [ ] **Issue #88: Remove legacy hardcoded code**
+  - [x] Remove hardcoded vertices in app.rs
+  - [x] Move shader registration to render passes
+  - [x] Extract lights from scenes
+  - [ ] Clean up remaining legacy helpers & docs
+- [ ] **Shadow mapping pipeline**
   - [ ] Shadow map render pass
   - [ ] Forward pass with shadow support
   - [ ] Tone mapping post-process
@@ -85,8 +85,7 @@ See [CURRENT_STATE.md](CURRENT_STATE.md) for detailed current status.
 - [ ] Performance profiling overlay
 
 ### Scene System Improvements
-- [ ] Extract lights to scene files (currently hardcoded in app)
-- [ ] Multiple light types in scenes
+- [ ] Expand lighting options (multiple lights, advanced falloff)
 - [ ] Scene hierarchy (parent/child transforms)
 - [ ] Multiple cameras
 - [ ] External geometry file support (OBJ)

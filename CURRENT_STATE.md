@@ -9,15 +9,11 @@
 ### ✅ Working Features
 
 **Both Vulkan and DirectX backends:**
-- Basic forward rendering with Blinn-Phong lighting
-- Vertex color rendering (triangle pass)
-- Scene loading from TOML files
-- GLTF model loading with textures
-- Depth testing and backface culling
-- Headless and windowed modes
-- Screenshot capture
-- Cross-compilation for Windows
-- DirectX testing via Proton on Linux
+- Forward lighting via the render-graph driven `ForwardSimplePass`
+- Scene-driven geometry (triangle, cube, glTF models) defined in TOML
+- Depth testing, backface culling, and screenshot capture
+- Headless and windowed execution paths
+- Cross-compilation for Windows plus Proton-based DirectX validation on Linux
 
 ### ⚠️ Known Issues
 
@@ -27,11 +23,10 @@
 - Minor backface culling differences between backends
 
 **Architecture:**
-- **Hardcoded shader paths** - Shaders referenced by fixed file paths in backend code
-- **Hardcoded pipeline state** - Depth, culling, blending not configurable
+- **Hardcoded shader paths** - Render passes still reference pre-built shader binaries directly
+- **Hardcoded pipeline state** - Depth, culling, blending not yet configurable per-scene
 - **Hardcoded resource bindings** - Descriptor layouts fixed in backends
-- **Legacy code** - Some unused paths and variables remain from refactoring
-- **Lights hardcoded in app** - Should come from scene files
+- **Legacy render graph gaps** - Index buffers and material binding still manual
 
 **CI/CD:**
 - Visual regression tests not yet automated
@@ -47,49 +42,37 @@ We are transitioning from hardcoded rendering to a fully data-driven render grap
 
 ### Immediate Goals
 
-1. **Remove legacy/hardcoded code**
-   - Clean up unused variables and paths
-   - Remove hardcoded vertex data in app.rs
-   - Move shader registration to render passes
-   - Extract lights from app to scene files
+1. **Issue #88 – Remove legacy hardcoded code**
+   - Finish cleaning `app.rs` now that the legacy pipeline/application stack is gone
+   - Move remaining shader references into render-pass builders
+   - Tighten vertex/index buffer handling so the graph stays declarative
 
-2. **Complete render graph resource management**
-   - Automatic resource allocation
-   - Proper resource upload and initialization
-   - Pipeline compilation from pass definitions
+2. **Shadow Mapping Prep**
+   - Define interfaces for depth-only shadow passes
+   - Extend forward pass to consume shadow resources
+   - Plan tone mapping/post effects once shadows land
 
-3. **Add shadow mapping**
-   - Shadow map render pass
-   - Forward rendering with shadows
-   - Tone mapping post-process
-
-4. **Make pipeline configurable**
-   - Runtime pass enable/disable
-   - Debug UI for pipeline configuration
+3. **Automation & CI**
+   - Stand up headless regression captures for Vulkan + DirectX
+   - Track parity deltas automatically
+   - Publish lightweight dashboards instead of sprawling status docs
 
 ## Next Steps
 
-### Phase 1: Code Cleanup (THIS WEEK)
-- [ ] Remove all hardcoded vertices in app.rs
-- [ ] Move shader registration to render passes
-- [ ] Extract lights to scene files
-- [ ] Remove unused/legacy code paths
-- [ ] Update documentation to reflect current state
+### Code Cleanup (in progress)
+- [ ] Finish shader registration migration into `ForwardSimplePass`
+- [ ] Replace manual vertex expansion with index buffer support
+- [ ] Remove unused resource helpers leftover from pipeline era
 
-### Phase 2: Shadow Mapping (THIS WEEK)
-- [ ] Implement shadow map render pass
-- [ ] Update forward pass to use shadow maps
-- [ ] Add tone mapping post-process pass
+### Shadow Mapping (next milestone)
+- [ ] Shadow map render pass & resource descriptors
+- [ ] Forward shading with shadow sampling
+- [ ] Tone mapping and simple PCF
 
-### Phase 3: CI and Testing (ONGOING)
-- [ ] Fix CI rendering tests
-- [ ] Automated backend parity validation
-- [ ] Reference image management
-
-### Phase 4: Debug UI (NEXT SPRINT)
-- [ ] Pipeline configuration UI
-- [ ] Pass enable/disable
-- [ ] Real-time shader reload
+### CI & Tooling (ongoing)
+- [ ] Re-enable automated screenshot comparisons
+- [ ] Capture Proton-based DirectX runs in CI
+- [ ] Publish consolidated status updates (single source of truth)
 
 ## Build Instructions
 
@@ -134,4 +117,3 @@ cargo run --release -- --backend directx --scene cube
 - **[docs/BAZZITE_SETUP.md](docs/BAZZITE_SETUP.md)** - Bazzite-specific setup
 - **[docs/TESTING_DIRECTX_ON_LINUX.md](docs/TESTING_DIRECTX_ON_LINUX.md)** - DirectX via Proton
 - **[ROADMAP.md](ROADMAP.md)** - Development roadmap
-

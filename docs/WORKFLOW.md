@@ -27,7 +27,7 @@ cargo test --lib
 
 # Build and test
 cargo build --release
-cargo run --release -- --scene scenes/cube.toml --pipeline forward --headless
+cargo run --release -- --scene scenes/cube.toml --headless
 
 # Commit (use pre-commit hook for auto-checks)
 git add -A

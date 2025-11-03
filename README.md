@@ -181,6 +181,13 @@ cargo run --release -- --scene cube --width 1920 --height 1080
 
 Note: `directx` backend native support only on Windows. On Linux, use `run_with_proton.sh` script.
 
+## Documentation
+
+- `CURRENT_STATE.md` – single source of truth for project status and priorities
+- `ROADMAP.md` – upcoming milestones and longer-term ideas
+- `docs/DESIGN.md` – architecture overview and active focus areas
+- `docs/WORKFLOW.md` – day-to-day development workflow and CI expectations
+
 ## Testing
 
 ### Unit and Integration Tests

@@ -43,24 +43,22 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ✅ Cross-compilation for Windows
 - ✅ Shader compilation (HLSL → SPIR-V/DXIL)
 
-### Current Focus - Code Cleanup & Shadow Mapping
+### Current Focus – Render Graph Refinement & Shadow Mapping
 
-**Cleaning up legacy code:**
-- Remove hardcoded vertices in app.rs
-- Move shader registration from app to render passes
-- Extract lights from app to scene files
-- Remove unused/legacy code paths
+**Cleanup & hardening**
+- Finish migrating any remaining shader references into pass builders
+- Replace manual vertex expansion with index/vertex buffer descriptors in the graph
+- Prune deprecated documentation and helpers from the pre-render-graph era
 
-**Implementing shadow mapping:**
-- Shadow map render pass (depth-only rendering)
-- Forward pass with shadow map sampling
-- Tone mapping post-process pass
-- Make pipeline configurable (enable/disable passes)
+**Shadow mapping roadmap**
+- Introduce a depth-only shadow map pass
+- Extend forward shading to sample shadows (with basic PCF)
+- Add tone mapping / post-processing once shadows land
 
-**CI and testing:**
-- Fix CI rendering tests
-- Automated backend parity validation
-- Reference image workflow
+**CI and testing**
+- Re-enable automated screenshot comparisons for Vulkan + DirectX
+- Capture Proton-based DirectX results as part of CI
+- Publish a single current-state document instead of many overlapping status reports
 
 ## Architecture Overview
 
