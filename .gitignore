@@ -53,3 +53,19 @@ Thumbs.db
 *.profraw
 *.profdata
 .xwin-cache/
+
+# Debug and log files
+*.log
+rusty_renderer_debug.log
+vulkan_debug.log
+dx_debug.log
+
+# Test output images (too many, not needed in repo)
+test_*.png
+cube_*.png
+triangle_*.png
+quad_*.png
+dx_*.png
+vk_*.png
+*_test.png
+*_debug.png
