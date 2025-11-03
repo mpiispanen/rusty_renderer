@@ -63,6 +63,7 @@ fn compile_hlsl_to_spirv(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &
         .arg("vs_6_0")
         .arg("-E")
         .arg(vs_entry)
+        .arg("-DVULKAN") // Define VULKAN for Vulkan-specific code
         .arg("-fspv-target-env=vulkan1.2")
         .arg("-Fo")
         .arg(&vert_spv)
@@ -100,6 +101,7 @@ fn compile_hlsl_to_spirv(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &
         .arg("ps_6_0")
         .arg("-E")
         .arg(ps_entry)
+        .arg("-DVULKAN") // Define VULKAN for Vulkan-specific code
         .arg("-fspv-target-env=vulkan1.2")
         .arg("-Fo")
         .arg(&frag_spv)
@@ -133,9 +135,8 @@ fn compile_hlsl_to_spirv(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &
 
 /// Compile HLSL to DXIL for DirectX using DXC
 fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &str) {
-    let out_dir = env::var("OUT_DIR").unwrap();
-    let vs_out = Path::new(&out_dir).join(format!("{}_vs.cso", name));
-    let ps_out = Path::new(&out_dir).join(format!("{}_ps.cso", name));
+    let vs_out = format!("shaders/{}.vert.dxil", name);
+    let ps_out = format!("shaders/{}.frag.dxil", name);
 
     // Check if DXC is available
     if Command::new("dxc").arg("--version").output().is_err() {
@@ -154,6 +155,8 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
         .arg("vs_6_0")
         .arg("-E")
         .arg(vs_entry)
+        .arg("-validator-version")
+        .arg("0.0") // Use internal validator (better VKD3D compatibility)
         .arg("-Fo")
         .arg(&vs_out)
         .arg(hlsl_src)
@@ -181,6 +184,8 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
         .arg("ps_6_0")
         .arg("-E")
         .arg(ps_entry)
+        .arg("-validator-version")
+        .arg("0.0") // Use internal validator (better VKD3D compatibility)
         .arg("-Fo")
         .arg(&ps_out)
         .arg(hlsl_src)

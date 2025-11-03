@@ -198,8 +198,8 @@ impl ForwardRenderPassBuilder {
             vertex_buffer: Arc::new(vertex_buffer),
             camera_buffer,
             lighting_buffer,
-            material_buffer: self.material_buffer,
-            texture: self.texture,
+            _material_buffer: self.material_buffer,
+            _texture: self.texture,
             transform: self.transform,
             vertex_count: self.vertex_count,
         };
@@ -222,8 +222,8 @@ struct ForwardRenderPassCallback {
     vertex_buffer: Arc<Box<dyn Buffer>>,
     camera_buffer: Arc<Box<dyn Buffer>>,
     lighting_buffer: Arc<Box<dyn Buffer>>,
-    material_buffer: Option<Arc<Box<dyn Buffer>>>,
-    texture: Option<Arc<Box<dyn Texture>>>,
+    _material_buffer: Option<Arc<Box<dyn Buffer>>>,
+    _texture: Option<Arc<Box<dyn Texture>>>,
     transform: Transform,
     vertex_count: u32,
 }
@@ -299,9 +299,25 @@ impl PassCallback for ForwardRenderPassCallback {
             self.vertex_count
         );
 
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "ForwardPass::execute - START");
+        }
+
         // Push model and normal matrices as push constants
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "ForwardPass::execute - matrices computed");
+        }
 
         // Combine both matrices into a single byte array (128 bytes total)
         let mut push_data = Vec::with_capacity(128);
@@ -320,10 +336,37 @@ impl PassCallback for ForwardRenderPassCallback {
             }
         }
 
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            use std::io::Write;
+            let _ = writeln!(
+                f,
+                "ForwardPass::execute - push data prepared, {} bytes",
+                push_data.len()
+            );
+        }
+
         // Push constants to vertex shader (stage flag 0x1 = VERTEX)
         if let Err(e) = context.push_constants(0x1, 0, &push_data) {
             log::error!("Failed to push constants: {e}");
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                use std::io::Write;
+                let _ = writeln!(f, "ForwardPass::execute - ERROR pushing constants: {e}");
+            }
             return;
+        }
+
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "ForwardPass::execute - push constants done");
         }
 
         // Bind camera uniforms (set 0, binding 0)

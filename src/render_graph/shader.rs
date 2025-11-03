@@ -187,6 +187,143 @@ impl ShaderDescriptor {
         }
     }
 
+    /// Compile shader to DXIL bytecode for DirectX 12
+    ///
+    /// This method compiles the shader source to DXIL bytecode suitable for DirectX 12.
+    /// For pre-compiled shaders, it loads the .dxil file. For source files, it uses DXC.
+    ///
+    /// # Returns
+    /// DXIL bytecode as a vector of u8 bytes
+    pub fn compile_to_dxil(&self) -> Result<Vec<u8>> {
+        use std::io::Write;
+
+        // Debug logging to file since Wine swallows stderr
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(f, "[compile_to_dxil] Called");
+        }
+
+        match &self.source {
+            ShaderSource::Embedded(bytecode) => {
+                // Assume embedded bytecode is already DXIL
+                log::debug!("Using embedded DXIL bytecode ({} bytes)", bytecode.len());
+                Ok(bytecode.to_vec())
+            }
+            ShaderSource::Compiled(path) => {
+                // Load pre-compiled DXIL
+                // Convert .spv path to .dxil path
+                let dxil_path = path.replace(".spv", ".dxil");
+
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "[compile_to_dxil] Loading: {}", dxil_path);
+                }
+
+                log::debug!("Loading pre-compiled DXIL from: {}", dxil_path);
+
+                let result = ShaderRegistry::load_compiled(&dxil_path);
+                if let Err(ref e) = result {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(f, "[compile_to_dxil] FAILED: {}", e);
+                    }
+                    log::error!("Failed to load pre-compiled DXIL from {}: {}", dxil_path, e);
+                } else if let Ok(ref bytecode) = result {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(
+                            f,
+                            "[compile_to_dxil] SUCCESS: loaded {} bytes",
+                            bytecode.len()
+                        );
+                    }
+                }
+                result
+            }
+            ShaderSource::File(path) => {
+                // Compile from source file
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "[compile_to_dxil] File source: {}", path);
+                }
+
+                log::debug!(
+                    "Shader source is File: {}, backend_compile: {}",
+                    path,
+                    self.backend_compile
+                );
+                if !self.backend_compile {
+                    return Err(ShaderError::CompilationError(
+                        "Shader marked as not backend-compilable but source is a file".to_string(),
+                    ));
+                }
+
+                // For now, assume all source files are HLSL and use DXC to compile to DXIL
+                log::warn!("Attempting runtime HLSL to DXIL compilation for: {}", path);
+                self.compile_hlsl_to_dxil(path)
+            }
+        }
+    }
+
+    /// Compile HLSL source to DXIL using DXC
+    fn compile_hlsl_to_dxil(&self, path: &str) -> Result<Vec<u8>> {
+        use std::process::Command;
+
+        // Determine shader profile based on stage
+        let profile = match self.stage {
+            ShaderStage::Vertex => "vs_6_0",
+            ShaderStage::Fragment => "ps_6_0",
+            ShaderStage::Compute => "cs_6_0",
+        };
+
+        // Create output path for DXIL
+        let output_path = format!("{}.dxil", path);
+
+        // Run DXC to compile HLSL to DXIL
+        let output = Command::new("dxc")
+            .arg("-T")
+            .arg(profile)
+            .arg("-E")
+            .arg(self.entry_point)
+            .arg(path)
+            .arg("-Fo")
+            .arg(&output_path)
+            .output()
+            .map_err(|e| ShaderError::CompilationError(format!("Failed to run DXC: {}", e)))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(ShaderError::CompilationError(format!(
+                "DXC compilation failed for {}: {}",
+                path, stderr
+            )));
+        }
+
+        // Load the compiled DXIL
+        let bytecode = std::fs::read(&output_path)
+            .map_err(|e| ShaderError::LoadError(format!("Failed to load compiled DXIL: {}", e)))?;
+
+        // Clean up temporary file
+        let _ = std::fs::remove_file(&output_path);
+
+        Ok(bytecode)
+    }
+
     /// Compile HLSL source to SPIR-V using DXC
     #[cfg(unix)]
     fn compile_hlsl_to_spirv(&self, path: &str) -> Result<Vec<u32>> {

@@ -70,7 +70,7 @@ fn main() -> Result<()> {
         let _ = f.flush();
     }
 
-    let mut runner = ApplicationRunner::new(args);
+    let runner = ApplicationRunner::new(args);
     if let Err(e) = runner.run() {
         eprintln!("Error running application: {e:?}");
         if let Some(ref mut f) = log_file {

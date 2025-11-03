@@ -25,17 +25,20 @@ cbuffer LightingUniforms : register(b1) {
     Light lights[MAX_LIGHTS];
 };
 
-// Push constants (b2)
-cbuffer PushConstants : register(b2) {
+// Push constants struct (b2 for DirectX, vk::push_constant for Vulkan)
+struct PushConstantData {
     float4x4 model;
     float4x4 normalMatrix;
 };
 
-// Material uniforms (b3)
-cbuffer MaterialUniforms : register(b3) {
-    float4 baseColor;
-    float4 properties;
+#ifdef VULKAN
+[[vk::push_constant]] PushConstantData pushConstants;
+#else
+// DirectX uses root constants at b2
+cbuffer PushConstants : register(b2) {
+    PushConstantData pushConstants;
 };
+#endif
 
 // Vertex input
 struct VSInput {
@@ -58,11 +61,11 @@ PSInput VSMain(VSInput input) {
     PSInput output;
     
     // Transform to world space
-    float4 worldPos = mul(model, float4(input.position, 1.0));
+    float4 worldPos = mul(pushConstants.model, float4(input.position, 1.0));
     output.worldPos = worldPos.xyz;
     
     // Transform normal
-    output.normal = normalize(mul((float3x3)normalMatrix, input.normal));
+    output.normal = normalize(mul((float3x3)pushConstants.normalMatrix, input.normal));
     
     // Transform to clip space
     output.position = mul(viewProj, worldPos);
@@ -78,8 +81,8 @@ float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize interpolated normal
     float3 normal = normalize(input.normal);
     
-    // Use vertex color and material base color
-    float3 surfaceColor = input.color.rgb * baseColor.rgb;
+    // Use vertex color (no material for now)
+    float3 surfaceColor = input.color.rgb;
     
     // Start with ambient light
     float3 ambient = ambientLightCount.xyz;

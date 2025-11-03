@@ -1,0 +1,17 @@
+Syncing binary and assets...
+  ✓ Binary copied (from x86_64-pc-windows-gnu)
+  ✓ Shaders synced
+  ✓ Assets synced
+  ✓ Scenes synced
+================================================
+Running rusty_renderer with Proton
+================================================
+Proton: /home/matpii01/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)
+VKD3D Debug: warn
+Arguments: --scene cube --headless
+================================================
+
+
+================================================
+Exit code: 1
+================================================

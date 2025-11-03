@@ -9,36 +9,37 @@ This is a cross-platform graphics rendering sandbox developed in Rust to aid lea
 ## Quick Start
 
 ```bash
-# Install Vulkan runtime (see docs/RUNNING_LOCALLY.md for platform-specific instructions)
-# Ubuntu/Debian example:
-sudo apt install vulkan-tools libvulkan-dev
+# Install Vulkan runtime (see docs/RUNNING_LOCALLY.md or docs/BAZZITE_SETUP.md)
+# On Bazzite, graphics drivers are usually pre-installed
 
 # Clone the repository
 git clone https://github.com/mpiispanen/rusty_renderer.git
 cd rusty_renderer
 
-# List available scenes
-cargo run --release -- --list-scenes
+# Run with Vulkan (default)
+cargo run --release -- --scene cube
 
-# Render triangle in windowed mode (interactive)
-cargo run --release -- --scene scenes/triangle.toml
+# Run with DirectX via Proton (Linux/Bazzite)
+./run_with_proton.sh cube
 
-# Render in headless mode with screenshot
-cargo run --release -- --scene scenes/triangle.toml --headless --screenshot triangle.png
+# Headless mode with screenshot
+cargo run --release -- --scene cube --headless --screenshot output.png
 ```
 
-You should see a colorful RGB triangle! Press Escape to exit windowed mode. 🎨
+You should see a rotating cube! Press Escape to exit windowed mode. 🎨
 
 ## Features
 
-- **Multi-backend support**: Vulkan (via vulkanalia) and DirectX 12 (Windows)
+- **Multi-backend support**: Vulkan and DirectX 12 (via Proton on Linux)
 - **Scene-driven rendering**: TOML-based scene files with geometry, cameras, and lighting
-- **Dual-mode operation**: Windowed (interactive) and headless (CI/testing) modes
-- **Render graph system**: Automatic dependency management and execution
-- **Cross-platform**: Linux and Windows support
-- **Well-tested**: Comprehensive unit and integration tests (122+ tests)
-- **CI/CD**: Automated builds, tests, and GPU validation
-- **Validation layers**: Debug mode with validation on all backends (see [docs/VALIDATION_LAYERS.md](docs/VALIDATION_LAYERS.md))
+- **Render graph system**: Automatic resource management and pass scheduling
+- **GLTF model loading**: Full support for textured 3D models
+- **Forward rendering**: Blinn-Phong lighting with diffuse and specular
+- **Dual-mode operation**: Windowed (interactive) and headless (CI/testing)
+- **Cross-platform**: Linux (Bazzite) and Windows support
+- **Unified shaders**: Single HLSL source compiled to SPIR-V and DXIL
+- **CI/CD**: Automated builds, tests, and validation
+- **Well-tested**: Comprehensive unit and integration tests (130+ tests)
 
 ## Building
 
@@ -46,8 +47,9 @@ You should see a colorful RGB triangle! Press Escape to exit windowed mode. 🎨
 
 - Rust 1.70+ (install from [rustup.rs](https://rustup.rs))
 - Platform-specific graphics drivers:
-  - **Linux**: Vulkan drivers (usually included with GPU drivers)
-  - **Windows**: DirectX 12 compatible GPU or Vulkan drivers
+  - **Linux/Bazzite**: Vulkan drivers (pre-installed on Bazzite)
+  - **Windows**: DirectX 12 compatible GPU
+- For DirectX on Linux: Proton/Wine with vkd3d-proton (see docs/TESTING_DIRECTX_ON_LINUX.md)
 
 ### Build Instructions
 
@@ -59,30 +61,24 @@ cd rusty_renderer
 # Build in release mode (recommended)
 cargo build --release
 
-# List available scenes
-cargo run --release -- --list-scenes
-
-# List available pipelines
-cargo run --release -- --list-pipelines
-
-# Run with triangle scene (windowed mode)
-cargo run --release -- --scene scenes/triangle.toml
+# Run with different scenes
+cargo run --release -- --scene triangle
+cargo run --release -- --scene cube
 
 # Run in headless mode with screenshot
-cargo run --release -- --scene scenes/triangle.toml --headless --screenshot output.png
+cargo run --release -- --scene cube --headless --screenshot output.png
 
-# Try different backends
-cargo run --release -- --scene scenes/triangle.toml --backend vulkan
-cargo run --release -- --scene scenes/triangle.toml --backend directx  # Windows only
-
-# Use forward rendering pipeline (when descriptor sets are available)
-cargo run --release -- --scene scenes/cube.toml --pipeline forward
+# Try DirectX backend via Proton (Linux/Bazzite)
+./run_with_proton.sh cube
 
 # Run with detailed logging
-RUST_LOG=debug cargo run --release -- --scene scenes/triangle.toml
+RUST_LOG=debug cargo run --release -- --scene cube
 ```
 
-For detailed instructions and troubleshooting, see [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md).
+For detailed instructions and troubleshooting:
+- **Linux/Bazzite**: See [docs/BAZZITE_SETUP.md](docs/BAZZITE_SETUP.md)
+- **DirectX on Linux**: See [docs/TESTING_DIRECTX_ON_LINUX.md](docs/TESTING_DIRECTX_ON_LINUX.md)
+- **General setup**: See [docs/RUNNING_LOCALLY.md](docs/RUNNING_LOCALLY.md)
 
 ## Usage
 
@@ -150,16 +146,14 @@ See `scenes/` directory for more examples.
 Usage: rusty_renderer [OPTIONS]
 
 Options:
-  -s, --scene <SCENE>          Scene file to render (required, or use --list-scenes)
-  -p, --pipeline <PIPELINE>    Rendering pipeline [default: simple] [possible values: simple, forward]
+  -s, --scene <SCENE>          Scene to render [examples: triangle, cube, or path to .toml]
   -b, --backend <BACKEND>      Graphics backend [default: vulkan] [possible values: vulkan, directx]
       --headless               Run in headless mode (no window)
       --width <WIDTH>          Window/render width [default: 800]
       --height <HEIGHT>        Window/render height [default: 600]
-      --max-frames <N>         Maximum frames to render (0 = unlimited)
+      --max-frames <N>         Maximum frames to render (0 = unlimited) [default: 0]
       --screenshot <FILE>      Save screenshot on exit (PNG format)
-      --list-scenes            List available scene files
-      --list-pipelines         List available rendering pipelines
+      --debug                  Enable validation layers
   -h, --help                   Print help
   -V, --version                Print version
 ```
@@ -167,25 +161,25 @@ Options:
 ### Examples
 
 ```bash
-# List what's available
-cargo run --release -- --list-scenes
-cargo run --release -- --list-pipelines
-
 # Basic rendering
-cargo run --release -- --scene scenes/triangle.toml
-cargo run --release -- --scene scenes/cube.toml --backend vulkan
+cargo run --release -- --scene triangle
+cargo run --release -- --scene cube --backend vulkan
 
 # Headless mode for CI/testing
-cargo run --release -- --scene scenes/triangle.toml --headless --screenshot test.png
+cargo run --release -- --scene cube --headless --screenshot test.png
 
-# Limit frames (good for testing)
-cargo run --release -- --scene scenes/triangle.toml --max-frames 60
+# Limit frames (useful for testing)
+cargo run --release -- --scene cube --max-frames 60
 
-# Different pipeline (when descriptor sets available)
-cargo run --release -- --scene scenes/cube.toml --pipeline forward
+# Custom resolution
+cargo run --release -- --scene cube --width 1920 --height 1080
+
+# DirectX via Proton (Linux)
+./run_with_proton.sh cube
+./run_with_proton.sh cube --headless --screenshot dx_output.png
 ```
 
-Note: `directx` backend is only available on Windows.
+Note: `directx` backend native support only on Windows. On Linux, use `run_with_proton.sh` script.
 
 ## Testing
 

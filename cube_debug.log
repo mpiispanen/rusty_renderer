@@ -1,0 +1,90 @@
+warning: rusty_renderer@0.1.0: Using pre-compiled forward shaders
+warning: rusty_renderer@0.1.0: Compiling shaders with glslc
+warning: rusty_renderer@0.1.0: Shaders compiled successfully with glslc
+warning: rusty_renderer@0.1.0: Shaders validated successfully with spirv-val
+    Finished `release` profile [optimized] target(s) in 0.09s
+     Running `target/release/rusty_renderer --scene cube --backend vulkan --max-frames 1`
+Starting Rusty Renderer v0.1.0
+Logging initialized
+[2025-11-02T18:38:02Z INFO  rusty_renderer] Rusty Renderer v0.1.0
+Parsing arguments...
+Arguments parsed successfully
+Running application...
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Starting Rusty Renderer
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Creating application
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Backend: Vulkan
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Window size: 1280x720
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Debug mode: false
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] VSync: true
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Headless: false
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Creating Vulkan backend (validation: false)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Vulkan library loaded successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Successfully created vulkan backend
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Creating window
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Window created: 1280x720
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Initializing Vulkan backend
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Vulkan instance created successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Available devices: 2
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Selected device: AMD Radeon Graphics (RADV PHOENIX)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Device type: INTEGRATED_GPU
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Logical device created
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Graphics queue family: 0
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Present queue family: 0
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Vulkan surface created
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Swapchain created: 1280x720
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Swapchain images: 4
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created 4 swapchain image views
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Render pass created successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Render pass completed successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Creating graphics pipeline
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Graphics pipeline creation skipped (using render graph pipelines)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created depth buffer: 1280x720
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created 4 framebuffers
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Command pool created
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Creating descriptor pool manager
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Descriptor pool manager created
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created default texture sampler
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created 4 command buffers
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Created synchronization objects: 4 semaphore pairs (per swapchain image), 2 fences (frames in flight)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Vulkan backend initialized
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Backend initialized successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Loading scene: scenes/cube.toml
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Scene loaded: Simple Cube
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Objects: 1
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Using forward rendering pass for scene: Simple Cube
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Total indexed vertices: 24, indices: 36, expanded to: 36 vertices
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Camera setup:
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app]   Aspect: 1.7777778
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app]   ViewProj[0]: [-0.9742786, 0.0, 0.0, 0.0]
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app]   ViewProj[3]: [0.0, 0.0, -0.1001001, 0.0]
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Render graph built successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::render_graph::graph] Graph compiled: 1 passes, 0 barriers, 1 pipelines, 5 resources to allocate
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] execute_graph called with 1 passes
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Allocating 5 resources from render graph
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 1728 bytes, handle Buffer(0x55600a53a6e0)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 64 bytes, handle Buffer(0x55600a577a60)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 400 bytes, handle Buffer(0x55600a567070)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Resource allocation complete: 2 textures, 3 buffers
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Pipelines compiled/cached successfully
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Got command buffer for image index 0
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Command buffer begun
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] About to execute 1 passes
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Executing pass callback for PassId(0)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Executing forward simple pass (36 vertices)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Getting vertex buffer ptr for resource ResourceId(2)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Getting camera buffer ptr for resource ResourceId(3)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Getting lighting buffer ptr for resource ResourceId(4)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Binding vertex buffer
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Binding camera uniforms
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Binding lighting uniforms
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Pushing constants
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Drawing 36 vertices
+[2025-11-02T18:38:02Z INFO  rusty_renderer::passes::forward_simple] Forward simple pass execution complete
+[2025-11-02T18:38:02Z INFO  rusty_renderer::app] Rendered 1 frames, exiting
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Cleaning up Vulkan backend
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 1728 bytes, handle Buffer(0x55600a54ff50)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 400 bytes, handle Buffer(0x55600a577a60)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan::resources] Dropping Vulkan buffer: 64 bytes, handle Buffer(0x55600a5651e0)
+[2025-11-02T18:38:02Z INFO  rusty_renderer::backends::vulkan] Vulkan backend cleaned up
+Shutdown complete
+[2025-11-02T18:38:02Z INFO  rusty_renderer] Shutdown complete

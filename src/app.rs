@@ -4,7 +4,7 @@
 //! and window management using winit.
 
 use crate::backends::{self, BackendType, GraphicsBackend};
-use crate::camera::CameraController;
+use crate::camera::{self, CameraBackend, CameraController};
 use crate::config::{Backend, Config};
 use crate::passes::{ForwardSimplePass, TrianglePass};
 use crate::render_graph::{
@@ -55,6 +55,15 @@ impl App {
             #[cfg(target_os = "windows")]
             Backend::DirectX => BackendType::DirectX12,
         };
+
+        // Set camera backend to match graphics backend
+        let camera_backend = match config.backend {
+            Backend::Vulkan => CameraBackend::Vulkan,
+            #[cfg(target_os = "windows")]
+            Backend::DirectX => CameraBackend::DirectX,
+        };
+        camera::set_camera_backend(camera_backend);
+        log::info!("Camera backend set to: {:?}", camera_backend);
 
         let mut backend = backends::create_backend(backend_type, config.debug)
             .with_context(|| format!("Failed to create {backend_type} backend"))?;

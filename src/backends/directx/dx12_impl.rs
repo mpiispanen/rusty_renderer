@@ -72,6 +72,11 @@ pub struct DirectXBackendImpl {
     // Render graph resource management (M10 Phase 1)
     resource_buffers: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Buffer>>,
     resource_textures: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Texture>>,
+
+    // Pipeline cache for render graph compiled pipelines
+    pipeline_cache: std::collections::HashMap<crate::render_graph::PassId, ID3D12PipelineState>,
+    root_signature_cache:
+        std::collections::HashMap<crate::render_graph::PassId, ID3D12RootSignature>,
 }
 
 // SAFETY: DirectX 12 objects are thread-safe once created
@@ -128,6 +133,8 @@ impl DirectXBackendImpl {
             },
             resource_buffers: std::collections::HashMap::new(),
             resource_textures: std::collections::HashMap::new(),
+            pipeline_cache: std::collections::HashMap::new(),
+            root_signature_cache: std::collections::HashMap::new(),
         })
     }
 
@@ -1561,6 +1568,298 @@ impl DirectXBackendImpl {
         }
     }
 
+    /// Compile a pipeline from a render graph pipeline builder
+    fn compile_pipeline_from_builder(
+        &mut self,
+        builder: &crate::render_graph::PipelineBuilder,
+        shader_registry: &crate::render_graph::ShaderRegistry,
+        pass_id: crate::render_graph::PassId,
+    ) -> Result<(ID3D12PipelineState, ID3D12RootSignature)> {
+        use crate::render_graph::{ShaderStage, VertexFormat};
+
+        let device = self.device.as_ref().context("Device not initialized")?;
+
+        log::debug!(
+            "Compiling DirectX pipeline from builder for pass {:?}",
+            pass_id
+        );
+
+        unsafe {
+            // Load shader bytecode
+            let mut vs_bytecode = None;
+            let mut ps_bytecode = None;
+
+            for shader_handle in builder.shaders() {
+                let shader_desc = shader_registry
+                    .get_by_handle(*shader_handle)
+                    .context("Shader not found in registry")?;
+
+                // Compile to DXIL (DirectX bytecode)
+                let dxil = shader_desc
+                    .compile_to_dxil()
+                    .map_err(|e| anyhow::anyhow!("Shader compilation failed: {}", e))?;
+
+                match shader_desc.stage {
+                    ShaderStage::Vertex => vs_bytecode = Some(dxil),
+                    ShaderStage::Fragment => ps_bytecode = Some(dxil),
+                    ShaderStage::Compute => {
+                        anyhow::bail!("Compute shaders not yet supported in DirectX")
+                    }
+                }
+            }
+
+            let vs_bytecode = vs_bytecode.context("No vertex shader provided")?;
+            let ps_bytecode = ps_bytecode.context("No pixel shader provided")?;
+
+            // Create root signature
+            // Match the shader layout:
+            // - b0: Camera uniforms (CBV)
+            // - b1: Lighting uniforms (CBV)
+            // - b2: Push constants (root constants)
+            let root_parameters = [
+                // Camera uniform buffer (CBV b0)
+                D3D12_ROOT_PARAMETER {
+                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                    Anonymous: D3D12_ROOT_PARAMETER_0 {
+                        Descriptor: D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: 0,
+                            RegisterSpace: 0,
+                        },
+                    },
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                },
+                // Lighting uniform buffer (CBV b1)
+                D3D12_ROOT_PARAMETER {
+                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                    Anonymous: D3D12_ROOT_PARAMETER_0 {
+                        Descriptor: D3D12_ROOT_DESCRIPTOR {
+                            ShaderRegister: 1,
+                            RegisterSpace: 0,
+                        },
+                    },
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                },
+                // Root constants (push constants b2)
+                D3D12_ROOT_PARAMETER {
+                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS,
+                    Anonymous: D3D12_ROOT_PARAMETER_0 {
+                        Constants: D3D12_ROOT_CONSTANTS {
+                            ShaderRegister: 2,
+                            RegisterSpace: 0,
+                            Num32BitValues: 32, // 128 bytes (2 x 4x4 matrices)
+                        },
+                    },
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                },
+            ];
+
+            let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
+                NumParameters: root_parameters.len() as u32,
+                pParameters: root_parameters.as_ptr(),
+                NumStaticSamplers: 0,
+                pStaticSamplers: std::ptr::null(),
+                Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+            };
+
+            let mut signature_blob: Option<ID3DBlob> = None;
+            let mut error_blob: Option<ID3DBlob> = None;
+
+            D3D12SerializeRootSignature(
+                &root_sig_desc,
+                D3D_ROOT_SIGNATURE_VERSION_1,
+                &mut signature_blob,
+                Some(&mut error_blob),
+            )?;
+
+            let signature_blob = signature_blob.context("Failed to serialize root signature")?;
+
+            let root_signature: ID3D12RootSignature = device.CreateRootSignature(
+                0,
+                std::slice::from_raw_parts(
+                    signature_blob.GetBufferPointer() as *const u8,
+                    signature_blob.GetBufferSize(),
+                ),
+            )?;
+
+            // Create input layout from vertex layout
+            let input_layout = if let Some(layout) = builder.get_vertex_layout() {
+                layout
+                    .attributes
+                    .iter()
+                    .map(|attr| {
+                        let format = match attr.format {
+                            VertexFormat::Float32 => DXGI_FORMAT_R32_FLOAT,
+                            VertexFormat::Float32x2 => DXGI_FORMAT_R32G32_FLOAT,
+                            VertexFormat::Float32x3 => DXGI_FORMAT_R32G32B32_FLOAT,
+                            VertexFormat::Float32x4 => DXGI_FORMAT_R32G32B32A32_FLOAT,
+                            VertexFormat::Sint32 => DXGI_FORMAT_R32_SINT,
+                            VertexFormat::Sint32x2 => DXGI_FORMAT_R32G32_SINT,
+                            VertexFormat::Sint32x3 => DXGI_FORMAT_R32G32B32_SINT,
+                            VertexFormat::Sint32x4 => DXGI_FORMAT_R32G32B32A32_SINT,
+                            VertexFormat::Uint32 => DXGI_FORMAT_R32_UINT,
+                            VertexFormat::Uint32x2 => DXGI_FORMAT_R32G32_UINT,
+                            VertexFormat::Uint32x3 => DXGI_FORMAT_R32G32B32_UINT,
+                            VertexFormat::Uint32x4 => DXGI_FORMAT_R32G32B32A32_UINT,
+                        };
+
+                        D3D12_INPUT_ELEMENT_DESC {
+                            SemanticName: match attr.location {
+                                0 => PCSTR(b"POSITION\0".as_ptr()),
+                                1 => PCSTR(b"NORMAL\0".as_ptr()),
+                                2 => PCSTR(b"TEXCOORD\0".as_ptr()),
+                                3 => PCSTR(b"COLOR\0".as_ptr()),
+                                _ => PCSTR(b"TEXCOORD\0".as_ptr()),
+                            },
+                            SemanticIndex: if attr.location == 2 || attr.location == 3 {
+                                0
+                            } else {
+                                0
+                            },
+                            Format: format,
+                            InputSlot: 0,
+                            AlignedByteOffset: attr.offset,
+                            InputSlotClass: D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+                            InstanceDataStepRate: 0,
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            } else {
+                Vec::new()
+            };
+
+            // Create pipeline state
+            let mut pso_desc = D3D12_GRAPHICS_PIPELINE_STATE_DESC {
+                pRootSignature: std::mem::ManuallyDrop::new(Some(root_signature.clone())),
+                VS: D3D12_SHADER_BYTECODE {
+                    pShaderBytecode: vs_bytecode.as_ptr() as *const _,
+                    BytecodeLength: vs_bytecode.len(),
+                },
+                PS: D3D12_SHADER_BYTECODE {
+                    pShaderBytecode: ps_bytecode.as_ptr() as *const _,
+                    BytecodeLength: ps_bytecode.len(),
+                },
+                DS: D3D12_SHADER_BYTECODE::default(),
+                HS: D3D12_SHADER_BYTECODE::default(),
+                GS: D3D12_SHADER_BYTECODE::default(),
+                StreamOutput: D3D12_STREAM_OUTPUT_DESC::default(),
+                BlendState: D3D12_BLEND_DESC {
+                    AlphaToCoverageEnable: FALSE,
+                    IndependentBlendEnable: FALSE,
+                    RenderTarget: [D3D12_RENDER_TARGET_BLEND_DESC {
+                        BlendEnable: FALSE,
+                        LogicOpEnable: FALSE,
+                        SrcBlend: D3D12_BLEND_ONE,
+                        DestBlend: D3D12_BLEND_ZERO,
+                        BlendOp: D3D12_BLEND_OP_ADD,
+                        SrcBlendAlpha: D3D12_BLEND_ONE,
+                        DestBlendAlpha: D3D12_BLEND_ZERO,
+                        BlendOpAlpha: D3D12_BLEND_OP_ADD,
+                        LogicOp: D3D12_LOGIC_OP_NOOP,
+                        RenderTargetWriteMask: D3D12_COLOR_WRITE_ENABLE_ALL.0 as u8,
+                    }; 8],
+                },
+                SampleMask: u32::MAX,
+                RasterizerState: D3D12_RASTERIZER_DESC {
+                    FillMode: D3D12_FILL_MODE_SOLID,
+                    CullMode: D3D12_CULL_MODE_BACK,
+                    FrontCounterClockwise: TRUE, // Match Vulkan
+                    DepthBias: 0,
+                    DepthBiasClamp: 0.0,
+                    SlopeScaledDepthBias: 0.0,
+                    DepthClipEnable: TRUE,
+                    MultisampleEnable: FALSE,
+                    AntialiasedLineEnable: FALSE,
+                    ForcedSampleCount: 0,
+                    ConservativeRaster: D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF,
+                },
+                DepthStencilState: D3D12_DEPTH_STENCIL_DESC {
+                    DepthEnable: TRUE,
+                    DepthWriteMask: D3D12_DEPTH_WRITE_MASK_ALL,
+                    DepthFunc: D3D12_COMPARISON_FUNC_LESS,
+                    StencilEnable: FALSE,
+                    StencilReadMask: 0,
+                    StencilWriteMask: 0,
+                    FrontFace: D3D12_DEPTH_STENCILOP_DESC::default(),
+                    BackFace: D3D12_DEPTH_STENCILOP_DESC::default(),
+                },
+                InputLayout: D3D12_INPUT_LAYOUT_DESC {
+                    pInputElementDescs: if input_layout.is_empty() {
+                        std::ptr::null()
+                    } else {
+                        input_layout.as_ptr()
+                    },
+                    NumElements: input_layout.len() as u32,
+                },
+                IBStripCutValue: D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED,
+                PrimitiveTopologyType: D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+                NumRenderTargets: 1,
+                RTVFormats: {
+                    let mut formats = [DXGI_FORMAT_UNKNOWN; 8];
+                    formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+                    formats
+                },
+                DSVFormat: DXGI_FORMAT_D32_FLOAT,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                NodeMask: 0,
+                CachedPSO: D3D12_CACHED_PIPELINE_STATE::default(),
+                Flags: D3D12_PIPELINE_STATE_FLAG_NONE,
+            };
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "About to create PSO with VS={} bytes, PS={} bytes",
+                    vs_bytecode.len(),
+                    ps_bytecode.len()
+                );
+                let _ = writeln!(
+                    f,
+                    "VS bytecode first 16 bytes: {:02x?}",
+                    &vs_bytecode[0..16.min(vs_bytecode.len())]
+                );
+                let _ = writeln!(
+                    f,
+                    "PS bytecode first 16 bytes: {:02x?}",
+                    &ps_bytecode[0..16.min(ps_bytecode.len())]
+                );
+            }
+
+            // Verify DXBC header
+            if vs_bytecode.len() < 4 || &vs_bytecode[0..4] != b"DXBC" {
+                anyhow::bail!("Invalid vertex shader: missing DXBC header");
+            }
+            if ps_bytecode.len() < 4 || &ps_bytecode[0..4] != b"DXBC" {
+                anyhow::bail!("Invalid pixel shader: missing DXBC header");
+            }
+
+            let pipeline_state: ID3D12PipelineState =
+                device.CreateGraphicsPipelineState(&pso_desc)?;
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "PSO created successfully!");
+            }
+
+            log::debug!(
+                "DirectX pipeline compiled successfully for pass {:?}",
+                pass_id
+            );
+
+            Ok((pipeline_state, root_signature))
+        }
+    }
+
     /// Execute a compiled render graph
     pub fn execute_graph(
         &mut self,
@@ -1569,10 +1868,55 @@ impl DirectXBackendImpl {
     ) -> Result<()> {
         use crate::render_graph::*;
 
+        // Debug logging
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(f, "execute_graph ENTERED");
+        }
+
         // Allocate resources if this is the first execution or resources changed
         // TODO: Add smarter resource lifecycle management (issue #87)
         if self.resource_buffers.is_empty() && self.resource_textures.is_empty() {
             self.allocate_graph_resources(graph, compiled)?;
+        }
+
+        // Compile/cache pipelines for all passes
+        log::debug!(
+            "Checking {} pipeline descriptions",
+            compiled.pipeline_descriptions.len()
+        );
+        for (pass_id, builder) in &compiled.pipeline_descriptions {
+            if !self.pipeline_cache.contains_key(pass_id) {
+                log::debug!("Compiling pipeline for pass {:?}", pass_id);
+                let (pipeline, root_sig) =
+                    self.compile_pipeline_from_builder(builder, graph.shader_registry(), *pass_id)?;
+                self.pipeline_cache.insert(*pass_id, pipeline);
+                self.root_signature_cache.insert(*pass_id, root_sig);
+
+                // Debug logging
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "Pipeline {:?} cached successfully", pass_id);
+                }
+            } else {
+                log::debug!("Using cached pipeline for pass {:?}", pass_id);
+            }
+        }
+        log::info!("Pipelines compiled/cached successfully");
+
+        // Debug logging
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("rusty_renderer_debug.log")
+        {
+            let _ = writeln!(f, "About to execute render passes");
         }
 
         log::debug!(
@@ -1582,6 +1926,53 @@ impl DirectXBackendImpl {
         );
 
         unsafe {
+            // Get command list and allocator
+            let command_allocator = self
+                .command_allocator
+                .as_ref()
+                .context("Command allocator not initialized")?;
+            let command_list = self
+                .command_list
+                .as_ref()
+                .context("Command list not initialized")?;
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Closing and resetting command list");
+            }
+
+            // Close the command list if it's open (ignore error if already closed)
+            let _ = command_list.Close();
+
+            // Reset the command allocator
+            // For the first frame or after waiting for GPU, we need to reset the allocator
+            command_allocator.Reset()?;
+
+            // Reset the command list for recording
+            command_list.Reset(command_allocator, None)?;
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Command list reset successfully");
+            }
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "In unsafe block");
+            }
+
             let _device = self.device.as_ref().context("Device not initialized")?;
             let command_list_ptr = self
                 .command_list
@@ -1589,15 +1980,16 @@ impl DirectXBackendImpl {
                 .context("Command list not initialized")?
                 as *const ID3D12GraphicsCommandList;
             let command_list = &*command_list_ptr;
-            let root_signature = self
-                .root_signature
-                .as_ref()
-                .context("Root signature not initialized")?;
-            let pipeline_state = self
-                .pipeline_state
-                .as_ref()
-                .context("Pipeline state not initialized")?;
             let rtv_heap = self.rtv_heap.as_ref().context("RTV heap not initialized")?;
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Got command list and RTV heap");
+            }
 
             // Extract values we need to avoid borrowing self
             let headless = self.headless;
@@ -1606,14 +1998,55 @@ impl DirectXBackendImpl {
             let frame_index = self.frame_index;
             let rtv_descriptor_size = self.rtv_descriptor_size;
 
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Extracted values, headless={}", headless);
+            }
+
             // Get render target and RTV handle
             let (render_target, rtv_handle) = if headless {
+                // Debug logging
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "Headless path: getting offscreen resource");
+                }
+
                 // Headless: use single offscreen target
                 let resource = self
                     .offscreen_resource
                     .as_ref()
                     .context("Offscreen resource not initialized")?;
+
+                // Debug logging
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(
+                        f,
+                        "Headless path: got offscreen resource, getting RTV handle"
+                    );
+                }
+
                 let handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
+
+                // Debug logging
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "Headless path: got RTV handle");
+                }
+
                 (resource.clone(), handle)
             } else {
                 // Windowed: use current frame's swapchain target
@@ -1645,17 +2078,81 @@ impl DirectXBackendImpl {
                 command_list.ResourceBarrier(&[barrier]);
             }
 
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "About to clear render target");
+            }
+
             // Clear render target
             let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background
             command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
 
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Cleared render target, about to clear depth");
+            }
+
             // Clear depth stencil
             let dsv_heap = self.dsv_heap.as_ref().context("DSV heap not created")?;
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Got DSV heap, getting handle");
+            }
+
             let dsv_handle = dsv_heap.GetCPUDescriptorHandleForHeapStart();
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "Got DSV handle (ptr={}), about to clear depth",
+                    dsv_handle.ptr
+                );
+            }
+
             command_list.ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, &[]);
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "Cleared depth, setting render targets (RTV ptr={}, DSV ptr={})",
+                    rtv_handle.ptr, dsv_handle.ptr
+                );
+            }
 
             // Set render target with depth stencil
             command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, Some(&dsv_handle));
+
+            // Debug logging
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "OMSetRenderTargets succeeded!");
+            }
 
             // Set viewport and scissor
             let viewport = D3D12_VIEWPORT {
@@ -1676,14 +2173,71 @@ impl DirectXBackendImpl {
             };
             command_list.RSSetScissorRects(&[scissor]);
 
-            // Set pipeline state
-            command_list.SetGraphicsRootSignature(root_signature);
-            command_list.SetPipelineState(pipeline_state);
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Viewport and scissor set, topology set next");
+            }
+
+            // Set primitive topology (common for all passes)
             command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "Topology set, executing {} passes",
+                    compiled.execution_order.len()
+                );
+            }
 
             // Execute passes in order
             for pass_id in &compiled.execution_order {
                 log::debug!("Executing pass: {pass_id:?}");
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "Executing pass {pass_id:?}");
+                }
+
+                // Set per-pass pipeline state and root signature
+                if let Some(pipeline_state) = self.pipeline_cache.get(pass_id) {
+                    if let Some(root_signature) = self.root_signature_cache.get(pass_id) {
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
+                            let _ = writeln!(
+                                f,
+                                "Setting root signature and pipeline for pass {pass_id:?}"
+                            );
+                        }
+                        command_list.SetGraphicsRootSignature(root_signature);
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
+                            let _ = writeln!(f, "Root signature set, setting pipeline state");
+                        }
+                        command_list.SetPipelineState(pipeline_state);
+                        if let Ok(mut f) = std::fs::OpenOptions::new()
+                            .append(true)
+                            .open("rusty_renderer_debug.log")
+                        {
+                            let _ = writeln!(f, "Pipeline state set");
+                        }
+                    } else {
+                        log::warn!("No root signature for pass {:?}, skipping", pass_id);
+                        continue;
+                    }
+                } else {
+                    log::warn!("No pipeline for pass {:?}, skipping", pass_id);
+                    continue;
+                }
 
                 // Note: Barriers are handled through resource state transitions
                 // in the main graph execution. In a full implementation, we would
@@ -1694,10 +2248,30 @@ impl DirectXBackendImpl {
                     .get_pass(*pass_id)
                     .context("Pass not found in graph")?;
 
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "Got pass from graph, checking callback");
+                }
+
                 if let Some(callback) = &pass.callback {
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(f, "Pass has callback, preparing");
+                    }
                     // Phase 1: Prepare resources (no-op for DirectX)
                     let mut prep_context = DirectXPrepContext;
                     callback.prepare(&mut prep_context);
+
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(f, "Callback prepared, executing");
+                    }
 
                     // Phase 2: Execute rendering
                     // Create pass context with command list and backend pointers
@@ -1709,6 +2283,13 @@ impl DirectXBackendImpl {
 
                     // Execute the pass callback
                     callback.execute(&mut context);
+
+                    if let Ok(mut f) = std::fs::OpenOptions::new()
+                        .append(true)
+                        .open("rusty_renderer_debug.log")
+                    {
+                        let _ = writeln!(f, "Callback executed successfully");
+                    }
                 } else {
                     log::warn!("Pass {:?} has no callback, skipping", pass_id);
                 }
@@ -3255,11 +3836,37 @@ impl PassExecutionContext for DirectXPassContext {
 
     fn push_constants(&mut self, _stage_flags: u32, offset: u32, data: &[u8]) -> Result<()> {
         unsafe {
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(
+                    f,
+                    "push_constants called: {} bytes at offset {}",
+                    data.len(),
+                    offset
+                );
+            }
+
             let command_list = self.command_list();
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Got command list");
+            }
 
             // Convert byte data to u32 array
             let num_values = data.len() / 4;
             let values = std::slice::from_raw_parts(data.as_ptr() as *const u32, num_values);
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "Converted to {} DWORDs", num_values);
+            }
 
             // Root parameter 2 is for push constants (see root signature creation)
             const ROOT_PARAMETER_INDEX_PUSH_CONSTANTS: u32 = 2;
@@ -3267,6 +3874,13 @@ impl PassExecutionContext for DirectXPassContext {
             // Set the 32-bit constants
             // offset is in bytes, but DirectX needs offset in DWORDs
             let offset_in_dwords = offset / 4;
+
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .append(true)
+                .open("rusty_renderer_debug.log")
+            {
+                let _ = writeln!(f, "About to call SetGraphicsRoot32BitConstants");
+            }
 
             command_list.SetGraphicsRoot32BitConstants(
                 ROOT_PARAMETER_INDEX_PUSH_CONSTANTS,

@@ -1,0 +1,5 @@
+warning: rusty_renderer@0.1.0: Using pre-compiled forward shaders
+warning: rusty_renderer@0.1.0: Compiling shaders with glslc
+warning: rusty_renderer@0.1.0: Shaders compiled successfully with glslc
+warning: rusty_renderer@0.1.0: Shaders validated successfully with spirv-val
+   Compiling rusty_renderer v0.1.0 (/var/home/matpii01/rusty_renderer)

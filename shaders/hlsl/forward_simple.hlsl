@@ -25,12 +25,20 @@ cbuffer LightingUniforms : register(b1) {
     Light lights[MAX_LIGHTS];
 };
 
-// Push constants struct
+// Push constants struct (b2 for DirectX, vk::push_constant for Vulkan)
 struct PushConstantData {
     float4x4 model;
     float4x4 normalMatrix;
 };
+
+#ifdef VULKAN
 [[vk::push_constant]] PushConstantData pushConstants;
+#else
+// DirectX uses root constants at b2
+cbuffer PushConstants : register(b2) {
+    PushConstantData pushConstants;
+};
+#endif
 
 // Vertex input
 struct VSInput {

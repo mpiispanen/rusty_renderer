@@ -49,10 +49,7 @@ impl ForwardPipeline {
 
     /// Expand indexed geometry into non-indexed triangles
     fn expand_indexed_geometry(vertices: &[VertexData], indices: &[u32]) -> Vec<VertexData> {
-        indices
-            .iter()
-            .map(|&idx| vertices[idx as usize].clone())
-            .collect()
+        indices.iter().map(|&idx| vertices[idx as usize]).collect()
     }
 
     /// Convert scene vertex data to backend vertex format with normals
@@ -311,54 +308,30 @@ impl RenderPipeline for ForwardPipeline {
         // Register shaders needed by this pipeline
         use crate::render_graph::{ShaderDescriptor, ShaderSource, ShaderStage};
 
-        // Use backend-specific shaders
-        #[cfg(target_os = "windows")]
-        {
-            graph.shader_registry_mut().register(
-                "forward.vert",
-                ShaderDescriptor {
-                    source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
-                    entry_point: "VSMain",
-                    stage: ShaderStage::Vertex,
-                    backend_compile: true,
-                },
-            );
+        // Use unified HLSL shaders pre-compiled for both backends
+        // For Vulkan: Pre-compiled to SPIR-V with DXC
+        // For DirectX: Pre-compiled to DXIL with DXC
+        // Both use the same HLSL source, compiled at build time
+        graph.shader_registry_mut().register(
+            "forward.vert",
+            ShaderDescriptor {
+                source: ShaderSource::Compiled("shaders/forward_simple.vert.spv"),
+                entry_point: "VSMain",
+                stage: ShaderStage::Vertex,
+                backend_compile: false,
+            },
+        );
 
-            graph.shader_registry_mut().register(
-                "forward.frag",
-                ShaderDescriptor {
-                    source: ShaderSource::File("shaders/hlsl/forward_simple.hlsl"),
-                    entry_point: "PSMain",
-                    stage: ShaderStage::Fragment,
-                    backend_compile: true,
-                },
-            );
-            log::info!("Using HLSL shaders for DirectX backend");
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            graph.shader_registry_mut().register(
-                "forward.vert",
-                ShaderDescriptor {
-                    source: ShaderSource::Compiled("shaders/forward_simple_glsl.vert.spv"),
-                    entry_point: "main",
-                    stage: ShaderStage::Vertex,
-                    backend_compile: false,
-                },
-            );
-
-            graph.shader_registry_mut().register(
-                "forward.frag",
-                ShaderDescriptor {
-                    source: ShaderSource::Compiled("shaders/forward_simple_glsl.frag.spv"),
-                    entry_point: "main",
-                    stage: ShaderStage::Fragment,
-                    backend_compile: false,
-                },
-            );
-            log::info!("Using GLSL shaders (pre-compiled SPIR-V) for Vulkan backend");
-        }
+        graph.shader_registry_mut().register(
+            "forward.frag",
+            ShaderDescriptor {
+                source: ShaderSource::Compiled("shaders/forward_simple.frag.spv"),
+                entry_point: "PSMain",
+                stage: ShaderStage::Fragment,
+                backend_compile: false,
+            },
+        );
+        log::info!("Using pre-compiled HLSL shaders (SPIR-V for Vulkan, DXIL for DirectX)");
 
         // Get dimensions from backend (or use defaults)
         let (width, height) = (800, 600); // TODO: Get from backend or args

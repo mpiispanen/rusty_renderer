@@ -1,98 +1,102 @@
 # Rusty Renderer - Development Roadmap
 
+**Last Updated:** 2025-11-03  
+**Status:** Transitioning to Render Graph Driven Architecture
+
+See [CURRENT_STATE.md](CURRENT_STATE.md) for detailed current status.
+
 ## ✅ Completed Features
 
 ### Core Architecture
 - [x] Multi-backend abstraction layer
 - [x] Vulkan backend (fully functional)
-- [x] DirectX 12 backend (functional)
+- [x] DirectX 12 backend (functional via Proton on Linux)
 - [x] Window management (winit integration)
 - [x] Event loop handling
+- [x] Render graph system with resource management
+- [x] Cross-compilation for Windows targets
 
 ### Scene System
 - [x] TOML-based scene files
 - [x] Scene loader with validation
 - [x] Camera system (perspective)
-- [x] Lighting system (directional, point lights)
-- [x] Material system (PBR properties)
 - [x] Transform system (position, rotation, scale)
+- [x] GLTF model loading with textures
+- [x] Inline geometry support
 
-### Asset Management
-- [x] Asset path resolution (flexible, portable)
-- [x] Texture loading (PNG support via image crate)
-- [x] GLTF model loading
-- [x] Material texture support
-- [x] Proper project structure (assets directory)
-
-### Rendering Pipelines
-- [x] Simple pipeline (vertex colors)
-- [x] Forward pipeline (lighting + textures)
-- [x] Pipeline factory pattern
-- [x] Render graph system
+### Rendering Features
+- [x] Forward rendering with Blinn-Phong lighting
+- [x] Simple triangle rendering (debug)
+- [x] Depth testing and backface culling
+- [x] Texture loading and sampling
+- [x] Vertex color rendering
+- [x] Headless and windowed modes
+- [x] Screenshot capture
 
 ### Build System
-- [x] Shader compilation (GLSL to SPIR-V)
+- [x] Unified HLSL shader compilation (DXC)
+- [x] SPIR-V generation for Vulkan
+- [x] DXIL generation for DirectX
 - [x] Shader validation
 - [x] Cross-platform builds
 - [x] Test infrastructure
 
 ### Documentation
 - [x] Architecture documentation
-- [x] Asset system guide
-- [x] Scene file format documentation
-- [x] Implementation summaries
+- [x] Workflow and contribution guidelines
+- [x] Bazzite/Linux setup guide
+- [x] DirectX via Proton testing guide
 
-## 🔄 In Progress (Current Focus)
+## 🔄 In Progress (Current Sprint)
 
-### Phase 1: CI Rendering & Visual Regression (CURRENT)
-- [ ] Update CI to render test scenes on Vulkan and DirectX
-- [ ] Enable headless rendering in CI
-- [ ] Automated backend parity validation with FLIP
-- [ ] Golden reference image library
-- [ ] Visual regression reports
+### Render Graph Architecture Completion (CURRENT)
+- [x] Render pass resource declaration
+- [x] Shader registry system
+- [ ] **Remove legacy hardcoded code** (THIS WEEK)
+  - [ ] Remove hardcoded vertices in app.rs
+  - [ ] Move shader registration to render passes
+  - [ ] Extract lights to scene files
+  - [ ] Clean up unused code paths
+- [ ] **Shadow mapping pipeline** (THIS WEEK)
+  - [ ] Shadow map render pass
+  - [ ] Forward pass with shadow support
+  - [ ] Tone mapping post-process
+- [ ] **CI rendering tests** (ONGOING)
+  - [ ] Fix CI visual regression tests
+  - [ ] Backend parity validation
+  - [ ] Reference image management
 
-**Why This First:** Prevents regressions as we refactor, ensures backends stay in sync
+**Why This Focus:** Complete the transition to render graph driven architecture before adding more features
 
-## 📋 TODO - High Priority (Data-Driven Architecture)
+## 📋 TODO - High Priority (Next Month)
 
-See `ARCHITECTURE_REFACTOR_PLAN.md` for detailed plan.
+### Shadow Mapping & Post-Processing
+- [ ] Shadow map render pass (depth-only)
+- [ ] Forward pass with shadow sampling
+- [ ] PCF (Percentage Closer Filtering)
+- [ ] Cascaded Shadow Maps (CSM)
+- [ ] Tone mapping post-process pass
 
-### Phase 2: Remove Hardcoded Shaders (Next)
-- [ ] Design pipeline template format (TOML)
-- [ ] Implement template loader
-- [ ] Dynamic shader loading from templates
-- [ ] Remove hardcoded shader paths from backends
-- [ ] Shader hot-reloading
+### Debug UI & Runtime Configuration
+- [ ] ImGui integration
+- [ ] Pipeline configuration UI
+- [ ] Pass enable/disable toggles
+- [ ] Real-time parameter adjustment
+- [ ] Performance profiling overlay
 
-### Phase 3: Remove Hardcoded Pipeline State
-- [ ] Define state in pipeline templates (depth, culling, blending)
-- [ ] Implement state parser
-- [ ] Refactor backends to use template state
-- [ ] Remove all hardcoded pipeline state
+### Scene System Improvements
+- [ ] Extract lights to scene files (currently hardcoded in app)
+- [ ] Multiple light types in scenes
+- [ ] Scene hierarchy (parent/child transforms)
+- [ ] Multiple cameras
+- [ ] External geometry file support (OBJ)
 
-### Phase 4: Remove Hardcoded Resource Bindings
-- [ ] Define descriptor layouts in templates
-- [ ] Dynamic descriptor layout builder
-- [ ] Remove hardcoded binding numbers
-- [ ] Support flexible binding configurations
-
-### Phase 5: Flexible Vertex Formats
-- [ ] Define vertex formats in templates
-- [ ] Support multiple formats per application
-- [ ] Validate geometry against format
-- [ ] Remove single hardcoded format
-
-### Phase 6: Complete Scene-Driven Rendering
-- [ ] Link scenes to pipeline templates
-- [ ] Remove all default materials/textures from code
-- [ ] All data must come from files
-- [ ] Graceful error handling for missing data
-
-### Phase 7: Validation
-- [ ] Zero hardcoded values in backends (automated check)
-- [ ] Runtime pipeline swapping
-- [ ] Hot-reload validation
-- [ ] Complete data-driven architecture verified
+### Material & Texture Enhancements
+- [ ] Normal mapping
+- [ ] Metallic/roughness maps
+- [ ] Ambient occlusion maps
+- [ ] Emissive maps
+- [ ] Material hot-reload
 
 ## 📋 Completed Features
 
@@ -199,22 +203,40 @@ See `ARCHITECTURE_REFACTOR_PLAN.md` for detailed plan.
 
 ## 🎯 Current Sprint Focus
 
-**Data-Driven Architecture Refactor** - Remove all hardcoded rendering
+**Render Graph Driven Architecture - Cleanup & Shadow Mapping**
 
-### Immediate Next Steps (This Week):
-1. **Phase 1: CI Rendering** - Automated visual regression testing
-   - Update CI workflows for headless rendering
-   - Implement backend parity validation
-   - Create golden reference images
+### This Week - Code Cleanup & Shadows
+1. ✅ **Remove Legacy Code**
+   - Remove hardcoded vertices in app.rs
+   - Move shader registration to render passes  
+   - Extract lights to scene files
+   - Clean up unused code paths
+
+2. 🔄 **Shadow Mapping**
+   - Implement shadow map render pass
+   - Update forward pass for shadows
+   - Add tone mapping post-process
+
+3. 🔄 **CI Fixes**
+   - Fix CI rendering tests
+   - Backend parity validation
+   - Reference image workflow
+
+### Next Week - Debug UI
+4. **ImGui Integration**
+   - Basic UI framework
+   - Pipeline configuration
+   - Pass toggles
+   - Performance metrics
+
+### This Month - Enhanced Rendering
+5. **Advanced Shadows**
+   - PCF filtering
+   - Cascaded shadow maps
    
-2. **Phase 2: Shader Templates** - Remove hardcoded shaders
-   - Design pipeline template format
-   - Implement template loader
-   - Dynamic shader loading
-
-### Next Month:
-3. **Phase 3-4: State & Bindings** - Complete template system
-4. **Phase 5-7: Polish & Validation** - Verify data-driven architecture
+6. **Post-Processing**
+   - Tone mapping refinement
+   - Additional effects (bloom, etc.)
 
 ## 📊 Progress Metrics
 

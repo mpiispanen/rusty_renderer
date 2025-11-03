@@ -1,0 +1,67 @@
+Starting Rusty Renderer v0.1.0
+Logging initialized
+[2025-11-02T23:12:16Z INFO  rusty_renderer] Rusty Renderer v0.1.0
+Parsing arguments...
+Arguments parsed successfully
+Running application...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Loading scene from: scenes/cube.toml
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Scene loaded: Simple Cube
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner]   Objects: 1
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Creating pipeline: forward
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Pipeline created: Forward
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Initializing application...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner]   Scene: Simple Cube
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner]   Pipeline: Forward
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner]   Mode: headless
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Creating backend: directx12
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx] Creating DirectX 12 backend (validation: true)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating DirectX 12 backend (WARP: false, validation: true)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Mode check: headless=true
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Running in HEADLESS mode
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Initializing DirectX 12 backend in headless mode: 800x600
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating DXGI factory
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating D3D12 device
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] D3D12 device created
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating command queue
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Offscreen render target created: 800x600
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] RTV heap created for headless mode
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating depth stencil buffer
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Created depth stencil buffer: 800x600
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating SRV/CBV/UAV descriptor heap for textures
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Created SRV descriptor heap with 256 descriptors (size: 64 bytes each)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating command allocator and list
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating fence for synchronization
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Creating pipeline state and root signature
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Loaded pre-compiled shader: shaders/compiled/forward_simple_vs.cso
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Using pre-compiled shader for VSMain (vs_5_0)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Loaded pre-compiled shader: shaders/compiled/forward_simple_ps.cso
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Using pre-compiled shader for PSMain (ps_5_0)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Pipeline created successfully
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] DirectX 12 backend initialized successfully in headless mode
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Backend initialized (headless 800x600)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Setting up pipeline...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Forward pipeline setup complete (shaders registered during build_graph)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Building render graph...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Using pre-compiled HLSL shaders (SPIR-V for Vulkan, DXIL for DirectX)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Created camera uniform buffer
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Lighting uniforms - ambient: [0.50, 0.50, 0.50], light_count: 1
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Light 0 - type: 0, dir/pos: [0.41, -0.82, 0.41], color: [1.00, 1.00, 1.00], intensity: 2.00
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Forward pipeline: 1 lights, ambient [0.5, 0.5, 0.5]
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] ForwardPipeline: Building graph for scene 'Simple Cube' with 1 objects
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Creating default fallback texture and material
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Created default 1x1 white texture
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] DX: Uploading 32-byte buffer (material): base_color=[1.00, 1.00, 1.00, 1.00], properties=[0.00, 0.50, 0.00, 0.00]
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] Created default material buffer
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward]   - Mesh 'cube': 24 vertices, 36 indices
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward]     Expanding indexed geometry (36 indices -> 36 vertices)
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward]   - No material specified, using defaults
+[2025-11-02T23:12:16Z INFO  rusty_renderer::pipelines::forward] ForwardPipeline: Render graph built successfully
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Compiling render graph...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::render_graph::graph] Graph compiled: 1 passes, 0 barriers, 1 pipelines, 1 resources to allocate
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Render graph compiled: 1 passes
+[2025-11-02T23:12:16Z INFO  rusty_renderer::application::runner] Rendering 1 frame(s)...
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Allocating 1 resources from render graph
+[2025-11-02T23:12:16Z INFO  rusty_renderer::backends::directx::dx12_impl] Resource allocation complete: 1 textures, 0 buffers
+Error running application: Invalid parameter. (0x80070057)
+Error: Invalid parameter. (0x80070057)
+Unable to read VR Path Registry from C:\users\steamuser\AppData\Local\openvr\openvrpaths.vrpath

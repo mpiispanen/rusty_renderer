@@ -1,8 +1,8 @@
 # Rusty Renderer - Design Document
 
-**Version:** 0.7.0  
-**Last Updated:** 2025-10-27  
-**Status:** Architecture Refactor - Implementing Data-Driven System
+**Version:** 0.8.0  
+**Last Updated:** 2025-11-03  
+**Status:** Render Graph Driven Architecture - Active Development
 
 ## Project Vision
 
@@ -18,80 +18,49 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 
 ## Current State
 
-**Phase:** Architecture Refactor - Data-Driven Rendering  
-**Status:** DirectX/Vulkan backends functional, removing hardcoded rendering
+**Phase:** Render Graph Driven Architecture  
+**Status:** Cleaning up legacy code, implementing shadow mapping
 
-### Recent Achievements (Oct 27, 2025)
-- ✅ **Vulkan Backend**: Renders textured cube with correct lighting and culling
-- ✅ **DirectX Backend**: Renders textured cube with correct lighting and culling
-- ✅ **Backend Parity**: Both backends produce nearly identical output
-- ✅ **Coordinate System Fixes**: Y-axis flipping handled correctly
-- ✅ **GLTF Loading**: Full texture and geometry loading working
-- ✅ **Backface Culling**: Working correctly on both backends
-- ✅ **Depth Testing**: Implemented on both backends
+### Recent Achievements (Nov 2025)
+- ✅ **Render Graph System**: Passes declare resources, graph manages allocation
+- ✅ **Shader Registry**: Centralized shader management with HLSL compilation
+- ✅ **Pipeline Compilation**: Render passes define their own pipelines
+- ✅ **Resource Upload**: Proper staging and GPU resource initialization
+- ✅ **Vulkan & DirectX**: Both backends rendering with minimal hardcoding
+- ✅ **Cross-Platform**: DirectX testing via Proton on Linux (Bazzite)
+- ✅ **Unified Shaders**: Single HLSL source compiled to SPIR-V (Vulkan) and DXIL (DirectX)
 
-### Completed (Production Ready on Vulkan + DirectX)
+### Completed (Production Ready)
 - ✅ Repository setup with CI/CD pipeline
-- ✅ Project structure with proper module organization
-- ✅ Backend abstraction layer with trait definitions
-- ✅ Two backend implementations: Vulkan (complete), DirectX 12 (functional)
-- ✅ Command-line argument parsing for backend selection
-- ✅ Validation layer support (zero errors on Vulkan)
-- ✅ Render graph architecture with automatic dependency resolution
-- ✅ Render graph execution on all backends
-- ✅ Modular pass system (passes in separate files)
-- ✅ Cross-compilation setup for Windows targets
-- ✅ DirectX 12 testing via Proton on Linux
-- ✅ Headless rendering and screenshot capture
-- ✅ Visual testing infrastructure (FLIP integration)
-- ✅ **Scene system with TOML definitions**
-- ✅ **Vertex and index buffer support**
-- ✅ **Forward rendering with Blinn-Phong lighting**
-- ✅ **Directional and point lights (up to 8)**
-- ✅ **Per-object transforms via push constants**
-- ✅ **Per-frame descriptor sets (proper synchronization)**
-- ✅ **Camera system with view-projection matrices**
-- ✅ **Normal transformation for non-uniform scaling**
-
-### Working Features (Both Vulkan and DirectX)
-- ✅ Forward renderer with diffuse + specular lighting
-- ✅ Multiple light types (directional, point)
-- ✅ Per-object position, rotation, scale
-- ✅ Ambient lighting
-- ✅ Material colors and textures
-- ✅ GLTF model loading
-- ✅ Texture loading and sampling
-- ✅ Depth testing
-- ✅ Backface culling
-- ✅ Proper resource cleanup (0 validation errors)
+- ✅ Backend abstraction layer
+- ✅ Vulkan and DirectX 12 backends
+- ✅ Render graph with automatic resource management
+- ✅ Scene system with TOML definitions
+- ✅ GLTF model loading with textures
+- ✅ Forward rendering with Blinn-Phong lighting
+- ✅ Depth testing and backface culling
 - ✅ Headless and windowed modes
-- ✅ Cross-compilation and Proton testing
+- ✅ Cross-compilation for Windows
+- ✅ Shader compilation (HLSL → SPIR-V/DXIL)
 
-### Known Limitations & Roadmap
+### Current Focus - Code Cleanup & Shadow Mapping
 
-**Current Issues:**
-- ⚠️ **Hardcoded shaders**: Shaders compiled from fixed paths, not template-driven
-- ⚠️ **Hardcoded pipeline state**: Depth testing, culling, blending not configurable
-- ⚠️ **Hardcoded resource bindings**: Descriptor layouts fixed in backends
-- ⚠️ **No CI rendering tests**: Visual regressions not caught automatically
-- ⚠️ **Minor color differences**: Slight variations between Vulkan and DirectX output
+**Cleaning up legacy code:**
+- Remove hardcoded vertices in app.rs
+- Move shader registration from app to render passes
+- Extract lights from app to scene files
+- Remove unused/legacy code paths
 
-**Architecture Goals (See `ARCHITECTURE_REFACTOR_PLAN.md`):**
-1. **Phase 1: CI Rendering** - Automated visual regression testing (CURRENT)
-2. **Phase 2: Shader Templates** - Remove hardcoded shader paths
-3. **Phase 3: State Templates** - Pipeline state driven by templates
-4. **Phase 4: Binding Templates** - Descriptor layouts from templates
-5. **Phase 5: Vertex Formats** - Flexible vertex format support
-6. **Phase 6: Scene-Driven** - Everything from glTF + scene files
-7. **Phase 7: Validation** - Complete data-driven architecture verified
+**Implementing shadow mapping:**
+- Shadow map render pass (depth-only rendering)
+- Forward pass with shadow map sampling
+- Tone mapping post-process pass
+- Make pipeline configurable (enable/disable passes)
 
-### In Progress (Current Focus)
-- **Phase 1: CI Rendering** - Setting up automated rendering tests
-- **Backend Parity Validation**: Automated comparison between Vulkan/DirectX
-- See `ARCHITECTURE_REFACTOR_PLAN.md` for complete plan
-
-### Coordinate System Handling
-All backends now properly handle coordinate system differences. Vulkan uses standard Y-down coordinates, while DirectX requires Y-axis flipping to maintain visual consistency. This is documented in `docs/COORDINATE_SYSTEMS.md`.
+**CI and testing:**
+- Fix CI rendering tests
+- Automated backend parity validation
+- Reference image workflow
 
 ## Architecture Overview
 

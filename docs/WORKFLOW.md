@@ -1,8 +1,8 @@
 # Development Workflow
 
-**Last Updated:** 2025-10-21
+**Last Updated:** 2025-11-03
 
-This document describes the standard development workflow for the Rusty Renderer project, including best practices learned through active development.
+This document describes the standard development workflow for the Rusty Renderer project, including testing with both Vulkan and DirectX (via Proton on Bazzite).
 
 ## Overview
 
@@ -90,26 +90,46 @@ git commit -m "Add Transform struct to scene module"
 
 ### 4. Local Validation (REQUIRED)
 
-Before pushing, ALWAYS run:
+Before pushing, ALWAYS run local checks to catch issues early:
 
 ```bash
-# Format code (fixes most style issues)
+# 1. Format code (fixes most style issues)
 cargo fmt
 
-# Run linter (catches bugs and bad patterns)
+# 2. Run linter (catches bugs and bad patterns)
 cargo clippy --all-targets -- -D warnings
 
-# Run all tests
+# 3. Run all tests
 cargo test
 
-# Build in release mode
+# 4. Build in release mode
 cargo build --release
-
-# Test actual rendering
-cargo run --release -- --scene scenes/cube.toml --pipeline forward --headless
 ```
 
 **All of these must pass before pushing.**
+
+### 5. Test Rendering (Both Backends)
+
+Test your changes on both Vulkan and DirectX to ensure backend parity:
+
+```bash
+# Test Vulkan (native on Linux/Bazzite)
+cargo run --release -- --backend vulkan --scene cube
+
+# Test DirectX via Proton (on Linux/Bazzite)
+./run_with_proton.sh cube
+
+# Headless mode with screenshot for comparison
+cargo run --release -- --backend vulkan --scene cube --headless --screenshot vk_test.png
+./run_with_proton.sh cube --headless --screenshot dx_test.png
+
+# Compare outputs (if you have visual comparison tools)
+# python3 scripts/flip_compare.py vk_test.png dx_test.png
+```
+
+**For rendering changes, both backends should produce similar output.**
+
+See [docs/TESTING_DIRECTX_ON_LINUX.md](TESTING_DIRECTX_ON_LINUX.md) for more details on Proton testing.
 
 ### 5. Commit Messages
 
@@ -198,6 +218,7 @@ gh run watch
 - ✓ Clippy
 - ✓ Format
 - ✓ Documentation
+- ✓ Backend Rendering Tests (when implemented)
 
 #### If CI fails:
 1. Check the logs: `gh run view <run-id> --log`
