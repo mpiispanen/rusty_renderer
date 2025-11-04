@@ -268,9 +268,13 @@ impl App {
             let (width, height, pixels) = backend.capture_frame()?;
 
             // Save as PNG using image crate
-            use image::ImageBuffer;
+            use image::{ImageBuffer, imageops};
             let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
                 .context("Failed to create image from captured pixels")?;
+            
+            // Flip vertically - Vulkan framebuffer has (0,0) at top-left
+            // but the rendered scene is upside down
+            let img = imageops::flip_vertical(&img);
 
             // Create parent directory if it doesn't exist
             if let Some(parent) = path.parent() {
