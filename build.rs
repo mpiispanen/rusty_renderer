@@ -5,6 +5,7 @@ use std::process::Command;
 fn main() {
     // Tell Cargo to rerun if shaders change
     println!("cargo:rerun-if-changed=shaders/hlsl/forward_simple.hlsl");
+    println!("cargo:rerun-if-changed=shaders/hlsl/shadow_map.hlsl");
     println!("cargo:rerun-if-changed=shaders/hlsl/triangle.hlsl");
 
     // Compile unified HLSL shaders for both Vulkan (SPIR-V) and DirectX
@@ -20,6 +21,12 @@ fn compile_unified_shaders() {
         (
             "shaders/hlsl/forward_simple.hlsl",
             "forward_simple",
+            "VSMain",
+            "PSMain",
+        ),
+        (
+            "shaders/hlsl/shadow_map.hlsl",
+            "shadow_map",
             "VSMain",
             "PSMain",
         ),
