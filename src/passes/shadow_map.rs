@@ -14,7 +14,7 @@ use glam::{Mat4, Vec3};
 
 /// Shadow map pass - renders scene depth from light's perspective
 pub struct ShadowMapPass {
-    pass_id: PassId,
+    // Empty struct - just a builder pattern wrapper
 }
 
 impl ShadowMapPass {
@@ -212,7 +212,7 @@ impl ShadowMapPassBuilder {
 
         graph.add_pass(pass);
 
-        Ok(ShadowMapPass { pass_id })
+        Ok(ShadowMapPass {})
     }
 }
 
@@ -285,6 +285,8 @@ impl PassCallback for ShadowMapPassCallback {
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         use crate::render_graph::IndexType;
 
+        log::info!("Executing shadow map pass ({} indices)", self.index_count);
+
         // Get buffer pointers from resource IDs
         let vertex_buffer_ptr = context
             .get_buffer_ptr(self.vertex_buffer)
@@ -295,6 +297,8 @@ impl PassCallback for ShadowMapPassCallback {
         let light_buffer_ptr = context
             .get_buffer_ptr(self.light_uniforms)
             .expect("Failed to get light uniforms buffer");
+
+        log::info!("Shadow map: binding buffers");
 
         // Bind vertex buffer
         context
@@ -311,9 +315,13 @@ impl PassCallback for ShadowMapPassCallback {
             .bind_uniform_buffer(0, 0, light_buffer_ptr, 0, 64)
             .expect("Failed to bind light uniforms");
 
+        log::info!("Shadow map: drawing {} indices", self.index_count);
+
         // Draw indexed
         context
             .draw_indexed(self.index_count, 1, 0, 0, 0)
             .expect("Failed to draw indexed");
+
+        log::info!("Shadow map pass execution complete");
     }
 }

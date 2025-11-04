@@ -230,6 +230,8 @@ pub struct ForwardSimplePassBuilder {
     lighting_buffer: Option<ResourceId>,
     material_buffer: Option<ResourceId>,
     albedo_texture: Option<ResourceId>,
+    shadow_map: Option<ResourceId>,
+    shadow_uniforms: Option<ResourceId>,
     transform: Transform,
     vertex_count: u32,
     index_count: u32,
@@ -248,6 +250,8 @@ impl ForwardSimplePassBuilder {
             lighting_buffer: None,
             material_buffer: None,
             albedo_texture: None,
+            shadow_map: None,
+            shadow_uniforms: None,
             transform: Transform::default(),
             vertex_count: 0,
             index_count: 0,
@@ -300,6 +304,18 @@ impl ForwardSimplePassBuilder {
     /// Set optional albedo texture
     pub fn albedo_texture(mut self, resource: ResourceId) -> Self {
         self.albedo_texture = Some(resource);
+        self
+    }
+
+    /// Set shadow map texture
+    pub fn shadow_map(mut self, resource: ResourceId) -> Self {
+        self.shadow_map = Some(resource);
+        self
+    }
+
+    /// Set shadow uniforms buffer
+    pub fn shadow_uniforms(mut self, resource: ResourceId) -> Self {
+        self.shadow_uniforms = Some(resource);
         self
     }
 
@@ -434,6 +450,28 @@ impl ForwardSimplePassBuilder {
             ));
         }
 
+        // Optional: Shadow map
+        let shadow_map = self.shadow_map;
+        if let Some(shadow_map_id) = shadow_map {
+            pass.add_input(ResourceAccess::new(
+                shadow_map_id,
+                AccessType::Read,
+                PipelineStage::new(PipelineStage::FRAGMENT_SHADER),
+                Some(ImageLayout::ShaderReadOnly),
+            ));
+        }
+
+        // Optional: Shadow uniforms
+        let shadow_uniforms = self.shadow_uniforms;
+        if let Some(shadow_uniforms_id) = shadow_uniforms {
+            pass.add_input(ResourceAccess::new(
+                shadow_uniforms_id,
+                AccessType::Read,
+                PipelineStage::new(PipelineStage::FRAGMENT_SHADER),
+                None,
+            ));
+        }
+
         // Set up execution callback
         let callback = ForwardSimplePassCallback {
             transform: self.transform,
@@ -445,6 +483,8 @@ impl ForwardSimplePassBuilder {
             lighting_buffer,
             material_buffer: self.material_buffer,
             albedo_texture: self.albedo_texture,
+            shadow_map,
+            shadow_uniforms,
         };
 
         pass = pass.with_callback(Box::new(callback));
@@ -477,6 +517,8 @@ struct ForwardSimplePassCallback {
     lighting_buffer: ResourceId,
     material_buffer: Option<ResourceId>,
     albedo_texture: Option<ResourceId>,
+    shadow_map: Option<ResourceId>,
+    shadow_uniforms: Option<ResourceId>,
 }
 
 impl PassCallback for ForwardSimplePassCallback {
@@ -593,6 +635,35 @@ impl PassCallback for ForwardSimplePassCallback {
         context
             .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 8 * 48) // LightingUniforms: ambient_light_count (16) + 8 lights (8*48 = 384) = 400 bytes
             .expect("Failed to bind lighting uniforms");
+
+        // Bind shadow uniforms if present
+        // TODO: Fix descriptor set layout to support shadow resources
+        /*
+        if let Some(shadow_uniforms_id) = self.shadow_uniforms {
+            log::info!("Binding shadow uniforms for resource {:?}", shadow_uniforms_id);
+            let shadow_buffer_ptr = context
+                .get_buffer_ptr(shadow_uniforms_id)
+                .expect("Failed to get shadow uniforms buffer");
+            context
+                .bind_uniform_buffer(0, 3, shadow_buffer_ptr, 0, 80) // lightSpaceMatrix (64) + shadowParams (16) = 80 bytes
+                .expect("Failed to bind shadow uniforms");
+            log::info!("Shadow uniforms bound successfully");
+        }
+
+        // Bind shadow map texture if present
+        if let Some(shadow_map_id) = self.shadow_map {
+            log::info!("Binding shadow map texture for resource {:?}", shadow_map_id);
+            let shadow_texture_ptr = context
+                .get_texture_ptr(shadow_map_id)
+                .expect("Failed to get shadow map");
+            log::info!("Got shadow texture ptr: {:?}", shadow_texture_ptr);
+            context
+                .bind_texture(0, 0, shadow_texture_ptr)
+                .expect("Failed to bind shadow map texture");
+            log::info!("Shadow map texture bound successfully");
+            // TODO: bind comparison sampler
+        }
+        */
 
         // Push model matrix as push constants
         let model_matrix = self.transform.matrix();

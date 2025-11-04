@@ -163,6 +163,9 @@ impl App {
             .map(|l| matches!(l.light_type(), crate::scene::LightType::Directional))
             .unwrap_or(false);
 
+        let mut shadow_map = None;
+        let mut shadow_uniforms = None;
+
         if has_directional_light {
             log::info!("Scene has directional light - enabling shadow mapping");
             
@@ -179,6 +182,9 @@ impl App {
             let shadow_resources =
                 ShadowMapPass::prepare_resources(&mut graph, light_direction, 1024);
 
+            shadow_map = Some(shadow_resources.shadow_map);
+            shadow_uniforms = Some(shadow_resources.light_uniforms);
+
             // Add shadow map pass (runs before forward pass)
             ShadowMapPass::builder()
                 .shadow_map_output(shadow_resources.shadow_map)
@@ -193,7 +199,7 @@ impl App {
         }
 
         // Create forward pass
-        ForwardSimplePass::builder()
+        let mut forward_builder = ForwardSimplePass::builder()
             .color_output(color_buffer)
             .depth_output(depth_buffer)
             .vertex_buffer(vertex_buffer)
@@ -203,8 +209,17 @@ impl App {
             .transform(transform)
             .vertex_count(vertex_count)
             .index_count(index_count)
-            .with_name("forward_simple")
-            .build(&mut graph)?;
+            .with_name("forward_simple");
+
+        // Add shadow resources if available
+        if let Some(sm) = shadow_map {
+            forward_builder = forward_builder.shadow_map(sm);
+        }
+        if let Some(su) = shadow_uniforms {
+            forward_builder = forward_builder.shadow_uniforms(su);
+        }
+
+        forward_builder.build(&mut graph)?;
         self.render_graph = Some(graph);
         log::info!("Render graph built successfully");
         Ok(())

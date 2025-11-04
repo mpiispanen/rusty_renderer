@@ -25,6 +25,14 @@ cbuffer LightingUniforms : register(b1) {
     Light lights[MAX_LIGHTS];
 };
 
+// Shadow uniforms (b3) - TODO: Enable when descriptor layout supports it
+/*
+cbuffer ShadowUniforms : register(b3) {
+    float4x4 lightSpaceMatrix;
+    float4 shadowParams; // x: enabled (0 or 1), y: bias, z: unused, w: unused
+};
+*/
+
 // Push constants struct (b2 for DirectX, vk::push_constant for Vulkan)
 struct PushConstantData {
     float4x4 model;
@@ -40,6 +48,12 @@ cbuffer PushConstants : register(b2) {
 };
 #endif
 
+// Shadow map texture (t0) and sampler (s0) - TODO: Enable when descriptor layout supports it
+/*
+Texture2D shadowMap : register(t0);
+SamplerComparisonState shadowSampler : register(s0);
+*/
+
 // Vertex input
 struct VSInput {
     float3 position : POSITION;
@@ -54,6 +68,7 @@ struct PSInput {
     float3 worldPos : POSITION0;
     float3 normal : NORMAL;
     float4 color : COLOR0;
+    // float4 lightSpacePos : POSITION1; // TODO: Enable for shadow mapping
 };
 
 // Vertex Shader
@@ -70,6 +85,9 @@ PSInput VSMain(VSInput input) {
     // Transform to clip space
     output.position = mul(viewProj, worldPos);
     
+    // Transform to light space for shadow mapping - TODO: Enable when shadow uniforms available
+    // output.lightSpacePos = mul(lightSpaceMatrix, worldPos);
+    
     // Pass color
     output.color = input.color;
     
@@ -77,6 +95,45 @@ PSInput VSMain(VSInput input) {
 }
 
 // Pixel Shader with simple lighting
+// TODO: Enable shadow calculation when shadow resources available
+/*
+float CalculateShadow(float4 lightSpacePos, float3 normal, float3 lightDir) {
+    // Perspective divide
+    float3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
+    
+    // Transform to [0,1] range (from NDC [-1,1])
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+    
+    // Flip Y for Vulkan/D3D coordinate system
+    projCoords.y = 1.0 - projCoords.y;
+    
+    // Check if outside shadow map
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || 
+        projCoords.y < 0.0 || projCoords.y > 1.0 || 
+        projCoords.z > 1.0) {
+        return 1.0; // No shadow
+    }
+    
+    // Bias to reduce shadow acne
+    float bias = max(shadowParams.y * (1.0 - dot(normal, lightDir)), shadowParams.y * 0.1);
+    float currentDepth = projCoords.z - bias;
+    
+    // PCF (Percentage Closer Filtering)
+    float shadow = 0.0;
+    float2 texelSize = 1.0 / float2(1024.0, 1024.0); // TODO: pass actual shadow map size
+    
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            float2 offset = float2(x, y) * texelSize;
+            shadow += shadowMap.SampleCmpLevelZero(shadowSampler, projCoords.xy + offset, currentDepth);
+        }
+    }
+    shadow /= 9.0;
+    
+    return shadow;
+}
+*/
+
 float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize interpolated normal
     float3 normal = normalize(input.normal);
@@ -111,7 +168,16 @@ float4 PSMain(PSInput input) : SV_TARGET {
         float diff = max(dot(normal, lightDir), 0.0);
         float3 diffuse = diff * light.colorIntensity.rgb * light.colorIntensity.a;
         
-        finalColor += diffuse * surfaceColor * attenuation;
+        // Apply shadow for directional lights - TODO: Enable when shadow resources available
+        /*
+        float shadow = 1.0;
+        if (light.lightType == LIGHT_DIRECTIONAL && shadowParams.x > 0.5) {
+            shadow = CalculateShadow(input.lightSpacePos, normal, lightDir);
+        }
+        */
+        float shadow = 1.0;
+        
+        finalColor += diffuse * surfaceColor * attenuation * shadow;
     }
     
     return float4(finalColor, 1.0);
