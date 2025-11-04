@@ -1493,6 +1493,56 @@ impl DirectXBackendImpl {
                                 data.len(),
                                 resource.name
                             );
+                            
+                            // DEBUG: Log buffer data
+                            if (resource.name.to_lowercase().contains("index") || resource.name.to_lowercase().contains("indic")) && data.len() >= 48 {
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open("rusty_renderer_debug.log")
+                                {
+                                    use std::io::Write;
+                                    let _ = writeln!(f, "=== INDEX BUFFER UPLOAD ===");
+                                    let _ = writeln!(f, "Buffer: {}, Size: {} bytes", resource.name, data.len());
+                                    // Interpret as u32 indices
+                                    let indices = bytemuck::cast_slice::<u8, u32>(data);
+                                    let _ = writeln!(f, "First 12 indices:");
+                                    for i in 0..12.min(indices.len()) {
+                                        let _ = writeln!(f, "  [{}] = {}", i, indices[i]);
+                                    }
+                                }
+                            }
+                            
+                            if resource.name.to_lowercase().contains("vert") && data.len() >= 384 {
+                                if let Ok(mut f) = std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open("rusty_renderer_debug.log")
+                                {
+                                    use std::io::Write;
+                                    let _ = writeln!(f, "=== VERTEX BUFFER UPLOAD ===");
+                                    let _ = writeln!(f, "Buffer: {}, Size: {} bytes", resource.name, data.len());
+                                    // Each vertex is 48 bytes (pos=12, normal=12, uv=8, color=16)
+                                    #[repr(C)]
+                                    #[derive(Clone, Copy)]
+                                    struct GpuVertex {
+                                        position: [f32; 3],
+                                        normal: [f32; 3],
+                                        uv: [f32; 2],
+                                        color: [f32; 4],
+                                    }
+                                    unsafe impl bytemuck::Pod for GpuVertex {}
+                                    unsafe impl bytemuck::Zeroable for GpuVertex {}
+                                    let vertices: &[GpuVertex] = bytemuck::cast_slice(data);
+                                    let _ = writeln!(f, "First 8 vertices:");
+                                    for i in 0..8.min(vertices.len()) {
+                                        let v = &vertices[i];
+                                        let _ = writeln!(f, "  [{}] pos={:?}, color={:?}, normal={:?}", 
+                                            i, v.position, v.color, v.normal);
+                                    }
+                                }
+                            }
+                            
                             self.upload_to_buffer(buffer.as_ref(), data, 0)?;
                         }
                         ResourceInitData::None => {
@@ -1762,7 +1812,7 @@ impl DirectXBackendImpl {
                 RasterizerState: D3D12_RASTERIZER_DESC {
                     FillMode: D3D12_FILL_MODE_SOLID,
                     CullMode: D3D12_CULL_MODE_BACK,
-                    FrontCounterClockwise: TRUE, // Match Vulkan
+                    FrontCounterClockwise: TRUE,
                     DepthBias: 0,
                     DepthBiasClamp: 0.0,
                     SlopeScaledDepthBias: 0.0,
@@ -1832,12 +1882,17 @@ impl DirectXBackendImpl {
                 );
             }
 
-            // Verify DXBC header
-            if vs_bytecode.len() < 4 || &vs_bytecode[0..4] != b"DXBC" {
-                anyhow::bail!("Invalid vertex shader: missing DXBC header");
+            // Verify shader container magic (accept DXBC and DXIL containers)
+            fn has_valid_dxil_magic(bytecode: &[u8]) -> bool {
+                bytecode.len() >= 4
+                    && (bytecode.starts_with(b"DXBC") || bytecode.starts_with(b"DXIL"))
             }
-            if ps_bytecode.len() < 4 || &ps_bytecode[0..4] != b"DXBC" {
-                anyhow::bail!("Invalid pixel shader: missing DXBC header");
+
+            if !has_valid_dxil_magic(&vs_bytecode) {
+                anyhow::bail!("Invalid vertex shader: unexpected container header");
+            }
+            if !has_valid_dxil_magic(&ps_bytecode) {
+                anyhow::bail!("Invalid pixel shader: unexpected container header");
             }
 
             let pipeline_state: ID3D12PipelineState =
@@ -3819,6 +3874,7 @@ impl PassExecutionContext for DirectXPassContext {
     ) -> Result<()> {
         unsafe {
             let command_list = self.command_list();
+            
             command_list.DrawIndexedInstanced(
                 index_count,
                 instance_count,

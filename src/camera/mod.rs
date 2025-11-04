@@ -38,12 +38,10 @@ pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, fa
             Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far)
         }
         CameraBackend::DirectX => {
-            // DirectX: Use right-handed coordinate system but with Y-flip for NDC
-            // This keeps vertex winding order consistent between backends
-            let mut proj = Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far);
-            // Flip Y in NDC space for DirectX convention (Y=-1 at top, Y=+1 at bottom)
-            proj.y_axis.y *= -1.0;
-            proj
+            // DirectX: Use right-handed coordinate system same as Vulkan
+            // Note: We use FrontCounterClockwise=TRUE in rasterizer state which handles
+            // DirectX's inverted Y convention, so no Y-flip is needed in the projection matrix
+            Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far)
         }
     }
 }

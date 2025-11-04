@@ -15,9 +15,17 @@ impl CameraUniforms {
     /// Create from view and projection matrices
     pub fn new(view: Mat4, projection: Mat4) -> Self {
         let view_proj = projection * view;
-        Self {
-            view_proj: view_proj.to_cols_array_2d(),
-        }
+        let matrix = view_proj.to_cols_array_2d();
+        
+        log::info!("=== CAMERA MATRIX DEBUG ===");
+        log::info!("Backend: {:?}", crate::camera::get_camera_backend());
+        log::info!("ViewProj matrix:");
+        log::info!("  Row 0: {:?}", matrix[0]);
+        log::info!("  Row 1: {:?}", matrix[1]);
+        log::info!("  Row 2: {:?}", matrix[2]);
+        log::info!("  Row 3: {:?}", matrix[3]);
+        
+        Self { view_proj: matrix }
     }
 
     /// Get as byte slice for buffer upload

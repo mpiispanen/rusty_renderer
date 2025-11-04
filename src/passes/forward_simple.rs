@@ -14,6 +14,16 @@ use crate::render_graph::{
 use crate::scene::{GeometryData, Scene, SceneObject, Transform};
 use anyhow::Result;
 
+/// Transpose a 4x4 matrix
+fn transpose_matrix(m: [[f32; 4]; 4]) -> [[f32; 4]; 4] {
+    [
+        [m[0][0], m[1][0], m[2][0], m[3][0]],
+        [m[0][1], m[1][1], m[2][1], m[3][1]],
+        [m[0][2], m[1][2], m[2][2], m[3][2]],
+        [m[0][3], m[1][3], m[2][3], m[3][3]],
+    ]
+}
+
 /// Simplified forward rendering pass
 ///
 /// This pass renders 3D geometry using resources managed entirely by the render graph:
@@ -597,6 +607,22 @@ impl PassCallback for ForwardSimplePassCallback {
         // Push model matrix as push constants
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
+
+        // Debug logging that works in both Windows and Linux
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("matrix_debug.log")
+        {
+            use std::io::Write;
+            let _ = writeln!(f, "=== MATRIX DEBUG ===");
+            let _ = writeln!(f, "Backend: {:?}", crate::camera::get_camera_backend());
+            let _ = writeln!(f, "Model matrix:");
+            let _ = writeln!(f, "  Row 0: {:?}", model_matrix[0]);
+            let _ = writeln!(f, "  Row 1: {:?}", model_matrix[1]);
+            let _ = writeln!(f, "  Row 2: {:?}", model_matrix[2]);
+            let _ = writeln!(f, "  Row 3: {:?}", model_matrix[3]);
+        }
 
         #[repr(C)]
         #[derive(Clone, Copy)]

@@ -61,14 +61,14 @@ PSInput VSMain(VSInput input) {
     PSInput output;
     
     // Transform to world space
-    float4 worldPos = mul(pushConstants.model, float4(input.position, 1.0));
+    float4 worldPos = mul(float4(input.position, 1.0), pushConstants.model);
     output.worldPos = worldPos.xyz;
     
     // Transform normal
-    output.normal = normalize(mul((float3x3)pushConstants.normalMatrix, input.normal));
+    output.normal = normalize(mul(input.normal, (float3x3)pushConstants.normalMatrix));
     
     // Transform to clip space
-    output.position = mul(viewProj, worldPos);
+    output.position = mul(worldPos, viewProj);
     
     // Pass color
     output.color = input.color;
