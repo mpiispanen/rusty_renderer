@@ -6,7 +6,7 @@
 use crate::backends::{self, BackendType, GraphicsBackend};
 use crate::camera::{self, CameraBackend};
 use crate::config::{Backend, Config};
-use crate::passes::{ForwardSimplePass, ForwardSimpleSceneResources};
+use crate::passes::{ForwardSimplePass, ForwardSimpleSceneResources, ShadowMapPass};
 use crate::render_graph::{
     Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
 };
@@ -154,6 +154,43 @@ impl App {
         } = ForwardSimplePass::prepare_scene_resources(scene, &mut graph, width, height)?;
 
         log::info!("ForwardSimplePass prepared {vertex_count} vertices");
+
+        // Check if scene has directional light for shadow mapping
+        let has_directional_light = scene
+            .lighting
+            .as_ref()
+            .and_then(|l| l.lights.first())
+            .map(|l| matches!(l.light_type(), crate::scene::LightType::Directional))
+            .unwrap_or(false);
+
+        if has_directional_light {
+            log::info!("Scene has directional light - enabling shadow mapping");
+            
+            // Get light direction from scene
+            let light_direction = scene
+                .lighting
+                .as_ref()
+                .and_then(|l| l.lights.first())
+                .and_then(|l| l.direction())
+                .map(|d| glam::Vec3::from_array(d))
+                .unwrap_or(glam::Vec3::new(0.0, -1.0, 0.0));
+
+            // Prepare shadow map resources
+            let shadow_resources =
+                ShadowMapPass::prepare_resources(&mut graph, light_direction, 1024);
+
+            // Add shadow map pass (runs before forward pass)
+            ShadowMapPass::builder()
+                .shadow_map_output(shadow_resources.shadow_map)
+                .vertex_buffer(vertex_buffer)
+                .index_buffer(index_buffer)
+                .light_uniforms(shadow_resources.light_uniforms)
+                .index_count(index_count)
+                .with_name("shadow_map")
+                .build(&mut graph)?;
+
+            log::info!("Shadow map pass added to render graph");
+        }
 
         // Create forward pass
         ForwardSimplePass::builder()
