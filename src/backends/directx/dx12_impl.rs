@@ -1661,75 +1661,183 @@ impl DirectXBackendImpl {
             let vs_bytecode = vs_bytecode.context("No vertex shader provided")?;
             let ps_bytecode = ps_bytecode.context("No pixel shader provided")?;
 
-            // Create root signature
-            // Match the shader layout:
-            // - b0: Camera uniforms (CBV)
-            // - b1: Lighting uniforms (CBV)
-            // - b2: Push constants (root constants)
-            let root_parameters = [
-                // Camera uniform buffer (CBV b0)
-                D3D12_ROOT_PARAMETER {
-                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
-                    Anonymous: D3D12_ROOT_PARAMETER_0 {
-                        Descriptor: D3D12_ROOT_DESCRIPTOR {
-                            ShaderRegister: 0,
-                            RegisterSpace: 0,
-                        },
-                    },
-                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
-                },
-                // Lighting uniform buffer (CBV b1)
-                D3D12_ROOT_PARAMETER {
-                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
-                    Anonymous: D3D12_ROOT_PARAMETER_0 {
-                        Descriptor: D3D12_ROOT_DESCRIPTOR {
-                            ShaderRegister: 1,
-                            RegisterSpace: 0,
-                        },
-                    },
-                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
-                },
-                // Root constants (push constants b2)
-                D3D12_ROOT_PARAMETER {
-                    ParameterType: D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS,
-                    Anonymous: D3D12_ROOT_PARAMETER_0 {
-                        Constants: D3D12_ROOT_CONSTANTS {
-                            ShaderRegister: 2,
-                            RegisterSpace: 0,
-                            Num32BitValues: 32, // 128 bytes (2 x 4x4 matrices)
-                        },
-                    },
-                    ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
-                },
-            ];
-
-            let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
-                NumParameters: root_parameters.len() as u32,
-                pParameters: root_parameters.as_ptr(),
-                NumStaticSamplers: 0,
-                pStaticSamplers: std::ptr::null(),
-                Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+            // Determine if this is a shadow map pass based on pass name
+            let is_shadow_pass = {
+                // Convert pass_id to string using Debug format
+                let pass_str = format!("{:?}", pass_id);
+                pass_str.contains("shadow")
             };
+            
+            log::debug!("Creating root signature for pass {:?}, is_shadow_pass={}", pass_id, is_shadow_pass);
 
-            let mut signature_blob: Option<ID3DBlob> = None;
-            let mut error_blob: Option<ID3DBlob> = None;
+            // Create root signature based on pass type
+            let root_signature: ID3D12RootSignature = if is_shadow_pass {
+                // Shadow map pass: only needs light uniforms (b0)
+                let root_parameters = [
+                    // Light uniform buffer (CBV b0) - contains lightViewProj matrix
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            Descriptor: D3D12_ROOT_DESCRIPTOR {
+                                ShaderRegister: 0,
+                                RegisterSpace: 0,
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                    },
+                ];
 
-            D3D12SerializeRootSignature(
-                &root_sig_desc,
-                D3D_ROOT_SIGNATURE_VERSION_1,
-                &mut signature_blob,
-                Some(&mut error_blob),
-            )?;
+                let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
+                    NumParameters: root_parameters.len() as u32,
+                    pParameters: root_parameters.as_ptr(),
+                    NumStaticSamplers: 0,
+                    pStaticSamplers: std::ptr::null(),
+                    Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+                };
 
-            let signature_blob = signature_blob.context("Failed to serialize root signature")?;
+                let mut signature_blob: Option<ID3DBlob> = None;
+                let mut error_blob: Option<ID3DBlob> = None;
 
-            let root_signature: ID3D12RootSignature = device.CreateRootSignature(
-                0,
-                std::slice::from_raw_parts(
-                    signature_blob.GetBufferPointer() as *const u8,
-                    signature_blob.GetBufferSize(),
-                ),
-            )?;
+                D3D12SerializeRootSignature(
+                    &root_sig_desc,
+                    D3D_ROOT_SIGNATURE_VERSION_1,
+                    &mut signature_blob,
+                    Some(&mut error_blob),
+                )?;
+
+                let signature_blob = signature_blob.context("Failed to serialize root signature")?;
+
+                device.CreateRootSignature(
+                    0,
+                    std::slice::from_raw_parts(
+                        signature_blob.GetBufferPointer() as *const u8,
+                        signature_blob.GetBufferSize(),
+                    ),
+                )?
+            } else {
+                // Forward pass: needs full set of parameters
+                // - b0: Camera uniforms (CBV)
+                // - b1: Lighting uniforms (CBV)
+                // - b2: Push constants (root constants)
+                // - b3: Shadow uniforms (CBV, optional)
+                // - t0: Shadow map texture (SRV, optional)
+                // - s0: Shadow comparison sampler (static sampler)
+                
+                // Shadow map descriptor range (t0)
+                let shadow_descriptor_range = D3D12_DESCRIPTOR_RANGE {
+                    RangeType: D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+                    NumDescriptors: 1,
+                    BaseShaderRegister: 0, // t0
+                    RegisterSpace: 0,
+                    OffsetInDescriptorsFromTableStart: 0,
+                };
+                let shadow_descriptor_ranges = vec![shadow_descriptor_range];
+                
+                let root_parameters = [
+                    // Camera uniform buffer (CBV b0)
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            Descriptor: D3D12_ROOT_DESCRIPTOR {
+                                ShaderRegister: 0,
+                                RegisterSpace: 0,
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                    },
+                    // Lighting uniform buffer (CBV b1)
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            Descriptor: D3D12_ROOT_DESCRIPTOR {
+                                ShaderRegister: 1,
+                                RegisterSpace: 0,
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                    },
+                    // Root constants (push constants b2)
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_32BIT_CONSTANTS,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            Constants: D3D12_ROOT_CONSTANTS {
+                                ShaderRegister: 2,
+                                RegisterSpace: 0,
+                                Num32BitValues: 32, // 128 bytes (2 x 4x4 matrices)
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                    },
+                    // Shadow uniform buffer (CBV b3)
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_CBV,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            Descriptor: D3D12_ROOT_DESCRIPTOR {
+                                ShaderRegister: 3,
+                                RegisterSpace: 0,
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,
+                    },
+                    // Shadow map descriptor table (t0)
+                    D3D12_ROOT_PARAMETER {
+                        ParameterType: D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE,
+                        Anonymous: D3D12_ROOT_PARAMETER_0 {
+                            DescriptorTable: D3D12_ROOT_DESCRIPTOR_TABLE {
+                                NumDescriptorRanges: 1,
+                                pDescriptorRanges: shadow_descriptor_ranges.as_ptr(),
+                            },
+                        },
+                        ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
+                    },
+                ];
+                
+                // Static comparison sampler for shadow map (s0)
+                let shadow_sampler = D3D12_STATIC_SAMPLER_DESC {
+                    Filter: D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,
+                    AddressU: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                    AddressV: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                    AddressW: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+                    MipLODBias: 0.0,
+                    MaxAnisotropy: 0,
+                    ComparisonFunc: D3D12_COMPARISON_FUNC_LESS_EQUAL,
+                    BorderColor: D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
+                    MinLOD: 0.0,
+                    MaxLOD: f32::MAX,
+                    ShaderRegister: 0, // s0
+                    RegisterSpace: 0,
+                    ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
+                };
+                let static_samplers = [shadow_sampler];
+
+                let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
+                    NumParameters: root_parameters.len() as u32,
+                    pParameters: root_parameters.as_ptr(),
+                    NumStaticSamplers: static_samplers.len() as u32,
+                    pStaticSamplers: static_samplers.as_ptr(),
+                    Flags: D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT,
+                };
+
+                let mut signature_blob: Option<ID3DBlob> = None;
+                let mut error_blob: Option<ID3DBlob> = None;
+
+                D3D12SerializeRootSignature(
+                    &root_sig_desc,
+                    D3D_ROOT_SIGNATURE_VERSION_1,
+                    &mut signature_blob,
+                    Some(&mut error_blob),
+                )?;
+
+                let signature_blob = signature_blob.context("Failed to serialize root signature")?;
+
+                device.CreateRootSignature(
+                    0,
+                    std::slice::from_raw_parts(
+                        signature_blob.GetBufferPointer() as *const u8,
+                        signature_blob.GetBufferSize(),
+                    ),
+                )?
+            };
 
             // Create input layout from vertex layout
             let input_layout = if let Some(layout) = builder.get_vertex_layout() {
@@ -1842,10 +1950,12 @@ impl DirectXBackendImpl {
                 },
                 IBStripCutValue: D3D12_INDEX_BUFFER_STRIP_CUT_VALUE_DISABLED,
                 PrimitiveTopologyType: D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-                NumRenderTargets: 1,
+                NumRenderTargets: if is_shadow_pass { 0 } else { 1 },
                 RTVFormats: {
                     let mut formats = [DXGI_FORMAT_UNKNOWN; 8];
-                    formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+                    if !is_shadow_pass {
+                        formats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+                    }
                     formats
                 },
                 DSVFormat: DXGI_FORMAT_D32_FLOAT,
@@ -1880,6 +1990,12 @@ impl DirectXBackendImpl {
                     "PS bytecode first 16 bytes: {:02x?}",
                     &ps_bytecode[0..16.min(ps_bytecode.len())]
                 );
+                let _ = writeln!(f, "PSO Desc:");
+                let _ = writeln!(f, "  NumRenderTargets: {}", pso_desc.NumRenderTargets);
+                let _ = writeln!(f, "  RTVFormats[0]: {:?}", pso_desc.RTVFormats[0]);
+                let _ = writeln!(f, "  DSVFormat: {:?}", pso_desc.DSVFormat);
+                let _ = writeln!(f, "  NumInputElements: {}", pso_desc.InputLayout.NumElements);
+                let _ = writeln!(f, "  is_shadow_pass: {}", is_shadow_pass);
             }
 
             // Verify shader container magic (accept DXBC and DXIL containers)
@@ -1946,6 +2062,16 @@ impl DirectXBackendImpl {
         for (pass_id, builder) in &compiled.pipeline_descriptions {
             if !self.pipeline_cache.contains_key(pass_id) {
                 log::debug!("Compiling pipeline for pass {:?}", pass_id);
+                
+                // Debug logging
+                if let Ok(mut f) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("rusty_renderer_debug.log")
+                {
+                    let _ = writeln!(f, "About to compile pipeline for pass {:?}", pass_id);
+                }
+                
                 let (pipeline, root_sig) =
                     self.compile_pipeline_from_builder(builder, graph.shader_registry(), *pass_id)?;
                 self.pipeline_cache.insert(*pass_id, pipeline);
@@ -2754,6 +2880,20 @@ impl DirectXBackendImpl {
             let device = self.device.as_ref().context("Device not initialized")?;
 
             let dxgi_format = dx12_helpers::texture_format_to_dxgi(desc.format);
+            
+            // For depth textures that will be sampled, we need to use typeless format
+            // for the resource and specific formats for DSV and SRV
+            let (resource_format, srv_format) = if desc.usage.depth_stencil && desc.usage.sampled {
+                match desc.format {
+                    TextureFormat::Depth32Float => (DXGI_FORMAT_R32_TYPELESS, DXGI_FORMAT_R32_FLOAT),
+                    TextureFormat::Depth24PlusStencil8 => {
+                        (DXGI_FORMAT_R24G8_TYPELESS, DXGI_FORMAT_R24_UNORM_X8_TYPELESS)
+                    }
+                    _ => (dxgi_format, dxgi_format),
+                }
+            } else {
+                (dxgi_format, dxgi_format)
+            };
 
             // Create resource description
             let mut resource_desc = D3D12_RESOURCE_DESC {
@@ -2763,7 +2903,7 @@ impl DirectXBackendImpl {
                 Height: desc.height,
                 DepthOrArraySize: 1,
                 MipLevels: desc.mip_levels as u16,
-                Format: dxgi_format,
+                Format: resource_format,  // Use typeless format for depth+sampled textures
                 SampleDesc: DXGI_SAMPLE_DESC {
                     Count: 1,
                     Quality: 0,
@@ -2835,7 +2975,7 @@ impl DirectXBackendImpl {
 
                 // Create SRV
                 let srv_desc = D3D12_SHADER_RESOURCE_VIEW_DESC {
-                    Format: dxgi_format,
+                    Format: srv_format,  // Use appropriate read format (R32_FLOAT for depth)
                     ViewDimension: D3D12_SRV_DIMENSION_TEXTURE2D,
                     Shader4ComponentMapping: D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
                     Anonymous: D3D12_SHADER_RESOURCE_VIEW_DESC_0 {
@@ -4087,18 +4227,29 @@ impl PassExecutionContext for DirectXPassContext {
             binding
         );
 
-        // For MVP, we only support set 0, binding 2 (texture)
-        if set != 0 || binding != 2 {
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "Texture binding SKIPPED (not set 0, binding 2)");
-            }
-            log::warn!("Only set 0, binding 2 is currently supported for textures, ignoring set {}, binding {}", set, binding);
+        // For MVP, we support:
+        // - set 0, binding 2 (main texture)
+        // - set 0, binding 4 (shadow map)
+        if set != 0 {
+            log::warn!("Only set 0 is currently supported for textures, ignoring set {}", set);
             return Ok(());
         }
+        
+        let root_parameter_index = match binding {
+            2 => {
+                // TODO: This was for the old pipeline, might not be used now
+                log::warn!("Binding 2 not currently mapped to any root parameter, skipping");
+                return Ok(());
+            }
+            4 => {
+                // Shadow map is at root parameter 4 (descriptor table for t0)
+                4
+            }
+            _ => {
+                log::warn!("Unsupported texture binding {}, skipping", binding);
+                return Ok(());
+            }
+        };
 
         unsafe {
             // Get texture first
@@ -4156,19 +4307,20 @@ impl PassExecutionContext for DirectXPassContext {
                     }
                 }
 
-                // Root parameter 4 is the descriptor table for textures (t0)
-                command_list.SetGraphicsRootDescriptorTable(4, gpu_handle);
+                // Set the descriptor table for the texture
+                command_list.SetGraphicsRootDescriptorTable(root_parameter_index, gpu_handle);
 
                 if let Ok(mut f) = std::fs::OpenOptions::new()
                     .create(true)
                     .append(true)
                     .open("rusty_renderer_debug.log")
                 {
-                    let _ = writeln!(f, "SetGraphicsRootDescriptorTable(4, gpu_handle) called");
+                    let _ = writeln!(f, "SetGraphicsRootDescriptorTable({}, gpu_handle) called", root_parameter_index);
                 }
 
                 log::debug!(
-                    "DirectXPassContext: Texture bound to root parameter 4 (descriptor table)"
+                    "DirectXPassContext: Texture bound to root parameter {} (descriptor table)",
+                    root_parameter_index
                 );
             } else {
                 if let Ok(mut f) = std::fs::OpenOptions::new()

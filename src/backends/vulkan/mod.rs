@@ -1123,9 +1123,12 @@ impl VulkanBackend {
 
         // Create pipeline layout for this specific pipeline
         // TODO: This should be derived from shader reflection, not hardcoded
-        // For now, create a simple layout for forward_simple shader:
+        // For now, create a layout for forward_simple shader with optional shadow mapping:
         // - Binding 0: Camera uniforms
         // - Binding 1: Lighting uniforms
+        // - Binding 3: Shadow uniforms (optional, for shadow mapping)
+        // - Texture 0: Shadow map depth texture (optional)
+        // - Sampler 0: Comparison sampler for shadow map (optional)
         // - Push constants: model and normal matrices
         let bindings = [
             vk::DescriptorSetLayoutBinding::builder()
@@ -1139,6 +1142,18 @@ impl VulkanBackend {
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(3)
+                .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(4)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
         ];
 

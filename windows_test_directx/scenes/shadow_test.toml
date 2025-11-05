@@ -1,0 +1,196 @@
+[metadata]
+name = "Shadow Test Scene"
+description = "Scene designed for testing shadow mapping - cube hovering over a ground plane"
+
+[camera]
+type = "perspective"
+position = [3.0, 3.0, 5.0]
+target = [0.0, 0.0, 0.0]
+fov = 60.0
+near = 0.1
+far = 100.0
+
+[lighting]
+ambient = [0.2, 0.2, 0.2]  # Low ambient so shadows are visible
+
+[[lighting.lights]]
+type = "directional"
+direction = [0.3, -1.0, 0.3]  # Light from upper-right
+color = [1.0, 1.0, 1.0]
+intensity = 1.5
+
+# Floating cube (will cast shadow on ground)
+[[objects]]
+type = "mesh"
+name = "floating_cube"
+
+[objects.transform]
+position = [0.0, 1.0, 0.0]  # Elevated above ground
+rotation = [0.0, 45.0, 0.0]  # Rotated for interesting shadow
+scale = [0.8, 0.8, 0.8]
+
+[objects.geometry]
+source = "inline"
+indices = [
+    0, 1, 2, 2, 3, 0,    # Front
+    4, 5, 6, 6, 7, 4,    # Back
+    8, 9, 10, 10, 11, 8,  # Left
+    12, 13, 14, 14, 15, 12, # Right
+    16, 17, 18, 18, 19, 16, # Top
+    20, 21, 22, 22, 23, 20  # Bottom
+]
+
+# Cube vertices (red)
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, 1.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, 1.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, 1.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, 1.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, -1.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, -1.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, -1.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 0.0, -1.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [-1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [-1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [-1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [-1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [1.0, 0.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, 0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, -1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, -0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, -1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, -1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-0.5, -0.5, 0.5]
+color = [0.8, 0.2, 0.2]
+normal = [0.0, -1.0, 0.0]
+
+# Ground plane (will receive shadow)
+[[objects]]
+type = "mesh"
+name = "ground"
+
+[objects.transform]
+position = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0]
+scale = [1.0, 1.0, 1.0]
+
+[objects.geometry]
+source = "inline"
+indices = [0, 1, 2, 2, 3, 0]
+
+[[objects.geometry.vertices]]
+position = [-5.0, 0.0, -5.0]
+color = [0.6, 0.6, 0.6]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [5.0, 0.0, -5.0]
+color = [0.6, 0.6, 0.6]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [5.0, 0.0, 5.0]
+color = [0.6, 0.6, 0.6]
+normal = [0.0, 1.0, 0.0]
+
+[[objects.geometry.vertices]]
+position = [-5.0, 0.0, 5.0]
+color = [0.6, 0.6, 0.6]
+normal = [0.0, 1.0, 0.0]

@@ -637,8 +637,6 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Failed to bind lighting uniforms");
 
         // Bind shadow uniforms if present
-        // TODO: Fix descriptor set layout to support shadow resources
-        /*
         if let Some(shadow_uniforms_id) = self.shadow_uniforms {
             log::info!("Binding shadow uniforms for resource {:?}", shadow_uniforms_id);
             let shadow_buffer_ptr = context
@@ -658,12 +656,10 @@ impl PassCallback for ForwardSimplePassCallback {
                 .expect("Failed to get shadow map");
             log::info!("Got shadow texture ptr: {:?}", shadow_texture_ptr);
             context
-                .bind_texture(0, 0, shadow_texture_ptr)
+                .bind_texture(0, 4, shadow_texture_ptr) // Binding 4 for combined image sampler
                 .expect("Failed to bind shadow map texture");
             log::info!("Shadow map texture bound successfully");
-            // TODO: bind comparison sampler
         }
-        */
 
         // Push model matrix as push constants
         let model_matrix = self.transform.matrix();

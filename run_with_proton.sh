@@ -193,6 +193,7 @@ VKD3D_DEBUG="$VKD3D_DEBUG_LEVEL" \
 RUST_LOG="${RUST_LOG:-debug}" \
 RUST_BACKTRACE="${RUST_BACKTRACE:-1}" \
 WINEDEBUG=-all \
+WINEDLLPATH="$PROTON_DIR/files/lib64/wine:$PROTON_DIR/files/lib64/vkd3d:$PROTON_DIR/files/lib/wine:$PROTON_DIR/files/lib/vkd3d" \
 "$PROTON_DIR/proton" run rusty_renderer.exe --backend directx "${APP_ARGS[@]}"
 
 EXIT_CODE=$?

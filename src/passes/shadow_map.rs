@@ -5,7 +5,7 @@
 
 use crate::render_graph::{
     AccessType, BufferUsageFlags, Format, ImageLayout, ImageUsageFlags, PassCallback,
-    PassExecutionContext, PassId, PassKind, PipelineBuilder, PipelineStage, RenderGraph,
+    PassExecutionContext, PassKind, PipelineBuilder, PipelineStage, RenderGraph,
     RenderPass, ResourceAccess, ResourceDescriptor, ResourceId, ShaderDescriptor, ShaderRegistry,
     ShaderStage,
 };
@@ -67,11 +67,22 @@ impl ShadowMapPass {
             },
         );
 
-        // Create light uniform buffer
+        // Create light uniform buffer with both matrix and shadow parameters
+        // Buffer layout: lightSpaceMatrix (64 bytes) + shadowParams (16 bytes) = 80 bytes
+        let mut uniform_data = Vec::with_capacity(80);
+        
+        // Add light space matrix (64 bytes)
         let light_matrix_data: [f32; 16] = light_view_proj.to_cols_array();
+        uniform_data.extend_from_slice(bytemuck::cast_slice(&light_matrix_data));
+        
+        // Add shadow parameters (16 bytes = 4 floats)
+        // x: enabled (1.0 = enabled), y: bias (0.005), z: unused, w: unused
+        let shadow_params: [f32; 4] = [1.0, 0.005, 0.0, 0.0];
+        uniform_data.extend_from_slice(bytemuck::cast_slice(&shadow_params));
+        
         let light_uniforms = graph.declare_buffer_with_data(
             "shadow_light_uniforms",
-            bytemuck::cast_slice(&light_matrix_data).to_vec(),
+            uniform_data,
             BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
         );
 
