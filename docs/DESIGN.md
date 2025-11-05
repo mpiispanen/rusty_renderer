@@ -43,22 +43,42 @@ Rusty Renderer is a graphics rendering sandbox and experimentation engine built 
 - ✅ Cross-compilation for Windows
 - ✅ Shader compilation (HLSL → SPIR-V/DXIL)
 
-### Current Focus – Render Graph Refinement & Shadow Mapping
+### Current Focus – Scene Rendering and Shadow Mapping
 
-**Cleanup & hardening**
-- Finish migrating any remaining shader references into pass builders
-- Replace manual vertex expansion with index/vertex buffer descriptors in the graph
-- Prune deprecated documentation and helpers from the pre-render-graph era
+**Current Status (Nov 2025)**
+- ✅ Shadow map generation working (depth-only pass renders correctly)
+- ✅ Both Vulkan and DirectX backends execute shadow pass
+- 🔄 Shadow sampling deferred until scene rendering improvements
 
-**Shadow mapping roadmap**
-- Introduce a depth-only shadow map pass
-- Extend forward shading to sample shadows (with basic PCF)
-- Add tone mapping / post-processing once shadows land
+**Priority: Scene Rendering Improvements** (#91, #92, #93)
+Before completing shadow mapping, we need better scene capabilities to properly test and visualize shadows:
 
-**CI and testing**
-- Re-enable automated screenshot comparisons for Vulkan + DirectX
-- Capture Proton-based DirectX results as part of CI
-- Publish a single current-state document instead of many overlapping status reports
+1. **Multi-Object Rendering** (#91) - HIGH Priority
+   - Support multiple objects with individual transforms
+   - Per-object model matrices and materials
+   - Render all objects from scene file
+   - **Why**: Need multiple objects to see shadows cast between them
+
+2. **Interactive Camera System** (#92) - HIGH Priority
+   - WASD + mouse look controls
+   - First-person camera movement
+   - View/projection matrix updates
+   - **Why**: Need to position camera to view shadows from different angles
+
+3. **glTF Scene Loading** (#93) - MEDIUM Priority
+   - Complete scene loading with hierarchies
+   - Multiple meshes and materials
+   - PBR material support
+   - **Why**: Real scenes make shadow testing meaningful
+
+**Shadow Mapping Completion** (#90) - MEDIUM Priority (After Above)
+- Enable shadow texture sampling in forward shader
+- Fix descriptor set layout for shadow texture/sampler
+- Pass shadow uniforms to forward pass
+- PCF filtering for soft shadows
+- Tone mapping post-process pass
+
+**Rationale**: Shadow map *generation* is complete and working. However, testing and visualizing shadow *sampling* requires multiple objects, camera movement, and realistic scenes. We'll improve the rendering foundation first, then return to complete shadow features.
 
 ## Architecture Overview
 

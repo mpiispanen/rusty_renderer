@@ -104,15 +104,42 @@ impl ForwardSimplePass {
         let mut indices = Vec::new();
         let mut vertex_offset = 0u32;
 
-        for obj in &scene.objects {
+        for (obj_idx, obj) in scene.objects.iter().enumerate() {
             match obj {
-                SceneObject::Mesh { geometry, .. } => match geometry {
+                SceneObject::Mesh { geometry, transform, .. } => match geometry {
                     GeometryData::Inline {
                         vertices,
                         indices: mesh_indices,
                     } => {
-                        // Push vertex data
-                        base_vertices.extend_from_slice(vertices);
+                        log::info!("Object {}: {} vertices, transform: pos={:?}, rot={:?}, scale={:?}",
+                            obj_idx, vertices.len(), transform.position, transform.rotation, transform.scale);
+                        
+                        // Apply per-object transforms to vertices
+                        let model_matrix = transform.matrix();
+                        let normal_matrix = transform.normal_matrix();
+                        
+                        for vertex in vertices {
+                            // Transform position
+                            let pos_vec4 = [vertex.position[0], vertex.position[1], vertex.position[2], 1.0];
+                            let transformed_pos = [
+                                model_matrix[0][0] * pos_vec4[0] + model_matrix[1][0] * pos_vec4[1] + model_matrix[2][0] * pos_vec4[2] + model_matrix[3][0] * pos_vec4[3],
+                                model_matrix[0][1] * pos_vec4[0] + model_matrix[1][1] * pos_vec4[1] + model_matrix[2][1] * pos_vec4[2] + model_matrix[3][1] * pos_vec4[3],
+                                model_matrix[0][2] * pos_vec4[0] + model_matrix[1][2] * pos_vec4[1] + model_matrix[2][2] * pos_vec4[2] + model_matrix[3][2] * pos_vec4[3],
+                            ];
+                            
+                            // Transform normal
+                            let norm_vec4 = [vertex.normal[0], vertex.normal[1], vertex.normal[2], 0.0];
+                            let transformed_normal = [
+                                normal_matrix[0][0] * norm_vec4[0] + normal_matrix[1][0] * norm_vec4[1] + normal_matrix[2][0] * norm_vec4[2],
+                                normal_matrix[0][1] * norm_vec4[0] + normal_matrix[1][1] * norm_vec4[1] + normal_matrix[2][1] * norm_vec4[2],
+                                normal_matrix[0][2] * norm_vec4[0] + normal_matrix[1][2] * norm_vec4[1] + normal_matrix[2][2] * norm_vec4[2],
+                            ];
+                            
+                            let mut transformed_vertex = vertex.clone();
+                            transformed_vertex.position = transformed_pos;
+                            transformed_vertex.normal = transformed_normal;
+                            base_vertices.push(transformed_vertex);
+                        }
 
                         // Push indices with proper offsets (generate sequential if missing)
                         if let Some(idx) = mesh_indices {
@@ -143,6 +170,10 @@ impl ForwardSimplePass {
         unsafe impl bytemuck::Pod for GpuVertex {}
         unsafe impl bytemuck::Zeroable for GpuVertex {}
 
+        log::info!("Total vertices after transform: {}, indices: {}", base_vertices.len(), indices.len());
+        log::info!("First vertex position: {:?}", base_vertices.get(0).map(|v| v.position));
+        log::info!("Last vertex position: {:?}", base_vertices.last().map(|v| v.position));
+        
         let gpu_vertices: Vec<GpuVertex> = base_vertices
             .iter()
             .map(|v| GpuVertex {
@@ -187,15 +218,8 @@ impl ForwardSimplePass {
             BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
         );
 
-        // Current implementation uses transform of the first mesh if available.
-        let transform = scene
-            .objects
-            .first()
-            .and_then(|obj| match obj {
-                SceneObject::Mesh { transform, .. } => Some(*transform),
-                _ => None,
-            })
-            .unwrap_or_default();
+        // Since we're baking transforms into vertices, use identity transform for rendering
+        let transform = Transform::default();
 
         Ok(ForwardSimpleSceneResources {
             vertex_buffer,
