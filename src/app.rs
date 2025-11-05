@@ -396,10 +396,10 @@ impl App {
                 camera.move_forward(-move_distance);
             }
             if self.input_state.keys_pressed.contains(&KeyCode::KeyA) {
-                camera.move_right(-move_distance);
+                camera.move_right(move_distance);
             }
             if self.input_state.keys_pressed.contains(&KeyCode::KeyD) {
-                camera.move_right(move_distance);
+                camera.move_right(-move_distance);
             }
 
             // QE for up/down
@@ -414,7 +414,7 @@ impl App {
             if self.mouse_captured && self.input_state.mouse_delta != (0.0, 0.0) {
                 let sensitivity = 0.1;
                 let delta_yaw = self.input_state.mouse_delta.0 as f32 * sensitivity;
-                let delta_pitch = -self.input_state.mouse_delta.1 as f32 * sensitivity;
+                let delta_pitch = self.input_state.mouse_delta.1 as f32 * sensitivity;
                 camera.rotate(delta_yaw, delta_pitch);
             }
 
@@ -563,22 +563,13 @@ impl ApplicationHandler for App {
                         ElementState::Pressed => {
                             self.input_state.keys_pressed.insert(keycode);
                             
-                            // Escape to toggle mouse capture
+                            // Escape to exit
                             if keycode == KeyCode::Escape {
-                                self.mouse_captured = !self.mouse_captured;
-                                if let Some(window) = &self.window {
-                                    window.set_cursor_visible(!self.mouse_captured);
-                                    if self.mouse_captured {
-                                        let _ = window.set_cursor_grab(
-                                            winit::window::CursorGrabMode::Confined
-                                        );
-                                    } else {
-                                        let _ = window.set_cursor_grab(
-                                            winit::window::CursorGrabMode::None
-                                        );
-                                    }
+                                if let Some(backend) = &mut self.backend {
+                                    backend.cleanup();
                                 }
-                                log::info!("Mouse captured: {}", self.mouse_captured);
+                                event_loop.exit();
+                                return;
                             }
                         }
                         ElementState::Released => {

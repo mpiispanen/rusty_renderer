@@ -5,12 +5,7 @@
 #define LIGHT_DIRECTIONAL 0
 #define LIGHT_POINT 1
 
-// Camera uniforms (b0)
-cbuffer CameraUniforms : register(b0) {
-    float4x4 viewProj;
-};
-
-// Lighting uniforms (b1)
+// Lighting uniforms (b0)
 struct Light {
     uint lightType;
     uint padding1;
@@ -20,24 +15,26 @@ struct Light {
     float4 colorIntensity;
 };
 
-cbuffer LightingUniforms : register(b1) {
+cbuffer LightingUniforms : register(b0) {
     float4 ambientLightCount;
     Light lights[MAX_LIGHTS];
 };
 
-// Shadow uniforms (b3)
+// Shadow uniforms (b1)
 #ifdef VULKAN
-[[vk::binding(3, 0)]]
+[[vk::binding(1, 0)]]
 #endif
-cbuffer ShadowUniforms : register(b3) {
+cbuffer ShadowUniforms : register(b1) {
     float4x4 lightSpaceMatrix;
     float4 shadowParams; // x: enabled (0 or 1), y: bias, z: unused, w: unused
 };
 
 // Push constants struct (b2 for DirectX, vk::push_constant for Vulkan)
+// Now includes camera matrices for dynamic updates
 struct PushConstantData {
-    float4x4 model;
-    float4x4 normalMatrix;
+    float4x4 viewProj;      // Camera view-projection matrix
+    float4x4 model;         // Model transform matrix
+    float4x4 normalMatrix;  // Normal matrix (inverse transpose of model)
 };
 
 #ifdef VULKAN
@@ -88,8 +85,8 @@ PSInput VSMain(VSInput input) {
     // Transform normal
     output.normal = normalize(mul((float3x3)pushConstants.normalMatrix, input.normal));
     
-    // Transform to clip space
-    output.position = mul(viewProj, worldPos);
+    // Transform to clip space using push constant view-proj matrix
+    output.position = mul(pushConstants.viewProj, worldPos);
     
     // Transform to light space for shadow mapping
     output.lightSpacePos = mul(lightSpaceMatrix, worldPos);

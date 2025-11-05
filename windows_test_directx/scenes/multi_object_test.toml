@@ -3,12 +3,11 @@ name = "Multi-Object Test Scene"
 description = "Scene with multiple objects to test multi-object rendering and transforms"
 
 [camera]
-type = "perspective"
+type = "free_fly"
 position = [4.0, 3.0, 6.0]
-target = [0.0, 0.5, 0.0]
+yaw = -135.0
+pitch = -20.0
 fov = 60.0
-near = 0.1
-far = 100.0
 
 [lighting]
 ambient = [0.3, 0.3, 0.3]
