@@ -4,19 +4,23 @@
 //! and window management using winit.
 
 use crate::backends::{self, BackendType, GraphicsBackend};
-use crate::camera::{self, CameraBackend};
+use crate::camera::{self, CameraBackend, CameraController};
 use crate::config::{Backend, Config};
 use crate::passes::{ForwardSimplePass, ForwardSimpleSceneResources, ShadowMapPass};
 use crate::render_graph::{
-    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, SampleCount,
+    Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, ResourceId,
+    SampleCount,
 };
 use crate::scene::{Scene, SceneLoader};
 use anyhow::{Context, Result};
+use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
+    event::{ElementState, KeyEvent, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
+    keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
 };
 
@@ -28,6 +32,19 @@ pub struct App {
     frame_count: u64,
     render_graph: Option<RenderGraph>,
     scene: Option<Scene>,
+    camera: Option<CameraController>,
+    camera_buffer: Option<ResourceId>,
+    input_state: InputState,
+    last_frame_time: Instant,
+    mouse_captured: bool,
+}
+
+/// Input state tracking
+#[derive(Default)]
+struct InputState {
+    keys_pressed: HashSet<KeyCode>,
+    mouse_delta: (f64, f64),
+    last_mouse_pos: Option<(f64, f64)>,
 }
 
 impl App {
@@ -84,6 +101,11 @@ impl App {
             frame_count: 0,
             render_graph: None,
             scene: None,
+            camera: None,
+            camera_buffer: None,
+            input_state: InputState::default(),
+            last_frame_time: Instant::now(),
+            mouse_captured: false,
         })
     }
 
@@ -152,6 +174,11 @@ impl App {
             lighting_buffer,
             transform,
         } = ForwardSimplePass::prepare_scene_resources(scene, &mut graph, width, height)?;
+
+        // Create camera controller from scene camera
+        let camera_ctrl = CameraController::from_scene_camera(&scene.camera, width, height);
+        self.camera = Some(camera_ctrl);
+        self.camera_buffer = Some(camera_buffer);
 
         log::info!("ForwardSimplePass prepared {vertex_count} vertices");
 
@@ -343,6 +370,74 @@ impl App {
         Ok(())
     }
 
+    /// Update camera based on input state
+    fn update_camera(&mut self, delta_time: f32) {
+        if let Some(camera) = &mut self.camera {
+            // Movement speed (units per second)
+            let base_speed = 5.0;
+            let speed = if self.input_state.keys_pressed.contains(&KeyCode::ShiftLeft) {
+                base_speed * 2.0
+            } else {
+                base_speed
+            };
+
+            let move_distance = speed * delta_time;
+
+            // WASD movement
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyW) {
+                camera.move_forward(move_distance);
+            }
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyS) {
+                camera.move_forward(-move_distance);
+            }
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyA) {
+                camera.move_right(-move_distance);
+            }
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyD) {
+                camera.move_right(move_distance);
+            }
+
+            // QE for up/down
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyE) {
+                camera.move_up(move_distance);
+            }
+            if self.input_state.keys_pressed.contains(&KeyCode::KeyQ) {
+                camera.move_up(-move_distance);
+            }
+
+            // Mouse look (only if mouse is captured)
+            if self.mouse_captured && self.input_state.mouse_delta != (0.0, 0.0) {
+                let sensitivity = 0.1;
+                let delta_yaw = self.input_state.mouse_delta.0 as f32 * sensitivity;
+                let delta_pitch = -self.input_state.mouse_delta.1 as f32 * sensitivity;
+                camera.rotate(delta_yaw, delta_pitch);
+            }
+
+            // Reset mouse delta
+            self.input_state.mouse_delta = (0.0, 0.0);
+        }
+    }
+
+    /// Rebuild camera buffer with updated uniforms
+    fn rebuild_camera_buffer(&mut self) -> Result<()> {
+        if let (Some(camera), Some(graph)) = (&self.camera, &mut self.render_graph) {
+            let (width, height) = self.config.window_size();
+            let camera_uniforms = camera.uniforms();
+            
+            use crate::render_graph::BufferUsageFlags;
+            
+            // Create a new camera buffer with updated data
+            let camera_buffer = graph.declare_buffer_with_data(
+                "forward_simple_camera",
+                bytemuck::bytes_of(&camera_uniforms).to_vec(),
+                BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
+            );
+            
+            self.camera_buffer = Some(camera_buffer);
+        }
+        Ok(())
+    }
+
     /// Run the application event loop
     pub fn run(config: Config) -> Result<()> {
         log::info!("Starting Rusty Renderer");
@@ -472,8 +567,81 @@ impl ApplicationHandler for App {
                         log::error!("Backend resize failed: {e}");
                     }
                 }
+                // Update camera aspect ratio
+                if let Some(camera) = &mut self.camera {
+                    camera.set_aspect_ratio(size.width, size.height);
+                }
+            }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if let PhysicalKey::Code(keycode) = event.physical_key {
+                    match event.state {
+                        ElementState::Pressed => {
+                            self.input_state.keys_pressed.insert(keycode);
+                            
+                            // Escape to toggle mouse capture
+                            if keycode == KeyCode::Escape {
+                                self.mouse_captured = !self.mouse_captured;
+                                if let Some(window) = &self.window {
+                                    window.set_cursor_visible(!self.mouse_captured);
+                                    if self.mouse_captured {
+                                        let _ = window.set_cursor_grab(
+                                            winit::window::CursorGrabMode::Confined
+                                        );
+                                    } else {
+                                        let _ = window.set_cursor_grab(
+                                            winit::window::CursorGrabMode::None
+                                        );
+                                    }
+                                }
+                                log::info!("Mouse captured: {}", self.mouse_captured);
+                            }
+                        }
+                        ElementState::Released => {
+                            self.input_state.keys_pressed.remove(&keycode);
+                        }
+                    }
+                }
+            }
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some(last_pos) = self.input_state.last_mouse_pos {
+                    let delta = (
+                        position.x - last_pos.0,
+                        position.y - last_pos.1,
+                    );
+                    if self.mouse_captured {
+                        self.input_state.mouse_delta.0 += delta.0;
+                        self.input_state.mouse_delta.1 += delta.1;
+                    }
+                }
+                self.input_state.last_mouse_pos = Some((position.x, position.y));
+            }
+            WindowEvent::MouseInput { state, button, .. } => {
+                // Optional: Click to capture mouse
+                if !self.config.headless
+                    && state == ElementState::Pressed
+                    && button == MouseButton::Left
+                    && !self.mouse_captured
+                {
+                    self.mouse_captured = true;
+                    if let Some(window) = &self.window {
+                        window.set_cursor_visible(false);
+                        let _ = window.set_cursor_grab(
+                            winit::window::CursorGrabMode::Confined
+                        );
+                    }
+                    log::info!("Mouse captured");
+                }
             }
             WindowEvent::RedrawRequested => {
+                // Update camera based on input (tracked but not yet applied to GPU)
+                let now = Instant::now();
+                let delta_time = (now - self.last_frame_time).as_secs_f32();
+                self.last_frame_time = now;
+                self.update_camera(delta_time);
+
+                // TODO: Update camera uniforms in GPU buffer
+                // Currently camera is static - render graph doesn't support dynamic buffer updates yet
+
                 // Render a frame using render graph
                 if let Some(backend) = &mut self.backend {
                     // Compile graph (could be cached in future)
