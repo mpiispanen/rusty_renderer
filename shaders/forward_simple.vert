@@ -8,14 +8,10 @@ layout(location = 1) in vec3 inNormal;
 layout(location = 2) in vec2 inUV;
 layout(location = 3) in vec4 inColor;
 
-// Uniforms (camera transforms)
-layout(set = 0, binding = 0) uniform CameraUniforms {
-    mat4 viewProj;  // View-projection matrix
-} camera;
-
-// Push constants (per-object transforms)
+// Push constants (per-frame camera + per-object transforms)
 layout(push_constant) uniform PushConstants {
-    mat4 model;     // Model matrix
+    mat4 viewProj;      // View-projection matrix (camera)
+    mat4 model;         // Model matrix
     mat4 normalMatrix;  // Normal matrix (inverse transpose of model)
 } push;
 
@@ -37,6 +33,6 @@ void main() {
     fragUV = inUV;
     fragColor = inColor;
     
-    // Transform to clip space
-    gl_Position = camera.viewProj * worldPos;
+    // Transform to clip space using push constant view-proj matrix
+    gl_Position = push.viewProj * worldPos;
 }

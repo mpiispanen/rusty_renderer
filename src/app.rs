@@ -18,7 +18,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use winit::{
     application::ApplicationHandler,
-    event::{ElementState, KeyEvent, MouseButton, WindowEvent},
+    event::{ElementState, MouseButton, WindowEvent},
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::{Window, WindowId},
@@ -231,7 +231,7 @@ impl App {
             .depth_output(depth_buffer)
             .vertex_buffer(vertex_buffer)
             .index_buffer(index_buffer)
-            .camera_buffer(camera_buffer)
+            // Camera is now passed via push constants, not uniform buffer
             .lighting_buffer(lighting_buffer)
             .transform(transform)
             .vertex_count(vertex_count)
@@ -274,6 +274,11 @@ impl App {
         }
 
         while self.frame_count < max_frames {
+            // Update camera uniforms for this frame (even though camera is static in headless mode)
+            if let Some(camera) = &self.camera {
+                camera::set_current_camera_uniforms(camera.uniforms());
+            }
+            
             if let Some(backend) = &mut self.backend {
                 // Compile and execute render graph
                 let mut graph = self.render_graph.take().unwrap();
@@ -416,26 +421,6 @@ impl App {
             // Reset mouse delta
             self.input_state.mouse_delta = (0.0, 0.0);
         }
-    }
-
-    /// Rebuild camera buffer with updated uniforms
-    fn rebuild_camera_buffer(&mut self) -> Result<()> {
-        if let (Some(camera), Some(graph)) = (&self.camera, &mut self.render_graph) {
-            let (width, height) = self.config.window_size();
-            let camera_uniforms = camera.uniforms();
-            
-            use crate::render_graph::BufferUsageFlags;
-            
-            // Create a new camera buffer with updated data
-            let camera_buffer = graph.declare_buffer_with_data(
-                "forward_simple_camera",
-                bytemuck::bytes_of(&camera_uniforms).to_vec(),
-                BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
-            );
-            
-            self.camera_buffer = Some(camera_buffer);
-        }
-        Ok(())
     }
 
     /// Run the application event loop
@@ -639,8 +624,10 @@ impl ApplicationHandler for App {
                 self.last_frame_time = now;
                 self.update_camera(delta_time);
 
-                // TODO: Update camera uniforms in GPU buffer
-                // Currently camera is static - render graph doesn't support dynamic buffer updates yet
+                // Update global camera uniforms for this frame (push constant rendering)
+                if let Some(camera) = &self.camera {
+                    camera::set_current_camera_uniforms(camera.uniforms());
+                }
 
                 // Render a frame using render graph
                 if let Some(backend) = &mut self.backend {

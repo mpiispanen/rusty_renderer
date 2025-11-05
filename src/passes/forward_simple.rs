@@ -114,32 +114,9 @@ impl ForwardSimplePass {
                         log::info!("Object {}: {} vertices, transform: pos={:?}, rot={:?}, scale={:?}",
                             obj_idx, vertices.len(), transform.position, transform.rotation, transform.scale);
                         
-                        // Apply per-object transforms to vertices
-                        let model_matrix = transform.matrix();
-                        let normal_matrix = transform.normal_matrix();
-                        
-                        for vertex in vertices {
-                            // Transform position
-                            let pos_vec4 = [vertex.position[0], vertex.position[1], vertex.position[2], 1.0];
-                            let transformed_pos = [
-                                model_matrix[0][0] * pos_vec4[0] + model_matrix[1][0] * pos_vec4[1] + model_matrix[2][0] * pos_vec4[2] + model_matrix[3][0] * pos_vec4[3],
-                                model_matrix[0][1] * pos_vec4[0] + model_matrix[1][1] * pos_vec4[1] + model_matrix[2][1] * pos_vec4[2] + model_matrix[3][1] * pos_vec4[3],
-                                model_matrix[0][2] * pos_vec4[0] + model_matrix[1][2] * pos_vec4[1] + model_matrix[2][2] * pos_vec4[2] + model_matrix[3][2] * pos_vec4[3],
-                            ];
-                            
-                            // Transform normal
-                            let norm_vec4 = [vertex.normal[0], vertex.normal[1], vertex.normal[2], 0.0];
-                            let transformed_normal = [
-                                normal_matrix[0][0] * norm_vec4[0] + normal_matrix[1][0] * norm_vec4[1] + normal_matrix[2][0] * norm_vec4[2],
-                                normal_matrix[0][1] * norm_vec4[0] + normal_matrix[1][1] * norm_vec4[1] + normal_matrix[2][1] * norm_vec4[2],
-                                normal_matrix[0][2] * norm_vec4[0] + normal_matrix[1][2] * norm_vec4[1] + normal_matrix[2][2] * norm_vec4[2],
-                            ];
-                            
-                            let mut transformed_vertex = vertex.clone();
-                            transformed_vertex.position = transformed_pos;
-                            transformed_vertex.normal = transformed_normal;
-                            base_vertices.push(transformed_vertex);
-                        }
+                        // DON'T bake transforms - keep vertices in object space
+                        // Transforms will be applied via push constants
+                        base_vertices.extend(vertices.iter().cloned());
 
                         // Push indices with proper offsets (generate sequential if missing)
                         if let Some(idx) = mesh_indices {
@@ -218,8 +195,14 @@ impl ForwardSimplePass {
             BufferUsageFlags::new(BufferUsageFlags::UNIFORM),
         );
 
-        // Since we're baking transforms into vertices, use identity transform for rendering
-        let transform = Transform::default();
+        // Get transform from first object (for single-object scenes)
+        // TODO: Support multiple objects with different transforms
+        let transform = scene.objects.first()
+            .and_then(|obj| match obj {
+                SceneObject::Mesh { transform, .. } => Some(transform.clone()),
+                SceneObject::GltfModel { transform, .. } => Some(transform.clone()),
+            })
+            .unwrap_or_default();
 
         Ok(ForwardSimpleSceneResources {
             vertex_buffer,
@@ -388,12 +371,11 @@ impl ForwardSimplePassBuilder {
         let index_buffer = self
             .index_buffer
             .ok_or_else(|| anyhow::anyhow!("index_buffer is required"))?;
-        let camera_buffer = self
-            .camera_buffer
-            .ok_or_else(|| anyhow::anyhow!("camera_buffer is required"))?;
         let lighting_buffer = self
             .lighting_buffer
             .ok_or_else(|| anyhow::anyhow!("lighting_buffer is required"))?;
+
+        // Camera is now passed via push constants, not uniform buffer
 
         if self.vertex_count == 0 {
             return Err(anyhow::anyhow!("vertex_count must be greater than 0"));
@@ -438,13 +420,7 @@ impl ForwardSimplePassBuilder {
             None,
         ));
 
-        // Input: Camera uniforms
-        pass.add_input(ResourceAccess::new(
-            camera_buffer,
-            AccessType::Read,
-            PipelineStage::new(PipelineStage::VERTEX_SHADER),
-            None,
-        ));
+        // NOTE: Camera uniforms are now passed via push constants, not uniform buffer
 
         // Input: Lighting uniforms
         pass.add_input(ResourceAccess::new(
@@ -503,7 +479,6 @@ impl ForwardSimplePassBuilder {
             index_count: self.index_count,
             vertex_buffer,
             index_buffer,
-            camera_buffer,
             lighting_buffer,
             material_buffer: self.material_buffer,
             albedo_texture: self.albedo_texture,
@@ -537,7 +512,6 @@ struct ForwardSimplePassCallback {
     index_count: u32,
     vertex_buffer: ResourceId,
     index_buffer: ResourceId,
-    camera_buffer: ResourceId,
     lighting_buffer: ResourceId,
     material_buffer: Option<ResourceId>,
     albedo_texture: Option<ResourceId>,
@@ -598,10 +572,14 @@ impl PassCallback for ForwardSimplePassCallback {
             .cull_mode(CullMode::None); // Disable culling for debugging
     }
 
-    fn prepare(&self, _context: &mut dyn PassPreparationContext) {
-        // TODO: In the future, resource binding will be prepared here
-        // For now, the backend handles this during execution
-        log::trace!("Preparing forward simple pass");
+    fn prepare(&self, context: &mut dyn PassPreparationContext) {
+        // Declare push constant size (view_proj + model + normal = 3 matrices = 192 bytes)
+        let _ = context.prepare_push_constants(
+            0x1, // VERTEX stage
+            0,   // offset
+            192, // size: 3 * 64 bytes
+        );
+        log::trace!("Preparing forward simple pass with push constants (192 bytes)");
     }
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
@@ -627,13 +605,6 @@ impl PassCallback for ForwardSimplePassCallback {
             .get_buffer_ptr(self.index_buffer)
             .expect("Failed to get index buffer");
         log::info!(
-            "Getting camera buffer ptr for resource {:?}",
-            self.camera_buffer
-        );
-        let camera_buffer_ptr = context
-            .get_buffer_ptr(self.camera_buffer)
-            .expect("Failed to get camera buffer");
-        log::info!(
             "Getting lighting buffer ptr for resource {:?}",
             self.lighting_buffer
         );
@@ -650,24 +621,20 @@ impl PassCallback for ForwardSimplePassCallback {
             .bind_index_buffer(index_buffer_ptr, 0, IndexType::U32)
             .expect("Failed to bind index buffer");
 
-        // Bind uniforms
-        log::info!("Binding camera uniforms");
+        // Bind uniforms (NOTE: Camera is now in push constants, not uniform buffer)
+        log::info!("Binding lighting uniforms at binding 0");
         context
-            .bind_uniform_buffer(0, 0, camera_buffer_ptr, 0, 64) // CameraUniforms: viewProj (mat4) = 64 bytes
-            .expect("Failed to bind camera uniforms");
-        log::info!("Binding lighting uniforms");
-        context
-            .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16 + 8 * 48) // LightingUniforms: ambient_light_count (16) + 8 lights (8*48 = 384) = 400 bytes
+            .bind_uniform_buffer(0, 0, lighting_buffer_ptr, 0, 16 + 8 * 48) // LightingUniforms: ambient_light_count (16) + 8 lights (8*48 = 384) = 400 bytes
             .expect("Failed to bind lighting uniforms");
 
         // Bind shadow uniforms if present
         if let Some(shadow_uniforms_id) = self.shadow_uniforms {
-            log::info!("Binding shadow uniforms for resource {:?}", shadow_uniforms_id);
+            log::info!("Binding shadow uniforms at binding 1 for resource {:?}", shadow_uniforms_id);
             let shadow_buffer_ptr = context
                 .get_buffer_ptr(shadow_uniforms_id)
                 .expect("Failed to get shadow uniforms buffer");
             context
-                .bind_uniform_buffer(0, 3, shadow_buffer_ptr, 0, 80) // lightSpaceMatrix (64) + shadowParams (16) = 80 bytes
+                .bind_uniform_buffer(0, 1, shadow_buffer_ptr, 0, 80) // lightSpaceMatrix (64) + shadowParams (16) = 80 bytes
                 .expect("Failed to bind shadow uniforms");
             log::info!("Shadow uniforms bound successfully");
         }
@@ -685,7 +652,9 @@ impl PassCallback for ForwardSimplePassCallback {
             log::info!("Shadow map texture bound successfully");
         }
 
-        // Push model matrix as push constants
+        // Push camera and model matrices as push constants
+        let camera_uniforms = crate::camera::get_current_camera_uniforms()
+            .expect("Camera uniforms not set for current frame");
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
 
@@ -698,16 +667,18 @@ impl PassCallback for ForwardSimplePassCallback {
             use std::io::Write;
             let _ = writeln!(f, "=== MATRIX DEBUG ===");
             let _ = writeln!(f, "Backend: {:?}", crate::camera::get_camera_backend());
+            let _ = writeln!(f, "ViewProj matrix:");
+            let _ = writeln!(f, "  Row 0: {:?}", camera_uniforms.view_proj[0]);
+            let _ = writeln!(f, "  Row 3: {:?}", camera_uniforms.view_proj[3]);
             let _ = writeln!(f, "Model matrix:");
             let _ = writeln!(f, "  Row 0: {:?}", model_matrix[0]);
-            let _ = writeln!(f, "  Row 1: {:?}", model_matrix[1]);
-            let _ = writeln!(f, "  Row 2: {:?}", model_matrix[2]);
             let _ = writeln!(f, "  Row 3: {:?}", model_matrix[3]);
         }
 
         #[repr(C)]
         #[derive(Clone, Copy)]
         struct PushConstants {
+            view_proj: [[f32; 4]; 4],
             model: [[f32; 4]; 4],
             normal: [[f32; 4]; 4],
         }
@@ -715,13 +686,14 @@ impl PassCallback for ForwardSimplePassCallback {
         unsafe impl bytemuck::Zeroable for PushConstants {}
 
         let push_data = PushConstants {
+            view_proj: camera_uniforms.view_proj,
             model: model_matrix,
             normal: normal_matrix,
         };
 
-        log::info!("Pushing constants");
+        log::info!("Pushing constants (camera + model)");
+        log::info!("  ViewProj matrix row 0: {:?}", camera_uniforms.view_proj[0]);
         log::info!("  Model matrix row 0: {:?}", model_matrix[0]);
-        log::info!("  Model matrix row 3: {:?}", model_matrix[3]);
         context
             .push_constants(
                 0x1, // VERTEX stage only

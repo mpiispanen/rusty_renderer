@@ -841,7 +841,7 @@ impl VulkanBackend {
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX)
             .offset(0)
-            .size(128) // 2 * sizeof(mat4) = 2 * 64 = 128 bytes
+            .size(192) // 3 * sizeof(mat4) = 3 * 64 = 192 bytes (viewProj + model + normal)
             .build();
 
         let push_constant_ranges = &[push_constant_range];
@@ -1169,7 +1169,7 @@ impl VulkanBackend {
         let push_constant_range = vk::PushConstantRange::builder()
             .stage_flags(vk::ShaderStageFlags::VERTEX) // Only used in vertex shader
             .offset(0)
-            .size(128) // 2 * sizeof(mat4)
+            .size(192) // 3 * sizeof(mat4) = 192 bytes (viewProj + model + normal)
             .build();
 
         let set_layouts = [descriptor_set_layout];

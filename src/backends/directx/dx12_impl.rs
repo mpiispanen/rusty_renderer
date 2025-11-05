@@ -666,7 +666,7 @@ impl DirectXBackendImpl {
                         Constants: D3D12_ROOT_CONSTANTS {
                             ShaderRegister: 2, // b2 in HLSL
                             RegisterSpace: 0,
-                            Num32BitValues: 32, // 128 bytes / 4 = 32 DWORDs
+                            Num32BitValues: 48, // 192 bytes / 4 = 48 DWORDs (viewProj + model + normal)
                         },
                     },
                     ShaderVisibility: D3D12_SHADER_VISIBILITY_VERTEX,
@@ -1763,7 +1763,7 @@ impl DirectXBackendImpl {
                             Constants: D3D12_ROOT_CONSTANTS {
                                 ShaderRegister: 2,
                                 RegisterSpace: 0,
-                                Num32BitValues: 32, // 128 bytes (2 x 4x4 matrices)
+                                Num32BitValues: 48, // 192 bytes (3 x 4x4 matrices: viewProj + model + normal)
                             },
                         },
                         ShaderVisibility: D3D12_SHADER_VISIBILITY_ALL,

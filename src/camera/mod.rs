@@ -8,6 +8,7 @@ pub mod controller;
 pub use controller::{CameraController, CameraUniforms};
 
 use glam::{Mat4, Vec3};
+use std::cell::RefCell;
 
 /// Graphics backend type for camera calculations
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +19,8 @@ pub enum CameraBackend {
 
 thread_local! {
     static CAMERA_BACKEND: std::cell::Cell<CameraBackend> = const { std::cell::Cell::new(CameraBackend::Vulkan) };
+    /// Current frame's camera uniforms for push constant rendering
+    static CURRENT_CAMERA_UNIFORMS: RefCell<Option<CameraUniforms>> = const { RefCell::new(None) };
 }
 
 /// Set the active camera backend (must be called before creating cameras)
@@ -28,6 +31,18 @@ pub fn set_camera_backend(backend: CameraBackend) {
 /// Get the active camera backend
 pub fn get_camera_backend() -> CameraBackend {
     CAMERA_BACKEND.with(|b| b.get())
+}
+
+/// Set current frame's camera uniforms (called by App before rendering)
+pub fn set_current_camera_uniforms(uniforms: CameraUniforms) {
+    CURRENT_CAMERA_UNIFORMS.with(|c| {
+        *c.borrow_mut() = Some(uniforms);
+    });
+}
+
+/// Get current frame's camera uniforms (called by render passes)
+pub fn get_current_camera_uniforms() -> Option<CameraUniforms> {
+    CURRENT_CAMERA_UNIFORMS.with(|c| *c.borrow())
 }
 
 /// Calculate perspective projection matrix (backend-aware)
