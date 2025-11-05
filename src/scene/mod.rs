@@ -147,6 +147,11 @@ impl Default for Transform {
 }
 
 impl Transform {
+    /// Create an identity transform (no translation, rotation, or scaling)
+    pub fn identity() -> Self {
+        Self::default()
+    }
+    
     /// Calculate the model matrix from this transform
     pub fn matrix(&self) -> [[f32; 4]; 4] {
         use std::f32::consts::PI;

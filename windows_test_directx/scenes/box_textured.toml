@@ -1,0 +1,26 @@
+[metadata]
+name = "Textured Box Test"
+description = "Test Khronos sample BoxTextured model"
+author = "Rusty Renderer"
+
+[[objects]]
+type = "gltf"
+name = "box"
+path = "assets/models/gltf_samples/BoxTextured.glb"
+transform = { position = [0.0, 0.0, 0.0], rotation = [0.0, 0.0, 0.0], scale = [1.0, 1.0, 1.0] }
+
+[camera]
+type = "free_fly"
+position = [3.0, 2.0, 3.0]
+yaw = -135.0
+pitch = -20.0
+fov = 60.0
+
+[lighting]
+ambient = [0.3, 0.3, 0.3]
+
+[[lighting.lights]]
+type = "directional"
+direction = [0.3, -1.0, 0.3]
+color = [1.0, 1.0, 1.0]
+intensity = 1.5

@@ -1,0 +1,26 @@
+[metadata]
+name = "Damaged Helmet Test"
+description = "Test complex glTF model with PBR materials"
+author = "Rusty Renderer"
+
+[[objects]]
+type = "gltf"
+name = "helmet"
+path = "assets/models/gltf_samples/DamagedHelmet.glb"
+transform = { position = [0.0, 0.0, 0.0], rotation = [0.0, 0.0, 0.0], scale = [1.0, 1.0, 1.0] }
+
+[camera]
+type = "free_fly"
+position = [0.0, 0.0, 3.0]
+yaw = -90.0
+pitch = 0.0
+fov = 45.0
+
+[lighting]
+ambient = [0.2, 0.2, 0.2]
+
+[[lighting.lights]]
+type = "directional"
+direction = [0.3, -1.0, 0.3]
+color = [1.0, 1.0, 1.0]
+intensity = 2.0
