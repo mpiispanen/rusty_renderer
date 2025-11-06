@@ -9,7 +9,7 @@ mod resources;
 mod shaders;
 
 use super::*;
-use crate::render_graph::ResourceId;
+use crate::render_graph::{ResourceId, ResourceDescriptor};
 use anyhow::{Context, Result};
 use std::ffi::CStr;
 use std::os::raw::c_void;
@@ -107,6 +107,10 @@ pub struct VulkanBackend {
     resource_buffers: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Buffer>>,
     resource_textures: std::collections::HashMap<crate::render_graph::ResourceId, Box<dyn Texture>>,
 
+    // Per-pass framebuffers and render passes (Issue #94)
+    pass_framebuffer_cache: std::collections::HashMap<u64, vk::Framebuffer>,
+    pass_render_pass_cache: std::collections::HashMap<u64, vk::RenderPass>,
+
     // Stub components (will be replaced in future issues)
     device_wrapper: VulkanDevice,
     swapchain: VulkanSwapchain,
@@ -169,6 +173,8 @@ impl VulkanBackend {
             shader_module_cache: std::collections::HashMap::new(),
             resource_buffers: std::collections::HashMap::new(),
             resource_textures: std::collections::HashMap::new(),
+            pass_framebuffer_cache: std::collections::HashMap::new(),
+            pass_render_pass_cache: std::collections::HashMap::new(),
             device_wrapper: VulkanDevice::new(),
             swapchain: VulkanSwapchain::new(),
         })
@@ -1967,6 +1973,206 @@ impl VulkanBackend {
         anyhow::bail!("Failed to find suitable memory type")
     }
 
+    /// Create or get cached render pass for a graph pass's outputs
+    fn get_or_create_pass_render_pass(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        pass_id: crate::render_graph::PassId,
+    ) -> Result<vk::RenderPass> {
+        use crate::render_graph::ImageLayout;
+        
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let pass = graph.get_pass(pass_id).context("Pass not found")?;
+        
+        // Build cache key from pass outputs
+        let mut color_formats = Vec::new();
+        let mut depth_format = None;
+        
+        for output in &pass.outputs {
+            if let Some(layout) = output.layout {
+                let resource = graph.get_resource(output.resource).context("Resource not found")?;
+                match layout {
+                    ImageLayout::ColorAttachment => {
+                        if let ResourceDescriptor::Image { format, .. } = resource.descriptor {
+                            color_formats.push(format);
+                        }
+                    }
+                    ImageLayout::DepthStencilAttachment => {
+                        if let ResourceDescriptor::Image { format, .. } = resource.descriptor {
+                            depth_format = Some(format);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        // Calculate cache key (simple hash of formats)
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        use std::hash::{Hash, Hasher};
+        color_formats.hash(&mut hasher);
+        depth_format.hash(&mut hasher);
+        let cache_key = hasher.finish();
+        
+        // Check cache
+        if let Some(&render_pass) = self.pass_render_pass_cache.get(&cache_key) {
+            return Ok(render_pass);
+        }
+        
+        // Create new render pass
+        let mut attachments = Vec::new();
+        let mut color_attachment_refs = Vec::new();
+        
+        // Add color attachments
+        for (i, &format) in color_formats.iter().enumerate() {
+            let vk_format = Self::translate_format(format);
+            attachments.push(
+                vk::AttachmentDescription::builder()
+                    .format(vk_format)
+                    .samples(vk::SampleCountFlags::_1)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::STORE)
+                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                    .initial_layout(vk::ImageLayout::UNDEFINED)
+                    .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                    .build(),
+            );
+            color_attachment_refs.push(vk::AttachmentReference {
+                attachment: i as u32,
+                layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            });
+        }
+        
+        // Add depth attachment if present
+        let depth_attachment_ref = if let Some(format) = depth_format {
+            let vk_format = Self::translate_format(format);
+            let depth_idx = attachments.len() as u32;
+            attachments.push(
+                vk::AttachmentDescription::builder()
+                    .format(vk_format)
+                    .samples(vk::SampleCountFlags::_1)
+                    .load_op(vk::AttachmentLoadOp::CLEAR)
+                    .store_op(vk::AttachmentStoreOp::STORE)
+                    .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+                    .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+                    .initial_layout(vk::ImageLayout::UNDEFINED)
+                    .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+                    .build(),
+            );
+            Some(vk::AttachmentReference {
+                attachment: depth_idx,
+                layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+            })
+        } else {
+            None
+        };
+        
+        // Create subpass
+        let mut subpass_builder = vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_attachment_refs);
+        
+        if let Some(ref depth_ref) = depth_attachment_ref {
+            subpass_builder = subpass_builder.depth_stencil_attachment(depth_ref);
+        }
+        let subpass = subpass_builder.build();
+        
+        // Create render pass
+        let render_pass_info = vk::RenderPassCreateInfo::builder()
+            .attachments(&attachments)
+            .subpasses(std::slice::from_ref(&subpass));
+        
+        let render_pass = unsafe { device.create_render_pass(&render_pass_info, None)? };
+        
+        // Cache and return
+        self.pass_render_pass_cache.insert(cache_key, render_pass);
+        Ok(render_pass)
+    }
+
+    /// Create or get cached framebuffer for a graph pass's outputs
+    fn get_or_create_pass_framebuffer(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        pass_id: crate::render_graph::PassId,
+        render_pass: vk::RenderPass,
+    ) -> Result<vk::Framebuffer> {
+        use crate::render_graph::ImageLayout;
+        
+        let device = self.device.as_ref().context("Device not initialized")?;
+        let pass = graph.get_pass(pass_id).context("Pass not found")?;
+        
+        // Collect image views from outputs
+        let mut attachment_views = Vec::new();
+        let width = self.swapchain_extent.width;
+        let height = self.swapchain_extent.height;
+        
+        for output in &pass.outputs {
+            if let Some(layout) = output.layout {
+                match layout {
+                    ImageLayout::ColorAttachment | ImageLayout::DepthStencilAttachment => {
+                        if let Some(texture) = self.resource_textures.get(&output.resource) {
+                            // Downcast to VulkanTexture to access image_view
+                            if let Some(vk_texture) = texture.as_any().downcast_ref::<resources::VulkanTexture>() {
+                                attachment_views.push(vk_texture.image_view);
+                            } else {
+                                log::warn!("Failed to downcast texture {:?} to VulkanTexture", output.resource);
+                            }
+                        } else {
+                            log::warn!("Texture resource {:?} not found for pass {:?}", output.resource, pass_id);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        
+        // Calculate cache key from attachment views
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        use std::hash::{Hash, Hasher};
+        for &view in &attachment_views {
+            (view.as_raw() as u64).hash(&mut hasher);
+        }
+        let cache_key = hasher.finish();
+        
+        // Check if we have any attachments
+        if attachment_views.is_empty() {
+            anyhow::bail!("Pass {:?} has no output attachments - cannot create framebuffer", pass_id);
+        }
+        
+        // Check cache
+        if let Some(&framebuffer) = self.pass_framebuffer_cache.get(&cache_key) {
+            return Ok(framebuffer);
+        }
+        
+        // Create framebuffer
+        let framebuffer_info = vk::FramebufferCreateInfo::builder()
+            .render_pass(render_pass)
+            .attachments(&attachment_views)
+            .width(width)
+            .height(height)
+            .layers(1);
+        
+        let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None)? };
+        
+        // Cache and return
+        self.pass_framebuffer_cache.insert(cache_key, framebuffer);
+        Ok(framebuffer)
+    }
+
+    /// Translate render graph format to Vulkan format
+    fn translate_format(format: crate::render_graph::Format) -> vk::Format {
+        use crate::render_graph::Format;
+        match format {
+            Format::Rgba8Unorm => vk::Format::R8G8B8A8_UNORM,
+            Format::Bgra8Unorm => vk::Format::B8G8R8A8_UNORM,
+            Format::Rgba16Float => vk::Format::R16G16B16A16_SFLOAT,
+            Format::Rgba32Float => vk::Format::R32G32B32A32_SFLOAT,
+            Format::Depth32Float => vk::Format::D32_SFLOAT,
+            Format::Depth24Stencil8 => vk::Format::D24_UNORM_S8_UINT,
+        }
+    }
+
     /// Insert a barrier between passes
     fn insert_barrier(
         &self,
@@ -3183,45 +3389,59 @@ impl GraphicsBackend for VulkanBackend {
         // Execute passes in order
         log::info!("About to execute {} passes", compiled.execution_order.len());
 
-        // Begin render pass for this frame
-        // TODO: In a full render graph, each pass would manage its own render pass
-        // For now, we use a single render pass for the whole frame
-        let framebuffer = self.framebuffers[image_index];
+        // Execute each pass with its own render pass and framebuffer
+        for (idx, pass_id) in compiled.execution_order.iter().enumerate() {
+            log::debug!("Executing pass {}/{}: {pass_id:?}", idx + 1, compiled.execution_order.len());
 
-        let clear_values = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.2, 0.3, 0.5, 1.0], // Blue background to see if cube renders
+            // Find barriers before this pass
+            for barrier in &compiled.barriers {
+                if barrier.dst_pass == *pass_id {
+                    log::debug!("Inserting barrier before pass {:?}", pass_id);
+                    self.insert_barrier(command_buffer, barrier)?;
+                }
+            }
+
+            // Create or get render pass for this pass's outputs
+            let render_pass = self.get_or_create_pass_render_pass(graph, *pass_id)?;
+            log::debug!("Got render pass for pass {:?}", pass_id);
+
+            // Create or get framebuffer for this pass's outputs
+            let framebuffer = self.get_or_create_pass_framebuffer(graph, *pass_id, render_pass)?;
+            log::debug!("Got framebuffer for pass {:?}", pass_id);
+
+            // Prepare clear values
+            let clear_values = [
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.2, 0.3, 0.5, 1.0], // Blue background
+                    },
                 },
-            },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
+                vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 1.0,
+                        stencil: 0,
+                    },
                 },
-            },
-        ];
+            ];
 
-        let render_pass_info = vk::RenderPassBeginInfo::builder()
-            .render_pass(self.render_pass)
-            .framebuffer(framebuffer)
-            .render_area(vk::Rect2D {
-                offset: vk::Offset2D { x: 0, y: 0 },
-                extent: self.swapchain_extent,
-            })
-            .clear_values(&clear_values);
+            // Begin render pass for THIS pass
+            let render_pass_info = vk::RenderPassBeginInfo::builder()
+                .render_pass(render_pass)
+                .framebuffer(framebuffer)
+                .render_area(vk::Rect2D {
+                    offset: vk::Offset2D { x: 0, y: 0 },
+                    extent: self.swapchain_extent,
+                })
+                .clear_values(&clear_values);
 
-        unsafe {
-            device.cmd_begin_render_pass(
-                command_buffer,
-                &render_pass_info,
-                vk::SubpassContents::INLINE,
-            );
-        }
-        log::debug!("Render pass begun");
-
-        for pass_id in &compiled.execution_order {
-            log::debug!("Executing pass: {pass_id:?}");
+            unsafe {
+                device.cmd_begin_render_pass(
+                    command_buffer,
+                    &render_pass_info,
+                    vk::SubpassContents::INLINE,
+                );
+            }
+            log::debug!("Render pass begun for pass {:?}", pass_id);
 
             // Bind pipeline for this pass if available in cache
             if let Some(&pipeline) = self.pipeline_cache.get(pass_id) {
@@ -3252,15 +3472,7 @@ impl GraphicsBackend for VulkanBackend {
                 }
             }
 
-            // Find barriers before this pass
-            for barrier in &compiled.barriers {
-                if barrier.dst_pass == *pass_id {
-                    // Insert barriers
-                    self.insert_barrier(command_buffer, barrier)?;
-                }
-            }
-
-            // Execute pass callback (M8.2)
+            // Execute pass callback
             if let Some(pass) = graph.get_pass(*pass_id) {
                 log::debug!(
                     "Found pass {:?}, has callback: {}",
@@ -3274,7 +3486,6 @@ impl GraphicsBackend for VulkanBackend {
                     callback.prepare(&mut prep_context);
 
                     // Phase 2: Execute rendering
-                    // Create execution context (backend_ptr created earlier to avoid borrow issues)
                     let mut context =
                         VulkanPassContext::new(device, command_buffer, backend_ptr, *pass_id);
 
@@ -3286,15 +3497,15 @@ impl GraphicsBackend for VulkanBackend {
             } else {
                 log::warn!("Could not find pass {:?} in graph", pass_id);
             }
+
+            // End render pass for THIS pass
+            unsafe {
+                device.cmd_end_render_pass(command_buffer);
+            }
+            log::debug!("Render pass ended for pass {:?}", pass_id);
         }
 
-        // End render pass
-        unsafe {
-            device.cmd_end_render_pass(command_buffer);
-        }
-        log::debug!("Render pass ended");
-
-        // End command buffer (passes should have ended their own render passes)
+        // End command buffer
         unsafe {
             device.end_command_buffer(command_buffer)?;
         }

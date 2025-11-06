@@ -27,7 +27,7 @@ pub enum ResourceKind {
 }
 
 /// Image format
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
     /// 8-bit RGBA
     Rgba8Unorm,

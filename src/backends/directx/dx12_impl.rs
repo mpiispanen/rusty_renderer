@@ -77,6 +77,10 @@ pub struct DirectXBackendImpl {
     pipeline_cache: std::collections::HashMap<crate::render_graph::PassId, ID3D12PipelineState>,
     root_signature_cache:
         std::collections::HashMap<crate::render_graph::PassId, ID3D12RootSignature>,
+    
+    // Per-pass render target tracking (Issue #94)
+    pass_rtv_cache: std::collections::HashMap<u64, D3D12_CPU_DESCRIPTOR_HANDLE>,
+    pass_dsv_cache: std::collections::HashMap<u64, D3D12_CPU_DESCRIPTOR_HANDLE>,
 }
 
 // SAFETY: DirectX 12 objects are thread-safe once created
@@ -135,6 +139,8 @@ impl DirectXBackendImpl {
             resource_textures: std::collections::HashMap::new(),
             pipeline_cache: std::collections::HashMap::new(),
             root_signature_cache: std::collections::HashMap::new(),
+            pass_rtv_cache: std::collections::HashMap::new(),
+            pass_dsv_cache: std::collections::HashMap::new(),
         })
     }
 
@@ -2027,6 +2033,72 @@ impl DirectXBackendImpl {
                 pass_id
             );
 
+        Ok((pipeline_state, root_signature))
+    }
+
+    /// Get or create render target view for a pass's color output
+    fn get_pass_rtv(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        pass_id: crate::render_graph::PassId,
+    ) -> Result<Option<D3D12_CPU_DESCRIPTOR_HANDLE>> {
+        use crate::render_graph::ImageLayout;
+        
+        let pass = graph.get_pass(pass_id).context("Pass not found")?;
+        
+        // Find color attachment output
+        for output in &pass.outputs {
+            if let Some(ImageLayout::ColorAttachment) = output.layout {
+                // Check if we have this texture allocated
+                if let Some(texture) = self.resource_textures.get(&output.resource) {
+                    // For now, we need to get RTV from the texture
+                    // In a full implementation, we'd create RTVs on demand
+                    // For simplicity, return the default RTV for now
+                    // TODO: Properly implement per-resource RTV creation
+                    log::debug!("Found color output for pass {:?}: {:?}", pass_id, output.resource);
+                }
+            }
+        }
+        
+        // Default: use swapchain render target
+        let rtv_heap = self.rtv_heap.as_ref().context("RTV heap not initialized")?;
+        let handle_base = unsafe { rtv_heap.GetCPUDescriptorHandleForHeapStart() };
+        let handle = D3D12_CPU_DESCRIPTOR_HANDLE {
+            ptr: handle_base.ptr + (self.frame_index as usize * self.rtv_descriptor_size as usize),
+        };
+        Ok(Some(handle))
+    }
+
+    /// Get or create depth stencil view for a pass's depth output
+    fn get_pass_dsv(
+        &mut self,
+        graph: &crate::render_graph::graph::RenderGraph,
+        pass_id: crate::render_graph::PassId,
+    ) -> Result<Option<D3D12_CPU_DESCRIPTOR_HANDLE>> {
+        use crate::render_graph::ImageLayout;
+        
+        let pass = graph.get_pass(pass_id).context("Pass not found")?;
+        
+        // Find depth attachment output
+        for output in &pass.outputs {
+            if let Some(ImageLayout::DepthStencilAttachment) = output.layout {
+                // Check if we have this texture allocated
+                if let Some(_texture) = self.resource_textures.get(&output.resource) {
+                    // For now, return the default DSV
+                    // TODO: Properly implement per-resource DSV creation
+                    log::debug!("Found depth output for pass {:?}: {:?}", pass_id, output.resource);
+                    let dsv_heap = self.dsv_heap.as_ref().context("DSV heap not created")?;
+                    let dsv_handle = unsafe { dsv_heap.GetCPUDescriptorHandleForHeapStart() };
+                    return Ok(Some(dsv_handle));
+                }
+            }
+        }
+        
+        // No depth output for this pass
+        Ok(None)
+    }
+
+    pub fn execute_graph(
             Ok((pipeline_state, root_signature))
         }
     }
@@ -2188,49 +2260,15 @@ impl DirectXBackendImpl {
                 let _ = writeln!(f, "Extracted values, headless={}", headless);
             }
 
-            // Get render target and RTV handle
-            let (render_target, rtv_handle) = if headless {
-                // Debug logging
-                if let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("rusty_renderer_debug.log")
-                {
-                    let _ = writeln!(f, "Headless path: getting offscreen resource");
-                }
-
-                // Headless: use single offscreen target
+            // Get render target for swapchain transitions (not for binding, just for transitions)
+            let (render_target, _default_rtv_handle) = if headless {
                 let resource = self
                     .offscreen_resource
                     .as_ref()
                     .context("Offscreen resource not initialized")?;
-
-                // Debug logging
-                if let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("rusty_renderer_debug.log")
-                {
-                    let _ = writeln!(
-                        f,
-                        "Headless path: got offscreen resource, getting RTV handle"
-                    );
-                }
-
                 let handle = rtv_heap.GetCPUDescriptorHandleForHeapStart();
-
-                // Debug logging
-                if let Ok(mut f) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("rusty_renderer_debug.log")
-                {
-                    let _ = writeln!(f, "Headless path: got RTV handle");
-                }
-
                 (resource.clone(), handle)
             } else {
-                // Windowed: use current frame's swapchain target
                 let resource = self.render_targets[frame_index as usize].clone();
                 let handle_base = rtv_heap.GetCPUDescriptorHandleForHeapStart();
                 let handle = D3D12_CPU_DESCRIPTOR_HANDLE {
@@ -2259,83 +2297,7 @@ impl DirectXBackendImpl {
                 command_list.ResourceBarrier(&[barrier]);
             }
 
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "About to clear render target");
-            }
-
-            // Clear render target
-            let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background
-            command_list.ClearRenderTargetView(rtv_handle, &clear_color, None);
-
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "Cleared render target, about to clear depth");
-            }
-
-            // Clear depth stencil
-            let dsv_heap = self.dsv_heap.as_ref().context("DSV heap not created")?;
-
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "Got DSV heap, getting handle");
-            }
-
-            let dsv_handle = dsv_heap.GetCPUDescriptorHandleForHeapStart();
-
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "Got DSV handle (ptr={}), about to clear depth",
-                    dsv_handle.ptr
-                );
-            }
-
-            command_list.ClearDepthStencilView(dsv_handle, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, &[]);
-
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(
-                    f,
-                    "Cleared depth, setting render targets (RTV ptr={}, DSV ptr={})",
-                    rtv_handle.ptr, dsv_handle.ptr
-                );
-            }
-
-            // Set render target with depth stencil
-            command_list.OMSetRenderTargets(1, Some(&rtv_handle), FALSE, Some(&dsv_handle));
-
-            // Debug logging
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "OMSetRenderTargets succeeded!");
-            }
-
-            // Set viewport and scissor
+            // Set viewport and scissor (common for all passes)
             let viewport = D3D12_VIEWPORT {
                 TopLeftX: 0.0,
                 TopLeftY: 0.0,
@@ -2353,13 +2315,6 @@ impl DirectXBackendImpl {
                 bottom: height as i32,
             };
             command_list.RSSetScissorRects(&[scissor]);
-
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .append(true)
-                .open("rusty_renderer_debug.log")
-            {
-                let _ = writeln!(f, "Viewport and scissor set, topology set next");
-            }
 
             // Set primitive topology (common for all passes)
             command_list.IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -2383,6 +2338,27 @@ impl DirectXBackendImpl {
                     .open("rusty_renderer_debug.log")
                 {
                     let _ = writeln!(f, "Executing pass {pass_id:?}");
+                }
+
+                // Get render targets for this pass
+                let rtv_handle = self.get_pass_rtv(graph, *pass_id)?;
+                let dsv_handle = self.get_pass_dsv(graph, *pass_id)?;
+
+                // Clear and set render targets for this pass
+                if let Some(rtv) = rtv_handle {
+                    let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32];
+                    command_list.ClearRenderTargetView(rtv, &clear_color, None);
+                    
+                    if let Some(dsv) = dsv_handle {
+                        command_list.ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, &[]);
+                        command_list.OMSetRenderTargets(1, Some(&rtv), FALSE, Some(&dsv));
+                    } else {
+                        command_list.OMSetRenderTargets(1, Some(&rtv), FALSE, None);
+                    }
+                } else if let Some(dsv) = dsv_handle {
+                    // Depth-only pass (like shadow mapping)
+                    command_list.ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH, 1.0, 0, &[]);
+                    command_list.OMSetRenderTargets(0, None, FALSE, Some(&dsv));
                 }
 
                 // Set per-pass pipeline state and root signature
