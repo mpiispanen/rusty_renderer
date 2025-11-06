@@ -1123,32 +1123,42 @@ impl VulkanBackend {
 
         // Create pipeline layout for this specific pipeline
         // TODO: This should be derived from shader reflection, not hardcoded
-        // For now, create a layout for forward_simple shader with optional shadow mapping:
-        // - Binding 0: Camera uniforms
-        // - Binding 1: Lighting uniforms
-        // - Binding 3: Shadow uniforms (optional, for shadow mapping)
-        // - Texture 0: Shadow map depth texture (optional)
-        // - Sampler 0: Comparison sampler for shadow map (optional)
-        // - Push constants: model and normal matrices
+        // For now, create a layout for forward_simple shader with optional shadow mapping and textures:
+        // - Binding 0: Lighting uniforms
+        // - Binding 1: Shadow uniforms (optional, for shadow mapping)
+        // - Binding 2: Albedo/Base color texture (optional)
+        // - Binding 4: Shadow map depth texture (optional)
+        // - Push constants: viewProj + model + normal matrices
         let bindings = [
+            // Binding 0: Lighting uniforms
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(0)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .build(),
+            // Binding 1: Shadow uniforms
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(1)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
                 .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
                 .build(),
+            // Binding 2: Albedo/Base color texture
+            vk::DescriptorSetLayoutBinding::builder()
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+                .build(),
+            // Binding 3: Material uniforms (currently unused but reserved)
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(3)
                 .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
                 .descriptor_count(1)
-                .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT)
+                .stage_flags(vk::ShaderStageFlags::FRAGMENT)
                 .build(),
+            // Binding 4: Shadow map texture
             vk::DescriptorSetLayoutBinding::builder()
                 .binding(4)
                 .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)

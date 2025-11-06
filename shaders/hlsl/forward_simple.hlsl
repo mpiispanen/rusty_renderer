@@ -1,5 +1,5 @@
 // Simplified forward rendering shader for DirectX 12
-// No textures - just vertex colors and basic lighting
+// Supports vertex colors, basic lighting, and optional base color texture
 
 #define MAX_LIGHTS 8
 #define LIGHT_DIRECTIONAL 0
@@ -46,15 +46,26 @@ cbuffer PushConstants : register(b2) {
 };
 #endif
 
-// Shadow map texture (t0) - combined with sampler in Vulkan at binding 4
+// Base color texture (t0) and sampler (s1) - optional material texture
+#ifdef VULKAN
+[[vk::binding(2, 0)]]
+Texture2D baseColorTexture : register(t0);
+[[vk::binding(2, 0)]]
+SamplerState baseColorSampler : register(s1);
+#else
+Texture2D baseColorTexture : register(t0);
+SamplerState baseColorSampler : register(s1);
+#endif
+
+// Shadow map texture (t1) - combined with sampler in Vulkan at binding 4
 #ifdef VULKAN
 [[vk::binding(4, 0)]]
-Texture2D shadowMap : register(t0);
+Texture2D shadowMap : register(t1);
 [[vk::binding(4, 0)]]
-SamplerComparisonState shadowSampler : register(s0);
+SamplerComparisonState shadowSampler : register(s2);
 #else
-Texture2D shadowMap : register(t0);
-SamplerComparisonState shadowSampler : register(s0);
+Texture2D shadowMap : register(t1);
+SamplerComparisonState shadowSampler : register(s2);
 #endif
 
 // Vertex input
@@ -70,6 +81,7 @@ struct PSInput {
     float4 position : SV_POSITION;
     float3 worldPos : POSITION0;
     float3 normal : NORMAL;
+    float2 uv : TEXCOORD0;
     float4 color : COLOR0;
     float4 lightSpacePos : POSITION1; // For shadow mapping
 };
@@ -91,7 +103,8 @@ PSInput VSMain(VSInput input) {
     // Transform to light space for shadow mapping
     output.lightSpacePos = mul(lightSpaceMatrix, worldPos);
     
-    // Pass color
+    // Pass UV coordinates and color
+    output.uv = input.uv;
     output.color = input.color;
     
     return output;
@@ -138,8 +151,11 @@ float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize interpolated normal
     float3 normal = normalize(input.normal);
     
-    // Use vertex color (no material for now)
-    float3 surfaceColor = input.color.rgb;
+    // Sample base color texture and modulate with vertex color
+    // If texture is white/default, vertex color dominates
+    // If vertex color is white/default, texture dominates
+    float3 textureColor = baseColorTexture.Sample(baseColorSampler, input.uv).rgb;
+    float3 surfaceColor = textureColor * input.color.rgb;
     
     // Start with ambient light
     float3 ambient = ambientLightCount.xyz;

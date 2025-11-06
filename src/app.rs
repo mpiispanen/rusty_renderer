@@ -11,7 +11,7 @@ use crate::render_graph::{
     Extent3D, ExtentMode, Format, ImageUsageFlags, RenderGraph, ResourceDescriptor, ResourceId,
     SampleCount,
 };
-use crate::scene::{Scene, SceneLoader};
+use crate::scene::{Scene, SceneLoader, SceneObject};
 use anyhow::{Context, Result};
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -130,6 +130,38 @@ impl App {
         Ok(())
     }
 
+    /// Load a texture file into the render graph
+    fn load_texture_to_graph(graph: &mut RenderGraph, texture_path: &str) -> Result<ResourceId> {
+        use crate::render_graph::{Extent3D, ExtentMode, Format, ImageUsageFlags, ResourceDescriptor, SampleCount};
+        
+        // Load the image file
+        let img = image::open(texture_path)
+            .with_context(|| format!("Failed to load texture: {}", texture_path))?;
+        let img = img.to_rgba8();
+        let (width, height) = img.dimensions();
+        let pixels = img.into_raw();
+
+        log::info!("Loaded texture: {}x{} from {}", width, height, texture_path);
+
+        // Create texture resource descriptor
+        let desc = ResourceDescriptor::Image {
+            format: Format::Rgba8Unorm,
+            extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
+            usage: ImageUsageFlags::new(ImageUsageFlags::SAMPLED | ImageUsageFlags::TRANSFER_DST),
+            samples: SampleCount::One,
+            mip_levels: 1,
+        };
+
+        // Create and populate the resource
+        let texture_id = graph.declare_image_with_data(
+            &format!("texture_{}", texture_path.replace('/', "_")),
+            pixels,
+            desc,
+        );
+
+        Ok(texture_id)
+    }
+
     /// Build the render graph based on loaded scene
     fn build_render_graph(&mut self) -> Result<()> {
         let scene = self
@@ -181,6 +213,30 @@ impl App {
         self.camera_buffer = Some(camera_buffer);
 
         log::info!("ForwardSimplePass prepared {vertex_count} vertices");
+
+        // Load base color texture from first object's material (if available)
+        let albedo_texture = scene
+            .objects
+            .first()
+            .and_then(|obj| match obj {
+                SceneObject::Mesh { material, .. } => *material,
+                _ => None,
+            })
+            .and_then(|mat_idx| scene.materials.get(mat_idx))
+            .and_then(|mat| mat.diffuse_texture.as_ref())
+            .and_then(|texture_path| {
+                log::info!("Loading base color texture: {}", texture_path);
+                match Self::load_texture_to_graph(&mut graph, texture_path) {
+                    Ok(tex_id) => {
+                        log::info!("Base color texture loaded successfully");
+                        Some(tex_id)
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load base color texture: {}", e);
+                        None
+                    }
+                }
+            });
 
         // Check if scene has directional light for shadow mapping
         let has_directional_light = scene
@@ -237,6 +293,12 @@ impl App {
             .vertex_count(vertex_count)
             .index_count(index_count)
             .with_name("forward_simple");
+
+        // Add base color texture if available
+        if let Some(tex) = albedo_texture {
+            log::info!("Adding albedo texture to forward pass");
+            forward_builder = forward_builder.albedo_texture(tex);
+        }
 
         // Add shadow resources if available
         if let Some(sm) = shadow_map {
@@ -372,6 +434,41 @@ impl App {
             log::info!("Screenshot saved: {width}x{height} -> {}", path.display());
         }
 
+        Ok(())
+    }
+
+    /// Capture screenshot in interactive (windowed) mode
+    fn capture_screenshot_interactive(&mut self) -> Result<()> {
+        if let Some(backend) = &mut self.backend {
+            let (width, height, pixels) = backend.capture_frame()?;
+            
+            // Generate filename with timestamp
+            use std::time::SystemTime;
+            let timestamp = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            let path = format!("screenshots/screenshot_{}.png", timestamp);
+            
+            log::info!("Capturing screenshot to {}", path);
+            
+            // Save as PNG
+            use image::{ImageBuffer, imageops};
+            let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
+                .context("Failed to create image from captured pixels")?;
+            
+            // Flip vertically for correct orientation
+            let img = imageops::flip_vertical(&img);
+            
+            // Create directory if needed
+            std::fs::create_dir_all("screenshots")
+                .context("Failed to create screenshots directory")?;
+            
+            img.save(&path)
+                .with_context(|| format!("Failed to save screenshot to {}", path))?;
+            
+            log::info!("Screenshot saved: {}x{} -> {}", width, height, path);
+        }
         Ok(())
     }
 
@@ -570,6 +667,14 @@ impl ApplicationHandler for App {
                                 }
                                 event_loop.exit();
                                 return;
+                            }
+                            
+                            // F12 to take screenshot
+                            if keycode == KeyCode::F12 {
+                                log::info!("F12 pressed - capturing screenshot");
+                                if let Err(e) = self.capture_screenshot_interactive() {
+                                    log::error!("Failed to capture screenshot: {}", e);
+                                }
                             }
                         }
                         ElementState::Released => {

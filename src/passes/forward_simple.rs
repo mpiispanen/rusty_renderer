@@ -652,6 +652,19 @@ impl PassCallback for ForwardSimplePassCallback {
             log::info!("Shadow map texture bound successfully");
         }
 
+        // Bind albedo texture if present
+        if let Some(albedo_texture_id) = self.albedo_texture {
+            log::info!("Binding albedo texture for resource {:?}", albedo_texture_id);
+            let albedo_texture_ptr = context
+                .get_texture_ptr(albedo_texture_id)
+                .expect("Failed to get albedo texture");
+            log::info!("Got albedo texture ptr: {:?}", albedo_texture_ptr);
+            context
+                .bind_texture(0, 2, albedo_texture_ptr) // Binding 2 for base color texture
+                .expect("Failed to bind albedo texture");
+            log::info!("Albedo texture bound successfully");
+        }
+
         // Push camera and model matrices as push constants
         let camera_uniforms = crate::camera::get_current_camera_uniforms()
             .expect("Camera uniforms not set for current frame");
@@ -703,7 +716,15 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Failed to push constants");
 
         // Draw
-        log::info!("Drawing indexed geometry ({} indices)", self.index_count);
+        log::info!("=== DRAWING INDEXED GEOMETRY ===");
+        log::info!("  Index count: {}", self.index_count);
+        log::info!("  Instance count: 1");
+        log::info!("  First index: 0");
+        log::info!("  Vertex offset: 0");
+        log::info!("  First instance: 0");
+        log::info!("  Transform: pos={:?}, rot={:?}, scale={:?}", 
+            self.transform.position, self.transform.rotation, self.transform.scale);
+        
         context
             .draw_indexed(self.index_count, 1, 0, 0, 0)
             .expect("Failed to draw indexed");
