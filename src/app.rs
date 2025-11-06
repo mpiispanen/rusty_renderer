@@ -241,12 +241,19 @@ impl App {
             });
 
         // Check if scene has directional light for shadow mapping
+        // TODO: Shadow mapping disabled until render pass architecture is fixed (Issue #XX)
+        // Currently, all passes share the same framebuffer/depth buffer which violates
+        // the render graph modularity principle. Each pass should have its own render targets.
+        // See: app.rs build_render_graph() for details.
+        let has_directional_light = false; // Temporarily disabled
+        /*
         let has_directional_light = scene
             .lighting
             .as_ref()
             .and_then(|l| l.lights.first())
             .map(|l| matches!(l.light_type(), crate::scene::LightType::Directional))
             .unwrap_or(false);
+        */
 
         let mut shadow_map = None;
         let mut shadow_uniforms = None;
