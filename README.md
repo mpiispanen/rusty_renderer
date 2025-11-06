@@ -29,12 +29,29 @@ cargo build --release --target x86_64-pc-windows-msvc
 ./target/release/rusty_renderer --backend directx --scene scenes/cube.toml --headless
 ```
 
+### Interactive Mode
+
+```bash
+# Run with window and camera controls
+./target/release/rusty_renderer --backend vulkan --scene damaged_helmet
+
+# Controls:
+# - Mouse: Click to capture, move to look around
+# - WASD: Move camera
+# - Q/E: Move up/down
+# - Shift: Move faster
+# - F12: Capture screenshot
+# - ESC: Exit
+```
+
 ### Headless Rendering
 
 ```bash
 # Render to PNG
 ./target/release/rusty_renderer --backend vulkan --scene scenes/cube.toml --headless --screenshot output.png --max-frames 1
 ```
+
+Screenshots are saved to `screenshots/` directory.
 
 ## Architecture
 
