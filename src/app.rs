@@ -187,7 +187,9 @@ impl App {
         };
         let color_buffer = graph.create_resource("swapchain_image", color_desc);
 
-        // Create depth buffer
+        // Create forward pass depth buffer
+        // NOTE: Each pass needs its own depth buffer for proper modularity
+        // The shadow pass will create its own shadow map depth texture
         let depth_desc = ResourceDescriptor::Image {
             format: Format::Depth32Float,
             extent: ExtentMode::Absolute(Extent3D::new_2d(width, height)),
@@ -195,7 +197,7 @@ impl App {
             samples: SampleCount::One,
             mip_levels: 1,
         };
-        let depth_buffer = graph.create_resource("depth_buffer", depth_desc);
+        let depth_buffer = graph.create_resource("forward_pass_depth", depth_desc);
 
         let ForwardSimpleSceneResources {
             vertex_buffer,
@@ -262,6 +264,8 @@ impl App {
                 .unwrap_or(glam::Vec3::new(0.0, -1.0, 0.0));
 
             // Prepare shadow map resources
+            // NOTE: This creates its own depth texture named "shadow_map" which is SEPARATE
+            // from the forward pass's "forward_pass_depth" buffer
             let shadow_resources =
                 ShadowMapPass::prepare_resources(&mut graph, light_direction, 1024);
 
@@ -269,6 +273,7 @@ impl App {
             shadow_uniforms = Some(shadow_resources.light_uniforms);
 
             // Add shadow map pass (runs before forward pass)
+            // The shadow pass writes to its own depth buffer (shadow_map)
             ShadowMapPass::builder()
                 .shadow_map_output(shadow_resources.shadow_map)
                 .vertex_buffer(vertex_buffer)

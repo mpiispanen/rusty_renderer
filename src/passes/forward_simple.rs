@@ -641,7 +641,7 @@ impl PassCallback for ForwardSimplePassCallback {
 
         // Bind shadow map texture if present
         if let Some(shadow_map_id) = self.shadow_map {
-            log::info!("Binding shadow map texture for resource {:?}", shadow_map_id);
+            log::info!("=== FORWARD PASS: Binding shadow map texture for resource {:?} ===", shadow_map_id);
             let shadow_texture_ptr = context
                 .get_texture_ptr(shadow_map_id)
                 .expect("Failed to get shadow map");
@@ -649,7 +649,7 @@ impl PassCallback for ForwardSimplePassCallback {
             context
                 .bind_texture(0, 4, shadow_texture_ptr) // Binding 4 for combined image sampler
                 .expect("Failed to bind shadow map texture");
-            log::info!("Shadow map texture bound successfully");
+            log::info!("=== Shadow map texture bound successfully ===");
         }
 
         // Bind albedo texture if present

@@ -296,6 +296,7 @@ impl PassCallback for ShadowMapPassCallback {
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         use crate::render_graph::IndexType;
 
+        log::info!("=== SHADOW MAP PASS EXECUTION ===");
         log::info!("Executing shadow map pass ({} indices)", self.index_count);
 
         // Get buffer pointers from resource IDs
@@ -334,5 +335,6 @@ impl PassCallback for ShadowMapPassCallback {
             .expect("Failed to draw indexed");
 
         log::info!("Shadow map pass execution complete");
+        log::info!("=== END SHADOW MAP PASS ===");
     }
 }
