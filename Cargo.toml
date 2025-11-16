@@ -24,6 +24,8 @@ thiserror = "1.0"
 # Logging
 log = "0.4"
 env_logger = "0.11"
+fern = "0.7"
+chrono = "0.4"
 
 # Image handling for screenshots
 image = "0.25"

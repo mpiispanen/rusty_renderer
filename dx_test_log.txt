@@ -1,0 +1,72 @@
+Syncing binary and assets...
+  ✓ Binary copied (from x86_64-pc-windows-gnu)
+  ✓ Shaders synced
+  ✓ Assets synced
+  ✓ Scenes synced
+================================================
+Running rusty_renderer with Proton
+================================================
+Proton: /home/matpii01/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)
+VKD3D Debug: warn
+Arguments: --scene scenes/gltf_textured.toml
+================================================
+
+wine: using kernel write watches, use_kernel_writewatch 1.
+fsync: up and running.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+wine: using kernel write watches, use_kernel_writewatch 1.
+774.387:0130:0134:warn:vkd3d-proton:openvr_instance_extensions: Failed to open VR registry key, status 2.
+774.387:0130:0134:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+774.387:0130:0134:info:vkd3d-proton:vkd3d_instance_apply_application_workarounds: Program name: "rusty_renderer.exe" (hash: 00e522d8f2bf47c0)
+774.387:0130:0134:info:vkd3d-proton:vkd3d_instance_deduce_config_flags_from_environment: shader_cache is used, global_pipeline_cache is enforced.
+774.387:0130:0134:info:vkd3d-proton:vkd3d_config_flags_init_once: VKD3D_CONFIG=''.
+774.409:0130:0134:info:vkd3d-proton:vkd3d_get_vk_version: vkd3d-proton - applicationVersion: 2.14.0.
+774.409:0130:0134:info:vkd3d-proton:vkd3d_instance_init: vkd3d-proton - build: d686616d170f510.
+774.422:0130:0134:warn:vkd3d-proton:openvr_device_extensions: Failed to open VR registry key, status 2.
+774.422:0130:0134:warn:vkd3d-proton:openxr_vulkan_extensions: Failed to get OpenXR extensions size from wineopenxr.
+774.455:0130:0134:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 0. All out of band work will happen on the in band queue.
+774.455:0130:0134:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 1. All out of band work will happen on the in band queue.
+774.455:0130:0134:warn:vkd3d-proton:d3d12_device_create_vkd3d_queues: Could not allocate an out of band queue for queue family 3. All out of band work will happen on the in band queue.
+774.455:0130:0134:info:vkd3d-proton:d3d12_device_init_workarounds: Detected Linux kernel version 6.14.4
+774.455:0130:0134:info:vkd3d-proton:d3d12_device_init_workarounds: AMDGPU broken kernel detected. Enabling manual memory clearing path.
+774.459:0130:0134:warn:vkd3d-proton:vkd3d_init_depth_stencil_formats: Mapping VK_FORMAT_D24_UNORM_S8_UINT to VK_FORMAT_D32_SFLOAT_S8_UINT.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_memory_info_decide_hvv_usage: Topology: No more than 1 device local heap, HVV access is viable.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_memory_info_upload_hvv_memory_properties: Topology: HVV usage is allowed, using DEVICE_LOCAL | HOST_COHERENT for UPLOAD.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_memory_info_init_budgets: Applying resizable BAR budget to memory types: 0x218.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Enabling fast paths for advanced ExecuteIndirect() graphics and compute (EXT_dgc).
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports VK_EXT_mutable_descriptor_type.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports ultra-fast path for descriptor copies.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_get_bindless_flags: Device supports packed metadata path for descriptor copies.
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+774.459:0130:0134:info:vkd3d-proton:vkd3d_bindless_state_add_binding: Device supports VK_EXT_descriptor_buffer!
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.6.
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.7.
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_caps_init_shader_model: Enabling support for SM 6.8.
+774.462:0130:0134:fixme:vkd3d-proton:d3d12_device_caps_init_feature_options1: TotalLaneCount = 768, may be inaccurate.
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR support enabled.
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_determine_ray_tracing_tier: DXR 1.1 support enabled.
+774.462:0130:0134:info:vkd3d-proton:d3d12_device_caps_init_feature_level: DX Ultimate supported!
+774.462:0130:0134:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Remapping VKD3D_SHADER_CACHE to: vkd3d-proton.cache.
+774.462:0130:0134:info:vkd3d-proton:vkd3d_pipeline_library_init_disk_cache: Attempting to load disk cache from: vkd3d-proton.cache.
+774.463:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Performing async setup of stream archive ...
+774.463:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_merge: No write cache exists. No need to merge any disk caches.
+774.463:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Merging pipeline libraries took 0.545 ms.
+774.464:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Mapping read-only cache took 0.222 ms.
+774.464:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_cache_initial_setup: Parsing stream archive took 0.026 ms.
+774.464:0130:0160:info:vkd3d-proton:vkd3d_pipeline_library_disk_thread_main: Done performing async setup of stream archive.
+774.469:0130:0134:info:vkd3d-proton:dxgi_vk_swap_chain_init: Creating swapchain (1280 x 720), BufferCount = 2.
+774.469:0130:0134:info:vkd3d-proton:dxgi_vk_swap_chain_init_sync_objects: Ensure maximum latency of 3 frames with KHR_present_wait.
+774.470:0130:0134:info:vkd3d-proton:dxgi_vk_swap_chain_init_waiter_thread: Enabling present wait path for frame latency.
+774.470:0130:0134:info:vkd3d-proton:dxgi_vk_swap_chain_init_sleep_state: Timer interval is 1.0 ms.
+774.860:0130:0168:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.
+774.982:0130:0168:info:vkd3d-proton:dxgi_vk_swap_chain_recreate_swapchain_in_present_task: Got 3 swapchain images.

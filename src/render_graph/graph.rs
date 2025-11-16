@@ -454,6 +454,11 @@ impl RenderGraph {
             .and_then(|id| self.get_resource(*id))
     }
 
+    /// Find a resource ID by name
+    pub fn find_resource_by_name(&self, name: &str) -> Option<ResourceId> {
+        self.resource_names.get(name).copied()
+    }
+
     /// Get next pass ID
     pub fn next_pass_id(&mut self) -> PassId {
         let id = PassId(self.next_pass_id);

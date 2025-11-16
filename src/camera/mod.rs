@@ -47,16 +47,21 @@ pub fn get_current_camera_uniforms() -> Option<CameraUniforms> {
 
 /// Calculate perspective projection matrix (backend-aware)
 pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, far: f32) -> Mat4 {
+    let base_proj = Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far);
+
     match get_camera_backend() {
         CameraBackend::Vulkan => {
-            // Vulkan: right-handed with reverse Z (0=far, 1=near) for better precision
-            Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far)
+            // Vulkan NDC: Y goes from -1 (top) to +1 (bottom) - INVERTED relative to DirectX
+            // We need to flip the Y-axis in the projection matrix to account for this
+            // This is the standard approach: negate row 1 (Y) of the projection matrix
+            let mut proj = base_proj;
+            proj.y_axis *= -1.0;
+            proj
         }
         CameraBackend::DirectX => {
-            // DirectX: Use right-handed coordinate system same as Vulkan
-            // Note: We use FrontCounterClockwise=TRUE in rasterizer state which handles
-            // DirectX's inverted Y convention, so no Y-flip is needed in the projection matrix
-            Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far)
+            // DirectX NDC: Y goes from -1 (bottom) to +1 (top) - STANDARD
+            // Use the projection matrix as-is
+            base_proj
         }
     }
 }

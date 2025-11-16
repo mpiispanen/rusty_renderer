@@ -28,7 +28,41 @@ The main difference is the **Y-axis direction**:
 
 ## Our Solution
 
-We use **Vulkan as the reference coordinate system** and flip Y coordinates in shaders for other backends:
+We handle the Y-axis difference **at the projection matrix level** in `src/camera/mod.rs`:
+
+### Projection Matrix Approach
+
+For Vulkan, we negate the Y-axis component of the projection matrix to account for its inverted NDC Y-axis:
+
+```rust
+pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, far: f32) -> Mat4 {
+    let base_proj = Mat4::perspective_rh(fov_degrees.to_radians(), aspect_ratio, near, far);
+    
+    match get_camera_backend() {
+        CameraBackend::Vulkan => {
+            // Vulkan NDC: Y goes from -1 (top) to +1 (bottom) - INVERTED
+            // Negate Y-axis in projection matrix to compensate
+            let mut proj = base_proj;
+            proj.y_axis *= -1.0;
+            proj
+        }
+        CameraBackend::DirectX => {
+            // DirectX NDC: Y goes from -1 (bottom) to +1 (top) - STANDARD
+            base_proj
+        }
+    }
+}
+```
+
+This approach:
+- **Keeps shaders identical** between backends (both use HLSL compiled to SPIR-V/DXIL)
+- **Handles the flip transparently** in the camera system
+- **Works correctly** for all camera types (perspective, orthographic, etc.)
+- **Is the standard solution** used by major engines
+
+### Legacy: Shader-level Flipping
+
+Previous versions flipped Y coordinates in shaders for specific backends:
 
 ### Triangle Example
 

@@ -29,10 +29,14 @@ pub enum ResourceKind {
 /// Image format
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
-    /// 8-bit RGBA
+    /// 8-bit RGBA (linear)
     Rgba8Unorm,
-    /// 8-bit BGRA
+    /// 8-bit RGBA (sRGB)
+    Rgba8Srgb,
+    /// 8-bit BGRA (linear)
     Bgra8Unorm,
+    /// 8-bit BGRA (sRGB)
+    Bgra8Srgb,
     /// 16-bit RGBA float
     Rgba16Float,
     /// 32-bit RGBA float
