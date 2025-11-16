@@ -91,6 +91,9 @@ jobs:
     runs-on: [self-hosted, Linux, GPU]
     needs: build
     steps:
+      - name: Add Homebrew to PATH
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      
       - uses: actions/checkout@v4
         with:
           lfs: true
