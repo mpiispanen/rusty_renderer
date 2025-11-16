@@ -237,11 +237,17 @@ jobs:
       - name: Build examples
         run: cargo build --release --examples
       
-      - name: Test DirectX 12 headless rendering
+      - name: Test DirectX 12 headless rendering (WARP software renderer)
         run: |
-          Write-Host "Testing DirectX 12 backend with damaged helmet scene"
+          Write-Host "Testing DirectX 12 backend with WARP software renderer"
+          Write-Host "Using damaged helmet scene for validation"
           mkdir screenshots/directx -Force
+          
+          # Use WARP software renderer (available on all Windows runners)
+          $env:RUSTY_RENDERER_USE_WARP = "1"
           $env:RUST_LOG = "warn"
+          
+          Write-Host "Running with WARP (software renderer)..."
           ./target/release/rusty_renderer.exe `
             --scene scenes/damaged_helmet.toml `
             --backend directx `
@@ -254,7 +260,7 @@ jobs:
             $fileSize = (Get-Item screenshots/directx/damaged_helmet.png).Length
             Write-Host "DirectX screenshot size: $fileSize bytes"
             if ($fileSize -gt 0) {
-              Write-Host "✅ DirectX screenshot created successfully"
+              Write-Host "✅ DirectX screenshot created successfully (WARP)"
             } else {
               Write-Host "❌ DirectX screenshot is empty"
               exit 1
@@ -280,10 +286,98 @@ jobs:
           path: target/release/rusty_renderer.exe
   
   # Visual regression testing - compare backends and check against golden images
+  test-rendering-directx-proton:
+    name: Test DirectX via Proton
+    runs-on: [self-hosted, Linux, GPU]
+    needs: build
+    steps:
+      - name: Add Homebrew to PATH
+        run: echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+      
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Add Windows target
+        run: rustup target add x86_64-pc-windows-gnu
+      
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-proton-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-proton-test-
+      
+      - name: Build Windows binary
+        run: cargo build --release --target x86_64-pc-windows-gnu --verbose
+      
+      - name: Check Proton availability
+        id: proton_check
+        run: |
+          STEAM_DIR="$HOME/.local/share/Steam"
+          PROTON_PATH="$STEAM_DIR/steamapps/common/Proton 9.0 (Beta)"
+          
+          if [ ! -d "$PROTON_PATH" ]; then
+            PROTON_PATH="$STEAM_DIR/steamapps/common/Proton - Experimental"
+          fi
+          
+          if [ -d "$PROTON_PATH" ]; then
+            echo "proton_available=true" >> $GITHUB_OUTPUT
+            echo "proton_path=$PROTON_PATH" >> $GITHUB_OUTPUT
+            echo "✅ Proton found at: $PROTON_PATH"
+          else
+            echo "proton_available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ Proton not found, skipping DirectX/Proton tests"
+            echo "Available Proton versions:"
+            ls -1 "$STEAM_DIR/steamapps/common/" | grep -i proton || echo "  None"
+          fi
+      
+      - name: Test DirectX headless rendering via Proton
+        if: steps.proton_check.outputs.proton_available == 'true'
+        run: |
+          mkdir -p screenshots/directx-proton
+          
+          # Set up Proton environment
+          export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"
+          export STEAM_COMPAT_DATA_PATH="$HOME/.proton_rusty_renderer_ci"
+          export WINEDEBUG="-all"
+          export RUST_LOG=warn
+          
+          # Run via Proton with headless mode
+          BINARY_PATH="target/x86_64-pc-windows-gnu/release/rusty_renderer.exe"
+          PROTON_CMD="${{ steps.proton_check.outputs.proton_path }}/proton"
+          
+          "$PROTON_CMD" run "$BINARY_PATH" \
+            --scene scenes/damaged_helmet.toml \
+            --backend directx \
+            --headless \
+            --max-frames 1 \
+            --screenshot screenshots/directx-proton/damaged_helmet.png
+          
+          # Verify screenshot was created
+          test -f screenshots/directx-proton/damaged_helmet.png
+          test -s screenshots/directx-proton/damaged_helmet.png
+          echo "✅ DirectX/Proton screenshot created successfully"
+      
+      - name: Upload DirectX-Proton screenshots
+        if: always() && steps.proton_check.outputs.proton_available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-directx-proton
+          path: screenshots/directx-proton/
+          retention-days: 30
+
   visual-regression:
     name: Visual Regression Testing
     runs-on: ubuntu-latest
-    needs: [test-rendering-vulkan, build-windows]
+    needs: [test-rendering-vulkan, build-windows, test-rendering-directx-proton]
     if: always()
     steps:
       - uses: actions/checkout@v4
@@ -304,11 +398,18 @@ jobs:
           name: screenshots-vulkan
           path: screenshots/vulkan/
       
-      - name: Download DirectX screenshots
+      - name: Download DirectX screenshots (WARP)
         uses: actions/download-artifact@v4
         with:
           name: screenshots-directx
           path: screenshots/directx/
+        continue-on-error: true
+      
+      - name: Download DirectX-Proton screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-directx-proton
+          path: screenshots/directx-proton/
         continue-on-error: true
       
       - name: List all screenshots
@@ -324,17 +425,46 @@ jobs:
           # Create comparison directory
           mkdir -p comparisons/backend_parity
           
-          # Compare if both screenshots exist
+          # Compare Vulkan vs DirectX (WARP)
           if [ -f "screenshots/vulkan/damaged_helmet.png" ] && [ -f "screenshots/directx/damaged_helmet.png" ]; then
+            echo "Comparing Vulkan vs DirectX (WARP)..."
             python3 scripts/flip_compare.py \
               screenshots/vulkan/damaged_helmet.png \
               screenshots/directx/damaged_helmet.png \
-              --error-map comparisons/backend_parity/vulkan_vs_directx.png || {
-                echo "::warning::Backend parity test failed - outputs differ significantly"
-                echo "parity_failed=true" >> $GITHUB_OUTPUT
+              --error-map comparisons/backend_parity/vulkan_vs_directx_warp.png || {
+                echo "::warning::Backend parity test failed (WARP) - outputs differ significantly"
+                echo "warp_parity_failed=true" >> $GITHUB_OUTPUT
               }
           else
-            echo "⚠️  Missing screenshots - skipping backend comparison"
+            echo "⚠️  Missing DirectX WARP screenshots - skipping comparison"
+          fi
+          
+          # Compare Vulkan vs DirectX (Proton)
+          if [ -f "screenshots/vulkan/damaged_helmet.png" ] && [ -f "screenshots/directx-proton/damaged_helmet.png" ]; then
+            echo "Comparing Vulkan vs DirectX (Proton)..."
+            python3 scripts/flip_compare.py \
+              screenshots/vulkan/damaged_helmet.png \
+              screenshots/directx-proton/damaged_helmet.png \
+              --error-map comparisons/backend_parity/vulkan_vs_directx_proton.png || {
+                echo "::warning::Backend parity test failed (Proton) - outputs differ significantly"
+                echo "proton_parity_failed=true" >> $GITHUB_OUTPUT
+              }
+          else
+            echo "⚠️  Missing DirectX Proton screenshots - skipping comparison"
+          fi
+          
+          # Compare DirectX WARP vs Proton (should be identical)
+          if [ -f "screenshots/directx/damaged_helmet.png" ] && [ -f "screenshots/directx-proton/damaged_helmet.png" ]; then
+            echo "Comparing DirectX WARP vs Proton..."
+            python3 scripts/flip_compare.py \
+              screenshots/directx/damaged_helmet.png \
+              screenshots/directx-proton/damaged_helmet.png \
+              --error-map comparisons/backend_parity/directx_warp_vs_proton.png || {
+                echo "::error::DirectX WARP vs Proton differ - this should not happen!"
+                echo "dx_consistency_failed=true" >> $GITHUB_OUTPUT
+              }
+          else
+            echo "⚠️  Cannot compare WARP vs Proton - missing screenshots"
           fi
       
       - name: Compare against golden references
@@ -414,12 +544,27 @@ jobs:
         run: |
           echo "=== Visual Regression Summary ==="
           
-          if [ "${{ steps.backend_parity.outputs.parity_failed }}" == "true" ]; then
-            echo "❌ Backend parity check FAILED - Vulkan and DirectX outputs differ"
+          # Backend parity checks
+          if [ "${{ steps.backend_parity.outputs.warp_parity_failed }}" == "true" ]; then
+            echo "❌ Backend parity (Vulkan vs DirectX WARP) FAILED"
           else
-            echo "✅ Backend parity check PASSED"
+            echo "✅ Backend parity (Vulkan vs DirectX WARP) PASSED"
           fi
           
+          if [ "${{ steps.backend_parity.outputs.proton_parity_failed }}" == "true" ]; then
+            echo "❌ Backend parity (Vulkan vs DirectX Proton) FAILED"
+          else
+            echo "✅ Backend parity (Vulkan vs DirectX Proton) PASSED"
+          fi
+          
+          if [ "${{ steps.backend_parity.outputs.dx_consistency_failed }}" == "true" ]; then
+            echo "❌ DirectX consistency check FAILED - WARP and Proton differ!"
+            echo "::error::DirectX outputs differ between WARP and Proton - this indicates a bug"
+          else
+            echo "✅ DirectX consistency (WARP vs Proton) PASSED"
+          fi
+          
+          # Golden reference checks
           if [ "${{ steps.golden_check.outputs.vulkan_regressed }}" == "true" ]; then
             echo "⚠️  Vulkan regression detected"
           fi
@@ -430,10 +575,15 @@ jobs:
           
           echo ""
           echo "📊 View detailed report in the visual-regression-results artifact"
+          echo ""
+          echo "Test configurations:"
+          echo "  • Vulkan: Native Linux with real GPU"
+          echo "  • DirectX (WARP): Windows runner with software renderer"
+          echo "  • DirectX (Proton): Linux with real GPU via VKD3D-Proton"
           
-          # Report backend parity status (warning only - 13% diff is expected due to GLSL vs HLSL)
-          if [ "${{ steps.backend_parity.outputs.parity_failed }}" == "true" ]; then
-            echo "::warning::Backend parity check shows differences - this is expected (GLSL vs HLSL shaders)"
-            echo "ℹ️  Backends produce ~13% RMSE difference due to different shader languages"
-            echo "ℹ️  Will be resolved when we move to unified shader compilation"
+          # Report backend parity status (warning only - some diff is expected)
+          if [ "${{ steps.backend_parity.outputs.warp_parity_failed }}" == "true" ] || [ "${{ steps.backend_parity.outputs.proton_parity_failed }}" == "true" ]; then
+            echo ""
+            echo "::warning::Backend parity check shows differences"
+            echo "ℹ️  Some differences may be expected due to shader compilation differences"
           fi
