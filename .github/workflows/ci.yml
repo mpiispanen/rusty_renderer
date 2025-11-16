@@ -121,7 +121,7 @@ jobs:
         run: |
           mkdir -p screenshots/vulkan
           RUST_LOG=warn ./target/release/rusty_renderer \
-            --scene scenes/damaged_helmet.toml \
+            --scene damaged_helmet \
             --backend vulkan \
             --headless \
             --max-frames 1 \
@@ -249,7 +249,7 @@ jobs:
           
           Write-Host "Running with WARP (software renderer)..."
           ./target/release/rusty_renderer.exe `
-            --scene scenes/damaged_helmet.toml `
+            --scene damaged_helmet `
             --backend directx `
             --headless `
             --max-frames 1 `
@@ -359,7 +359,7 @@ jobs:
           PROTON_CMD="${{ steps.proton_check.outputs.proton_path }}/proton"
           
           "$PROTON_CMD" run "$BINARY_PATH" \
-            --scene scenes/damaged_helmet.toml \
+            --scene damaged_helmet \
             --backend directx \
             --headless \
             --max-frames 1 \
