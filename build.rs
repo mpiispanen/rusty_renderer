@@ -157,9 +157,10 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
     println!("cargo:warning=Compiling {} to DXIL with DXC", name);
 
     // Compile vertex shader to DXIL
+    // Use SM 5.1 for better vkd3d-proton compatibility
     let vert_result = Command::new("dxc")
         .arg("-T")
-        .arg("vs_6_0")
+        .arg("vs_5_1")
         .arg("-E")
         .arg(vs_entry)
         .arg("-Fo")
@@ -184,9 +185,10 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
     }
 
     // Compile fragment shader to DXIL
+    // Use SM 5.1 for better vkd3d-proton compatibility
     let frag_result = Command::new("dxc")
         .arg("-T")
-        .arg("ps_6_0")
+        .arg("ps_5_1")
         .arg("-E")
         .arg(ps_entry)
         .arg("-Fo")
