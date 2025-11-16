@@ -851,9 +851,13 @@ impl DirectXBackendImpl {
                 log::info!("Loaded pre-compiled DXIL shader: {}", path);
                 return Some(bytecode);
             }
-            
+
             // Also try .cso files for compatibility
-            let cso_path = format!("shaders/compiled/{}_{}.cso", name, if shader_type == "vert" { "vs" } else { "ps" });
+            let cso_path = format!(
+                "shaders/compiled/{}_{}.cso",
+                name,
+                if shader_type == "vert" { "vs" } else { "ps" }
+            );
             if let Ok(bytecode) = std::fs::read(&cso_path) {
                 log::info!("Loaded pre-compiled CSO shader: {}", cso_path);
                 return Some(bytecode);
