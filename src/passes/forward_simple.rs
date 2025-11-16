@@ -839,14 +839,24 @@ mod tests {
             },
         );
 
+        let index_buffer = graph.create_resource(
+            "indices",
+            ResourceDescriptor::Buffer {
+                size: 512,
+                usage: BufferUsageFlags::new(BufferUsageFlags::INDEX),
+            },
+        );
+
         // Build pass
         let _pass = ForwardSimplePass::builder()
             .color_output(color)
             .depth_output(depth)
             .vertex_buffer(vertex_buffer)
+            .index_buffer(index_buffer)
             .camera_buffer(camera)
             .lighting_buffer(lighting)
             .vertex_count(36)
+            .index_count(36)
             .build(&mut graph)
             .unwrap();
 

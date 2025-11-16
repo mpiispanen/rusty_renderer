@@ -313,18 +313,13 @@ impl Default for ResourceLifetime {
 /// Resource initialization data
 ///
 /// Used to upload initial data to a resource after allocation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum ResourceInitData {
     /// No initial data - resource will be uninitialized
+    #[default]
     None,
     /// Upload data from a buffer
     Buffer(Vec<u8>),
-}
-
-impl Default for ResourceInitData {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// A resource in the render graph
