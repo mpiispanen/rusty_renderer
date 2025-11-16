@@ -347,6 +347,10 @@ jobs:
           # Set up Proton environment
           export STEAM_COMPAT_CLIENT_INSTALL_PATH="$HOME/.local/share/Steam"
           export STEAM_COMPAT_DATA_PATH="$HOME/.proton_rusty_renderer_ci"
+          
+          # Create Proton prefix directory
+          mkdir -p "$STEAM_COMPAT_DATA_PATH"
+          
           export WINEDEBUG="-all"
           export RUST_LOG=warn
           
