@@ -59,9 +59,12 @@ pub fn perspective_projection(fov_degrees: f32, aspect_ratio: f32, near: f32, fa
             proj
         }
         CameraBackend::DirectX => {
-            // DirectX NDC: Y goes from -1 (bottom) to +1 (top) - STANDARD
-            // Use the projection matrix as-is
-            base_proj
+            // DirectX NDC: Y goes from -1 (bottom) to +1 (top)
+            // However, to match Vulkan's output orientation, we need to flip Y here too.
+            // This ensures both backends produce the same world-space orientation.
+            let mut proj = base_proj;
+            proj.y_axis *= -1.0;
+            proj
         }
     }
 }

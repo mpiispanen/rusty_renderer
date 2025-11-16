@@ -1936,11 +1936,16 @@ impl DirectXBackendImpl {
             }
         }
 
-        // Default: use swapchain render target
+        // Default: use swapchain render target (or offscreen in headless)
         let rtv_heap = self.rtv_heap.as_ref().context("RTV heap not initialized")?;
         let handle_base = unsafe { rtv_heap.GetCPUDescriptorHandleForHeapStart() };
+        
+        // In headless mode, always use descriptor 0 (only one RTV exists)
+        // In windowed mode, use frame_index to select the current swapchain buffer
+        let descriptor_index = if self.headless { 0 } else { self.frame_index as usize };
+        
         let handle = D3D12_CPU_DESCRIPTOR_HANDLE {
-            ptr: handle_base.ptr + (self.frame_index as usize * self.rtv_descriptor_size as usize),
+            ptr: handle_base.ptr + (descriptor_index * self.rtv_descriptor_size as usize),
         };
         Ok(Some(handle))
     }
@@ -2125,7 +2130,8 @@ impl DirectXBackendImpl {
                 // Clear and set render targets for this pass
                 if let Some(rtv) = rtv_handle {
                     let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background (matches Vulkan)
-                    log::trace!("Clearing RTV at ptr: 0x{:x}", rtv.ptr);
+                    log::debug!("Clearing RTV at ptr: 0x{:x} with color [{}, {}, {}, {}]", 
+                        rtv.ptr, clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
                     command_list.ClearRenderTargetView(rtv, &clear_color, None);
 
                     if let Some(dsv) = dsv_handle {
