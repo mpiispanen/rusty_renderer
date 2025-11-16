@@ -834,20 +834,28 @@ impl DirectXBackendImpl {
     fn load_precompiled_shader(&self, entry_point: &str, target: &str) -> Option<Vec<u8>> {
         // Determine shader type from entry point and target
         let shader_type = if entry_point == "VSMain" || target.starts_with("vs_") {
-            "vs"
+            "vert"
         } else if entry_point == "PSMain" || target.starts_with("ps_") {
-            "ps"
+            "frag"
         } else {
             return None;
         };
 
-        // Try different shader variants
+        // Try different shader variants (DXIL files from build.rs)
         let shader_names = vec!["forward_simple", "forward", "triangle"];
 
         for name in shader_names {
-            let path = format!("shaders/compiled/{}_{}.cso", name, shader_type);
+            // Try .dxil files in shaders/ directory (from build.rs)
+            let path = format!("shaders/{}.{}.dxil", name, shader_type);
             if let Ok(bytecode) = std::fs::read(&path) {
-                log::info!("Loaded pre-compiled shader: {}", path);
+                log::info!("Loaded pre-compiled DXIL shader: {}", path);
+                return Some(bytecode);
+            }
+            
+            // Also try .cso files for compatibility
+            let cso_path = format!("shaders/compiled/{}_{}.cso", name, if shader_type == "vert" { "vs" } else { "ps" });
+            if let Ok(bytecode) = std::fs::read(&cso_path) {
+                log::info!("Loaded pre-compiled CSO shader: {}", cso_path);
                 return Some(bytecode);
             }
         }
