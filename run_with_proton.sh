@@ -24,7 +24,7 @@ BUILD_TARGETS=("x86_64-pc-windows-gnu" "x86_64-pc-windows-msvc")
 # Default settings
 VKD3D_DEBUG_LEVEL="warn"
 APP_ARGS=()
-DEFAULT_SCENE="scenes/gltf_textured.toml"
+DEFAULT_SCENE=""  # Use the app's default scene (damaged_helmet)
 DEFAULT_MAX_FRAMES=""  # No frame limit by default
 SCENE_PROVIDED=false
 FORCE_REBUILD=false
@@ -94,8 +94,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# If no --scene argument was provided, add the default
-if [[ "$SCENE_PROVIDED" == "false" ]]; then
+# If no --scene argument was provided, add the default (if set)
+if [[ "$SCENE_PROVIDED" == "false" ]] && [[ -n "$DEFAULT_SCENE" ]]; then
     APP_ARGS+=("--scene" "$DEFAULT_SCENE")
 fi
 

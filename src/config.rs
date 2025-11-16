@@ -34,7 +34,7 @@ pub struct Config {
     pub backend: Backend,
 
     /// Scene to render (triangle, cube, etc.)
-    #[arg(short, long, default_value = "triangle")]
+    #[arg(short, long, default_value = "damaged_helmet")]
     pub scene: String,
 
     /// Window width

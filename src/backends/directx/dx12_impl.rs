@@ -2124,7 +2124,7 @@ impl DirectXBackendImpl {
 
                 // Clear and set render targets for this pass
                 if let Some(rtv) = rtv_handle {
-                    let clear_color = [0.0f32, 0.0f32, 0.0f32, 1.0f32];
+                    let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background (matches Vulkan)
                     log::trace!("Clearing RTV at ptr: 0x{:x}", rtv.ptr);
                     command_list.ClearRenderTargetView(rtv, &clear_color, None);
 
