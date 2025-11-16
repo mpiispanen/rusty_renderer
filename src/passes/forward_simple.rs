@@ -106,14 +106,24 @@ impl ForwardSimplePass {
 
         for (obj_idx, obj) in scene.objects.iter().enumerate() {
             match obj {
-                SceneObject::Mesh { geometry, transform, .. } => match geometry {
+                SceneObject::Mesh {
+                    geometry,
+                    transform,
+                    ..
+                } => match geometry {
                     GeometryData::Inline {
                         vertices,
                         indices: mesh_indices,
                     } => {
-                        log::info!("Object {}: {} vertices, transform: pos={:?}, rot={:?}, scale={:?}",
-                            obj_idx, vertices.len(), transform.position, transform.rotation, transform.scale);
-                        
+                        log::info!(
+                            "Object {}: {} vertices, transform: pos={:?}, rot={:?}, scale={:?}",
+                            obj_idx,
+                            vertices.len(),
+                            transform.position,
+                            transform.rotation,
+                            transform.scale
+                        );
+
                         // DON'T bake transforms - keep vertices in object space
                         // Transforms will be applied via push constants
                         base_vertices.extend(vertices.iter().cloned());
@@ -147,10 +157,20 @@ impl ForwardSimplePass {
         unsafe impl bytemuck::Pod for GpuVertex {}
         unsafe impl bytemuck::Zeroable for GpuVertex {}
 
-        log::info!("Total vertices after transform: {}, indices: {}", base_vertices.len(), indices.len());
-        log::info!("First vertex position: {:?}", base_vertices.get(0).map(|v| v.position));
-        log::info!("Last vertex position: {:?}", base_vertices.last().map(|v| v.position));
-        
+        log::info!(
+            "Total vertices after transform: {}, indices: {}",
+            base_vertices.len(),
+            indices.len()
+        );
+        log::info!(
+            "First vertex position: {:?}",
+            base_vertices.first().map(|v| v.position)
+        );
+        log::info!(
+            "Last vertex position: {:?}",
+            base_vertices.last().map(|v| v.position)
+        );
+
         let gpu_vertices: Vec<GpuVertex> = base_vertices
             .iter()
             .map(|v| GpuVertex {
@@ -197,10 +217,12 @@ impl ForwardSimplePass {
 
         // Get transform from first object (for single-object scenes)
         // TODO: Support multiple objects with different transforms
-        let transform = scene.objects.first()
-            .and_then(|obj| match obj {
-                SceneObject::Mesh { transform, .. } => Some(transform.clone()),
-                SceneObject::GltfModel { transform, .. } => Some(transform.clone()),
+        let transform = scene
+            .objects
+            .first()
+            .map(|obj| match obj {
+                SceneObject::Mesh { transform, .. } => *transform,
+                SceneObject::GltfModel { transform, .. } => *transform,
             })
             .unwrap_or_default();
 
@@ -584,9 +606,10 @@ impl PassCallback for ForwardSimplePassCallback {
 
     fn execute(&self, context: &mut dyn PassExecutionContext) {
         log::info!(
-            "Executing forward simple pass ({} vertices, {} indices)",
+            "Executing forward simple pass ({} vertices, {} indices, has_texture: {})",
             self.vertex_count,
-            self.index_count
+            self.index_count,
+            self.albedo_texture.is_some()
         );
 
         // Get buffer pointers from resource IDs
@@ -627,9 +650,13 @@ impl PassCallback for ForwardSimplePassCallback {
             .bind_uniform_buffer(0, 0, lighting_buffer_ptr, 0, 16 + 8 * 48) // LightingUniforms: ambient_light_count (16) + 8 lights (8*48 = 384) = 400 bytes
             .expect("Failed to bind lighting uniforms");
 
-        // Bind shadow uniforms if present
+        // Bind shadow uniforms if present, or bind lighting buffer as fallback
+        // CRITICAL: Root parameter 1 MUST be bound to avoid GPU null pointer access
         if let Some(shadow_uniforms_id) = self.shadow_uniforms {
-            log::info!("Binding shadow uniforms at binding 1 for resource {:?}", shadow_uniforms_id);
+            log::info!(
+                "Binding shadow uniforms at binding 1 for resource {:?}",
+                shadow_uniforms_id
+            );
             let shadow_buffer_ptr = context
                 .get_buffer_ptr(shadow_uniforms_id)
                 .expect("Failed to get shadow uniforms buffer");
@@ -637,11 +664,23 @@ impl PassCallback for ForwardSimplePassCallback {
                 .bind_uniform_buffer(0, 1, shadow_buffer_ptr, 0, 80) // lightSpaceMatrix (64) + shadowParams (16) = 80 bytes
                 .expect("Failed to bind shadow uniforms");
             log::info!("Shadow uniforms bound successfully");
+        } else {
+            // No shadow uniforms - bind lighting buffer as dummy to avoid null pointer
+            // The shader may not use it, but DirectX requires ALL root parameters to be bound
+            log::info!(
+                "No shadow uniforms present, binding lighting buffer as dummy to root parameter 1"
+            );
+            context
+                .bind_uniform_buffer(0, 1, lighting_buffer_ptr, 0, 16) // Just bind something valid
+                .expect("Failed to bind dummy shadow uniforms");
         }
 
         // Bind shadow map texture if present
         if let Some(shadow_map_id) = self.shadow_map {
-            log::info!("=== FORWARD PASS: Binding shadow map texture for resource {:?} ===", shadow_map_id);
+            log::info!(
+                "=== FORWARD PASS: Binding shadow map texture for resource {:?} ===",
+                shadow_map_id
+            );
             let shadow_texture_ptr = context
                 .get_texture_ptr(shadow_map_id)
                 .expect("Failed to get shadow map");
@@ -653,16 +692,31 @@ impl PassCallback for ForwardSimplePassCallback {
         }
 
         // Bind albedo texture if present
+        // Shader requires texture sampling, so we must have a texture (default white if none provided)
         if let Some(albedo_texture_id) = self.albedo_texture {
-            log::info!("Binding albedo texture for resource {:?}", albedo_texture_id);
-            let albedo_texture_ptr = context
-                .get_texture_ptr(albedo_texture_id)
-                .expect("Failed to get albedo texture");
-            log::info!("Got albedo texture ptr: {:?}", albedo_texture_ptr);
-            context
-                .bind_texture(0, 2, albedo_texture_ptr) // Binding 2 for base color texture
-                .expect("Failed to bind albedo texture");
-            log::info!("Albedo texture bound successfully");
+            log::info!(
+                "Binding albedo texture for resource {:?}",
+                albedo_texture_id
+            );
+            match context.get_texture_ptr(albedo_texture_id) {
+                Ok(albedo_texture_ptr) => {
+                    log::debug!("Got albedo texture ptr: {:?}", albedo_texture_ptr);
+                    if let Err(e) = context.bind_texture(0, 2, albedo_texture_ptr) {
+                        log::error!("Failed to bind albedo texture: {:?}", e);
+                    } else {
+                        log::debug!("Albedo texture bound successfully to slot 2");
+                    }
+                }
+                Err(e) => {
+                    log::error!(
+                        "Failed to get albedo texture ptr for {:?}: {:?}",
+                        albedo_texture_id,
+                        e
+                    );
+                }
+            }
+        } else {
+            log::error!("No albedo texture set - shader requires texture sampling!");
         }
 
         // Push camera and model matrices as push constants
@@ -670,23 +724,6 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Camera uniforms not set for current frame");
         let model_matrix = self.transform.matrix();
         let normal_matrix = self.transform.normal_matrix();
-
-        // Debug logging that works in both Windows and Linux
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("matrix_debug.log")
-        {
-            use std::io::Write;
-            let _ = writeln!(f, "=== MATRIX DEBUG ===");
-            let _ = writeln!(f, "Backend: {:?}", crate::camera::get_camera_backend());
-            let _ = writeln!(f, "ViewProj matrix:");
-            let _ = writeln!(f, "  Row 0: {:?}", camera_uniforms.view_proj[0]);
-            let _ = writeln!(f, "  Row 3: {:?}", camera_uniforms.view_proj[3]);
-            let _ = writeln!(f, "Model matrix:");
-            let _ = writeln!(f, "  Row 0: {:?}", model_matrix[0]);
-            let _ = writeln!(f, "  Row 3: {:?}", model_matrix[3]);
-        }
 
         #[repr(C)]
         #[derive(Clone, Copy)]
@@ -704,9 +741,20 @@ impl PassCallback for ForwardSimplePassCallback {
             normal: normal_matrix,
         };
 
-        log::info!("Pushing constants (camera + model)");
-        log::info!("  ViewProj matrix row 0: {:?}", camera_uniforms.view_proj[0]);
-        log::info!("  Model matrix row 0: {:?}", model_matrix[0]);
+        log::debug!(
+            "Pushing constants: Backend={:?}",
+            crate::camera::get_camera_backend()
+        );
+        log::debug!(
+            "  ViewProj row 0: {:?}, row 3: {:?}",
+            camera_uniforms.view_proj[0],
+            camera_uniforms.view_proj[3]
+        );
+        log::debug!(
+            "  Model row 0: {:?}, row 3: {:?}",
+            model_matrix[0],
+            model_matrix[3]
+        );
         context
             .push_constants(
                 0x1, // VERTEX stage only
@@ -716,20 +764,19 @@ impl PassCallback for ForwardSimplePassCallback {
             .expect("Failed to push constants");
 
         // Draw
-        log::info!("=== DRAWING INDEXED GEOMETRY ===");
-        log::info!("  Index count: {}", self.index_count);
-        log::info!("  Instance count: 1");
-        log::info!("  First index: 0");
-        log::info!("  Vertex offset: 0");
-        log::info!("  First instance: 0");
-        log::info!("  Transform: pos={:?}, rot={:?}, scale={:?}", 
-            self.transform.position, self.transform.rotation, self.transform.scale);
-        
+        log::debug!(
+            "Drawing indexed: {} indices, 1 instance, transform: pos={:?} rot={:?} scale={:?}",
+            self.index_count,
+            self.transform.position,
+            self.transform.rotation,
+            self.transform.scale
+        );
+
         context
             .draw_indexed(self.index_count, 1, 0, 0, 0)
             .expect("Failed to draw indexed");
 
-        log::info!("Forward simple pass execution complete");
+        log::debug!("Forward simple pass execution complete");
     }
 }
 

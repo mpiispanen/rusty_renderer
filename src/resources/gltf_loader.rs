@@ -46,20 +46,26 @@ impl GltfLoader {
         // Load meshes from scene graph if available, otherwise load all meshes directly
         if let Some(scene) = gltf.default_scene().or_else(|| gltf.scenes().next()) {
             log::info!("Loading from scene: {}", scene.name().unwrap_or("default"));
-            
+
             // Traverse scene nodes and load meshes with transforms
             for node in scene.nodes() {
                 Self::load_node(&node, &buffers, &Transform::identity(), &mut objects)?;
             }
         } else {
             log::warn!("No scene found, loading meshes directly");
-            
+
             // Fallback: load meshes without scene graph
             for mesh in gltf.meshes() {
                 let mesh_name = mesh.name().unwrap_or("mesh").to_string();
 
                 for (prim_idx, primitive) in mesh.primitives().enumerate() {
-                    let obj = Self::load_primitive(&primitive, &buffers, &mesh_name, prim_idx, Transform::default())?;
+                    let obj = Self::load_primitive(
+                        &primitive,
+                        &buffers,
+                        &mesh_name,
+                        prim_idx,
+                        Transform::default(),
+                    )?;
                     objects.push(obj);
                 }
             }
@@ -94,53 +100,54 @@ impl GltfLoader {
     ) -> Result<()> {
         // Get node transform
         let node_transform = Self::extract_transform(node);
-        
+
         // Compose with parent transform
         let combined_transform = Self::compose_transforms(parent_transform, &node_transform);
-        
+
         // Load mesh if present
         if let Some(mesh) = node.mesh() {
-            let mesh_name = mesh.name().unwrap_or_else(|| {
-                node.name().unwrap_or("mesh")
-            }).to_string();
-            
+            let mesh_name = mesh
+                .name()
+                .unwrap_or_else(|| node.name().unwrap_or("mesh"))
+                .to_string();
+
             for (prim_idx, primitive) in mesh.primitives().enumerate() {
                 let obj = Self::load_primitive(
                     &primitive,
                     buffers,
                     &mesh_name,
                     prim_idx,
-                    combined_transform.clone(),
+                    combined_transform,
                 )?;
                 objects.push(obj);
             }
         }
-        
+
         // Recursively load children
         for child in node.children() {
             Self::load_node(&child, buffers, &combined_transform, objects)?;
         }
-        
+
         Ok(())
     }
-    
+
     /// Extract transform from a glTF node
     fn extract_transform(node: &gltf::Node) -> Transform {
         let (translation, rotation, scale) = node.transform().decomposed();
-        
+
         // Convert quaternion to Euler angles (simplified - just extract Y rotation for now)
         // For full support, we'd need proper quaternion->euler conversion
-        let rotation_y = 2.0 * (rotation[3] * rotation[1] + rotation[0] * rotation[2]).atan2(
-            1.0 - 2.0 * (rotation[1] * rotation[1] + rotation[2] * rotation[2])
-        );
-        
+        let rotation_y = 2.0
+            * (rotation[3] * rotation[1] + rotation[0] * rotation[2])
+                .atan2(1.0 - 2.0 * (rotation[1] * rotation[1] + rotation[2] * rotation[2]));
+
         Transform {
             position: [translation[0], translation[1], translation[2]],
             rotation: [0.0, rotation_y.to_degrees(), 0.0], // Simplified: only Y rotation
             scale: [scale[0], scale[1], scale[2]],
         }
     }
-    
+
     /// Compose two transforms (parent * child)
     fn compose_transforms(parent: &Transform, child: &Transform) -> Transform {
         // For simplicity, we'll just add positions and rotations, multiply scales

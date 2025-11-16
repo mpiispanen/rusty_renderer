@@ -132,8 +132,10 @@ impl App {
 
     /// Load a texture file into the render graph
     fn load_texture_to_graph(graph: &mut RenderGraph, texture_path: &str) -> Result<ResourceId> {
-        use crate::render_graph::{Extent3D, ExtentMode, Format, ImageUsageFlags, ResourceDescriptor, SampleCount};
-        
+        use crate::render_graph::{
+            Extent3D, ExtentMode, Format, ImageUsageFlags, ResourceDescriptor, SampleCount,
+        };
+
         // Load the image file
         let img = image::open(texture_path)
             .with_context(|| format!("Failed to load texture: {}", texture_path))?;
@@ -154,10 +156,32 @@ impl App {
 
         // Create and populate the resource
         let texture_id = graph.declare_image_with_data(
-            &format!("texture_{}", texture_path.replace('/', "_")),
+            format!("texture_{}", texture_path.replace('/', "_")),
             pixels,
             desc,
         );
+
+        Ok(texture_id)
+    }
+
+    /// Create a default 1x1 white texture for use when no texture is provided
+    fn create_default_texture(graph: &mut RenderGraph) -> Result<ResourceId> {
+        use crate::render_graph::{
+            Extent3D, ExtentMode, Format, ImageUsageFlags, ResourceDescriptor, SampleCount,
+        };
+
+        // Create a 1x1 white texture
+        let pixels = vec![255u8, 255, 255, 255]; // RGBA white
+
+        let desc = ResourceDescriptor::Image {
+            format: Format::Rgba8Unorm,
+            extent: ExtentMode::Absolute(Extent3D::new_2d(1, 1)),
+            usage: ImageUsageFlags::new(ImageUsageFlags::SAMPLED | ImageUsageFlags::TRANSFER_DST),
+            samples: SampleCount::One,
+            mip_levels: 1,
+        };
+
+        let texture_id = graph.declare_image_with_data("default_white_texture", pixels, desc);
 
         Ok(texture_id)
     }
@@ -240,34 +264,51 @@ impl App {
                 }
             });
 
+        // Create default white texture if no texture was loaded
+        // This is required because the shader samples baseColorTexture unconditionally
+        let albedo_texture = if let Some(tex) = albedo_texture {
+            tex
+        } else {
+            log::info!("No albedo texture provided by scene, creating default white texture");
+            Self::create_default_texture(&mut graph)?
+        };
+
+        // CRITICAL: Always create a default shadow map texture, even when shadows are disabled
+        // The DirectX root signature declares a descriptor table with BOTH t0 (albedo) and t1 (shadow map)
+        // at consecutive heap offsets. If we don't create an SRV for t1, the GPU will access an
+        // invalid/null descriptor, causing a GPU fault (GPUVM fault at address 0x0).
+        // Creating a default 1x1 white texture ensures the descriptor table is valid.
+        log::info!("Creating default shadow map texture (required for descriptor table)");
+        let default_shadow_map = Self::create_default_texture(&mut graph)?;
+
         // Check if scene has directional light for shadow mapping
         // TODO: Shadow mapping disabled until render pass architecture is fixed (Issue #XX)
         // Currently, all passes share the same framebuffer/depth buffer which violates
         // the render graph modularity principle. Each pass should have its own render targets.
         // See: app.rs build_render_graph() for details.
         let has_directional_light = false; // Temporarily disabled
-        /*
-        let has_directional_light = scene
-            .lighting
-            .as_ref()
-            .and_then(|l| l.lights.first())
-            .map(|l| matches!(l.light_type(), crate::scene::LightType::Directional))
-            .unwrap_or(false);
-        */
+                                           /*
+                                           let has_directional_light = scene
+                                               .lighting
+                                               .as_ref()
+                                               .and_then(|l| l.lights.first())
+                                               .map(|l| matches!(l.light_type(), crate::scene::LightType::Directional))
+                                               .unwrap_or(false);
+                                           */
 
-        let mut shadow_map = None;
+        let mut shadow_map = Some(default_shadow_map); // Always use at least the default
         let mut shadow_uniforms = None;
 
         if has_directional_light {
             log::info!("Scene has directional light - enabling shadow mapping");
-            
+
             // Get light direction from scene
             let light_direction = scene
                 .lighting
                 .as_ref()
                 .and_then(|l| l.lights.first())
                 .and_then(|l| l.direction())
-                .map(|d| glam::Vec3::from_array(d))
+                .map(glam::Vec3::from_array)
                 .unwrap_or(glam::Vec3::new(0.0, -1.0, 0.0));
 
             // Prepare shadow map resources
@@ -304,13 +345,8 @@ impl App {
             .transform(transform)
             .vertex_count(vertex_count)
             .index_count(index_count)
+            .albedo_texture(albedo_texture) // Always provide a texture (default if none from scene)
             .with_name("forward_simple");
-
-        // Add base color texture if available
-        if let Some(tex) = albedo_texture {
-            log::info!("Adding albedo texture to forward pass");
-            forward_builder = forward_builder.albedo_texture(tex);
-        }
 
         // Add shadow resources if available
         if let Some(sm) = shadow_map {
@@ -352,7 +388,7 @@ impl App {
             if let Some(camera) = &self.camera {
                 camera::set_current_camera_uniforms(camera.uniforms());
             }
-            
+
             if let Some(backend) = &mut self.backend {
                 // Compile and execute render graph
                 let mut graph = self.render_graph.take().unwrap();
@@ -426,13 +462,16 @@ impl App {
             let (width, height, pixels) = backend.capture_frame()?;
 
             // Save as PNG using image crate
-            use image::{ImageBuffer, imageops};
-            let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
+            use image::{imageops, ImageBuffer};
+            let mut img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
                 .context("Failed to create image from captured pixels")?;
-            
-            // Flip vertically - Vulkan framebuffer has (0,0) at top-left
-            // but the rendered scene is upside down
-            let img = imageops::flip_vertical(&img);
+
+            // Flip vertically for Vulkan only
+            // Vulkan and DirectX have different framebuffer readback conventions
+            // Vulkan reads bottom-to-top, DirectX reads top-to-bottom
+            if backend.backend_type() == crate::backends::BackendType::Vulkan {
+                img = imageops::flip_vertical(&img);
+            }
 
             // Create parent directory if it doesn't exist
             if let Some(parent) = path.parent() {
@@ -453,7 +492,7 @@ impl App {
     fn capture_screenshot_interactive(&mut self) -> Result<()> {
         if let Some(backend) = &mut self.backend {
             let (width, height, pixels) = backend.capture_frame()?;
-            
+
             // Generate filename with timestamp
             use std::time::SystemTime;
             let timestamp = SystemTime::now()
@@ -461,24 +500,27 @@ impl App {
                 .unwrap()
                 .as_secs();
             let path = format!("screenshots/screenshot_{}.png", timestamp);
-            
+
             log::info!("Capturing screenshot to {}", path);
-            
+
             // Save as PNG
-            use image::{ImageBuffer, imageops};
-            let img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
+            use image::{imageops, ImageBuffer};
+            let mut img = ImageBuffer::<image::Rgba<u8>, _>::from_raw(width, height, pixels)
                 .context("Failed to create image from captured pixels")?;
-            
-            // Flip vertically for correct orientation
-            let img = imageops::flip_vertical(&img);
-            
+
+            // Flip vertically for Vulkan only
+            // Vulkan and DirectX have different framebuffer readback conventions
+            if backend.backend_type() == crate::backends::BackendType::Vulkan {
+                img = imageops::flip_vertical(&img);
+            }
+
             // Create directory if needed
             std::fs::create_dir_all("screenshots")
                 .context("Failed to create screenshots directory")?;
-            
+
             img.save(&path)
                 .with_context(|| format!("Failed to save screenshot to {}", path))?;
-            
+
             log::info!("Screenshot saved: {}x{} -> {}", width, height, path);
         }
         Ok(())
@@ -544,7 +586,7 @@ impl App {
 
         // Otherwise, run with event loop
         let event_loop = EventLoop::new()?;
-        event_loop.set_control_flow(ControlFlow::Poll);
+        // Don't set control flow here - we'll manage it per-frame
 
         let mut app = App::new(config)?;
         event_loop.run_app(&mut app)?;
@@ -624,13 +666,18 @@ impl ApplicationHandler for App {
                 if let Some(ref path) = self.config.screenshot {
                     log::info!("Capturing screenshot to {}", path.display());
                     if let Some(backend) = &mut self.backend {
+                        let backend_type = backend.backend_type();
                         match backend.capture_frame() {
                             Ok((width, height, pixels)) => {
-                                use image::ImageBuffer;
+                                use image::{imageops, ImageBuffer};
                                 match ImageBuffer::<image::Rgba<u8>, _>::from_raw(
                                     width, height, pixels,
                                 ) {
-                                    Some(img) => {
+                                    Some(mut img) => {
+                                        // Flip vertically for Vulkan only
+                                        if backend_type == crate::backends::BackendType::Vulkan {
+                                            img = imageops::flip_vertical(&img);
+                                        }
                                         if let Err(e) = img.save(path) {
                                             log::error!("Failed to save screenshot: {e}");
                                         } else {
@@ -671,7 +718,7 @@ impl ApplicationHandler for App {
                     match event.state {
                         ElementState::Pressed => {
                             self.input_state.keys_pressed.insert(keycode);
-                            
+
                             // Escape to exit
                             if keycode == KeyCode::Escape {
                                 if let Some(backend) = &mut self.backend {
@@ -680,7 +727,7 @@ impl ApplicationHandler for App {
                                 event_loop.exit();
                                 return;
                             }
-                            
+
                             // F12 to take screenshot
                             if keycode == KeyCode::F12 {
                                 log::info!("F12 pressed - capturing screenshot");
@@ -697,10 +744,7 @@ impl ApplicationHandler for App {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(last_pos) = self.input_state.last_mouse_pos {
-                    let delta = (
-                        position.x - last_pos.0,
-                        position.y - last_pos.1,
-                    );
+                    let delta = (position.x - last_pos.0, position.y - last_pos.1);
                     if self.mouse_captured {
                         self.input_state.mouse_delta.0 += delta.0;
                         self.input_state.mouse_delta.1 += delta.1;
@@ -718,9 +762,7 @@ impl ApplicationHandler for App {
                     self.mouse_captured = true;
                     if let Some(window) = &self.window {
                         window.set_cursor_visible(false);
-                        let _ = window.set_cursor_grab(
-                            winit::window::CursorGrabMode::Confined
-                        );
+                        let _ = window.set_cursor_grab(winit::window::CursorGrabMode::Confined);
                     }
                     log::info!("Mouse captured");
                 }
@@ -815,21 +857,23 @@ impl ApplicationHandler for App {
                             backend.cleanup();
                         }
                         event_loop.exit();
-                        return;
                     }
                 }
 
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
+                // Only request redraw at the end of frame processing, not here
+                // This prevents infinite redraw loops
             }
             _ => {}
         }
     }
 
-    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+        // Request redraw continuously for smooth animation
+        // This is called after all events are processed
         if let Some(window) = &self.window {
             window.request_redraw();
         }
+        // Use Poll mode for continuous rendering
+        event_loop.set_control_flow(ControlFlow::Poll);
     }
 }

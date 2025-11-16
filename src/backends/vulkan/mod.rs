@@ -9,7 +9,7 @@ mod resources;
 mod shaders;
 
 use super::*;
-use crate::render_graph::{ResourceId, ResourceDescriptor};
+use crate::render_graph::{ResourceDescriptor, ResourceId};
 use anyhow::{Context, Result};
 use std::ffi::CStr;
 use std::os::raw::c_void;
@@ -1980,17 +1980,19 @@ impl VulkanBackend {
         pass_id: crate::render_graph::PassId,
     ) -> Result<vk::RenderPass> {
         use crate::render_graph::ImageLayout;
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
         let pass = graph.get_pass(pass_id).context("Pass not found")?;
-        
+
         // Build cache key from pass outputs
         let mut color_formats = Vec::new();
         let mut depth_format = None;
-        
+
         for output in &pass.outputs {
             if let Some(layout) = output.layout {
-                let resource = graph.get_resource(output.resource).context("Resource not found")?;
+                let resource = graph
+                    .get_resource(output.resource)
+                    .context("Resource not found")?;
                 match layout {
                     ImageLayout::ColorAttachment => {
                         if let ResourceDescriptor::Image { format, .. } = resource.descriptor {
@@ -2006,23 +2008,23 @@ impl VulkanBackend {
                 }
             }
         }
-        
+
         // Calculate cache key (simple hash of formats)
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         use std::hash::{Hash, Hasher};
         color_formats.hash(&mut hasher);
         depth_format.hash(&mut hasher);
         let cache_key = hasher.finish();
-        
+
         // Check cache
         if let Some(&render_pass) = self.pass_render_pass_cache.get(&cache_key) {
             return Ok(render_pass);
         }
-        
+
         // Create new render pass
         let mut attachments = Vec::new();
         let mut color_attachment_refs = Vec::new();
-        
+
         // Add color attachments
         for (i, &format) in color_formats.iter().enumerate() {
             let vk_format = Self::translate_format(format);
@@ -2043,7 +2045,7 @@ impl VulkanBackend {
                 layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
             });
         }
-        
+
         // Add depth attachment if present
         let depth_attachment_ref = if let Some(format) = depth_format {
             let vk_format = Self::translate_format(format);
@@ -2067,24 +2069,24 @@ impl VulkanBackend {
         } else {
             None
         };
-        
+
         // Create subpass
         let mut subpass_builder = vk::SubpassDescription::builder()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
             .color_attachments(&color_attachment_refs);
-        
+
         if let Some(ref depth_ref) = depth_attachment_ref {
             subpass_builder = subpass_builder.depth_stencil_attachment(depth_ref);
         }
         let subpass = subpass_builder.build();
-        
+
         // Create render pass
         let render_pass_info = vk::RenderPassCreateInfo::builder()
             .attachments(&attachments)
             .subpasses(std::slice::from_ref(&subpass));
-        
+
         let render_pass = unsafe { device.create_render_pass(&render_pass_info, None)? };
-        
+
         // Cache and return
         self.pass_render_pass_cache.insert(cache_key, render_pass);
         Ok(render_pass)
@@ -2098,53 +2100,62 @@ impl VulkanBackend {
         render_pass: vk::RenderPass,
     ) -> Result<vk::Framebuffer> {
         use crate::render_graph::ImageLayout;
-        
+
         let device = self.device.as_ref().context("Device not initialized")?;
         let pass = graph.get_pass(pass_id).context("Pass not found")?;
-        
+
         // Collect image views from outputs
         let mut attachment_views = Vec::new();
         let width = self.swapchain_extent.width;
         let height = self.swapchain_extent.height;
-        
+
         for output in &pass.outputs {
-            if let Some(layout) = output.layout {
-                match layout {
-                    ImageLayout::ColorAttachment | ImageLayout::DepthStencilAttachment => {
-                        if let Some(texture) = self.resource_textures.get(&output.resource) {
-                            // Downcast to VulkanTexture to access image_view
-                            if let Some(vk_texture) = texture.as_any().downcast_ref::<resources::VulkanTexture>() {
-                                attachment_views.push(vk_texture.image_view);
-                            } else {
-                                log::warn!("Failed to downcast texture {:?} to VulkanTexture", output.resource);
-                            }
-                        } else {
-                            log::warn!("Texture resource {:?} not found for pass {:?}", output.resource, pass_id);
-                        }
+            if let Some(ImageLayout::ColorAttachment | ImageLayout::DepthStencilAttachment) =
+                output.layout
+            {
+                if let Some(texture) = self.resource_textures.get(&output.resource) {
+                    // Downcast to VulkanTexture to access image_view
+                    if let Some(vk_texture) =
+                        texture.as_any().downcast_ref::<resources::VulkanTexture>()
+                    {
+                        attachment_views.push(vk_texture.image_view);
+                    } else {
+                        log::warn!(
+                            "Failed to downcast texture {:?} to VulkanTexture",
+                            output.resource
+                        );
                     }
-                    _ => {}
+                } else {
+                    log::warn!(
+                        "Texture resource {:?} not found for pass {:?}",
+                        output.resource,
+                        pass_id
+                    );
                 }
             }
         }
-        
+
         // Calculate cache key from attachment views
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         use std::hash::{Hash, Hasher};
         for &view in &attachment_views {
-            (view.as_raw() as u64).hash(&mut hasher);
+            view.as_raw().hash(&mut hasher);
         }
         let cache_key = hasher.finish();
-        
+
         // Check if we have any attachments
         if attachment_views.is_empty() {
-            anyhow::bail!("Pass {:?} has no output attachments - cannot create framebuffer", pass_id);
+            anyhow::bail!(
+                "Pass {:?} has no output attachments - cannot create framebuffer",
+                pass_id
+            );
         }
-        
+
         // Check cache
         if let Some(&framebuffer) = self.pass_framebuffer_cache.get(&cache_key) {
             return Ok(framebuffer);
         }
-        
+
         // Create framebuffer
         let framebuffer_info = vk::FramebufferCreateInfo::builder()
             .render_pass(render_pass)
@@ -2152,9 +2163,9 @@ impl VulkanBackend {
             .width(width)
             .height(height)
             .layers(1);
-        
+
         let framebuffer = unsafe { device.create_framebuffer(&framebuffer_info, None)? };
-        
+
         // Cache and return
         self.pass_framebuffer_cache.insert(cache_key, framebuffer);
         Ok(framebuffer)
@@ -2165,7 +2176,9 @@ impl VulkanBackend {
         use crate::render_graph::Format;
         match format {
             Format::Rgba8Unorm => vk::Format::R8G8B8A8_UNORM,
+            Format::Rgba8Srgb => vk::Format::R8G8B8A8_SRGB,
             Format::Bgra8Unorm => vk::Format::B8G8R8A8_UNORM,
+            Format::Bgra8Srgb => vk::Format::B8G8R8A8_SRGB,
             Format::Rgba16Float => vk::Format::R16G16B16A16_SFLOAT,
             Format::Rgba32Float => vk::Format::R32G32B32A32_SFLOAT,
             Format::Depth32Float => vk::Format::D32_SFLOAT,
@@ -2702,7 +2715,9 @@ impl VulkanBackend {
         use crate::render_graph::Format;
         match format {
             Format::Rgba8Unorm => TextureFormat::Rgba8Unorm,
+            Format::Rgba8Srgb => TextureFormat::Rgba8Srgb,
             Format::Bgra8Unorm => TextureFormat::Bgra8Unorm,
+            Format::Bgra8Srgb => TextureFormat::Bgra8Srgb,
             Format::Rgba16Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
             Format::Rgba32Float => TextureFormat::Rgba8Unorm, // Fallback to 8-bit
             Format::Depth24Stencil8 => TextureFormat::Depth24PlusStencil8,
@@ -2823,7 +2838,12 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn begin_frame(&mut self) -> Result<()> {
-        log::debug!("begin_frame called");
+        log::info!(
+            "begin_frame: headless={}, in_flight_fences.len()={}",
+            self.headless,
+            self.in_flight_fences.len()
+        );
+
         let device = match self.device.as_ref() {
             Some(d) => d,
             None => return Ok(()), // Not initialized yet
@@ -2840,6 +2860,11 @@ impl GraphicsBackend for VulkanBackend {
 
         // Windowed mode: acquire swapchain image
         // Wait for the current frame's fence
+        if self.in_flight_fences.is_empty() {
+            anyhow::bail!(
+                "in_flight_fences is empty - backend not properly initialized for windowed mode"
+            );
+        }
         let in_flight_fence = self.in_flight_fences[self.current_frame];
         unsafe {
             device.wait_for_fences(&[in_flight_fence], true, u64::MAX)?;
@@ -3043,15 +3068,21 @@ impl GraphicsBackend for VulkanBackend {
     }
 
     fn capture_frame(&mut self) -> Result<(u32, u32, Vec<u8>)> {
+        // Currently, capture_frame only works in headless mode where we have offscreen_image.
+        // In windowed mode, capturing would require reading back from the swapchain image or
+        // render target resource, which requires additional synchronization.
         if !self.headless {
-            anyhow::bail!("Frame capture is only available in headless mode");
+            anyhow::bail!("Frame capture in windowed mode is not yet implemented");
         }
 
         let device = self.device.as_ref().context("Device not initialized")?;
         let width = self.swapchain_extent.width;
         let height = self.swapchain_extent.height;
 
-        log::info!("Capturing frame: {width}x{height}");
+        log::info!(
+            "Capturing frame: {width}x{height} (headless: {})",
+            self.headless
+        );
 
         // Create staging buffer for readback
         let buffer_size = (width * height * 4) as vk::DeviceSize; // RGBA8
@@ -3391,7 +3422,11 @@ impl GraphicsBackend for VulkanBackend {
 
         // Execute each pass with its own render pass and framebuffer
         for (idx, pass_id) in compiled.execution_order.iter().enumerate() {
-            log::debug!("Executing pass {}/{}: {pass_id:?}", idx + 1, compiled.execution_order.len());
+            log::debug!(
+                "Executing pass {}/{}: {pass_id:?}",
+                idx + 1,
+                compiled.execution_order.len()
+            );
 
             // Find barriers before this pass
             for barrier in &compiled.barriers {
@@ -3503,6 +3538,275 @@ impl GraphicsBackend for VulkanBackend {
                 device.cmd_end_render_pass(command_buffer);
             }
             log::debug!("Render pass ended for pass {:?}", pass_id);
+        }
+
+        // In headless mode, blit the final render target to offscreen_image for capture
+        if self.headless && !compiled.execution_order.is_empty() {
+            // Find the swapchain_image resource (the final color output)
+            if let Some(swapchain_res) = graph.find_resource_by_name("swapchain_image") {
+                if let Some(texture) = self.resource_textures.get(&swapchain_res) {
+                    if let Some(vk_texture) =
+                        texture.as_any().downcast_ref::<resources::VulkanTexture>()
+                    {
+                        log::debug!("Blitting render result to offscreen image for capture");
+
+                        // Transition render target to TRANSFER_SRC
+                        let src_barrier = vk::ImageMemoryBarrier::builder()
+                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .image(vk_texture.image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: vk::ImageAspectFlags::COLOR,
+                                base_mip_level: 0,
+                                level_count: 1,
+                                base_array_layer: 0,
+                                layer_count: 1,
+                            })
+                            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                            .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+                            .build();
+
+                        // Transition offscreen_image to TRANSFER_DST
+                        let dst_barrier = vk::ImageMemoryBarrier::builder()
+                            .old_layout(vk::ImageLayout::UNDEFINED)
+                            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .image(self.offscreen_image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: vk::ImageAspectFlags::COLOR,
+                                base_mip_level: 0,
+                                level_count: 1,
+                                base_array_layer: 0,
+                                layer_count: 1,
+                            })
+                            .src_access_mask(vk::AccessFlags::empty())
+                            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                            .build();
+
+                        unsafe {
+                            device.cmd_pipeline_barrier(
+                                command_buffer,
+                                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                                vk::PipelineStageFlags::TRANSFER,
+                                vk::DependencyFlags::empty(),
+                                &[] as &[vk::MemoryBarrier],
+                                &[] as &[vk::BufferMemoryBarrier],
+                                &[src_barrier, dst_barrier],
+                            );
+
+                            // Blit the image
+                            let blit_region = vk::ImageBlit::builder()
+                                .src_subresource(vk::ImageSubresourceLayers {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    mip_level: 0,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .src_offsets([
+                                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                                    vk::Offset3D {
+                                        x: self.swapchain_extent.width as i32,
+                                        y: self.swapchain_extent.height as i32,
+                                        z: 1,
+                                    },
+                                ])
+                                .dst_subresource(vk::ImageSubresourceLayers {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    mip_level: 0,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .dst_offsets([
+                                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                                    vk::Offset3D {
+                                        x: self.swapchain_extent.width as i32,
+                                        y: self.swapchain_extent.height as i32,
+                                        z: 1,
+                                    },
+                                ])
+                                .build();
+
+                            device.cmd_blit_image(
+                                command_buffer,
+                                vk_texture.image,
+                                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                                self.offscreen_image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &[blit_region],
+                                vk::Filter::NEAREST,
+                            );
+
+                            // Transition offscreen_image to TRANSFER_SRC for capture
+                            let final_barrier = vk::ImageMemoryBarrier::builder()
+                                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                                .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                                .image(self.offscreen_image)
+                                .subresource_range(vk::ImageSubresourceRange {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    base_mip_level: 0,
+                                    level_count: 1,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                                .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+                                .build();
+
+                            device.cmd_pipeline_barrier(
+                                command_buffer,
+                                vk::PipelineStageFlags::TRANSFER,
+                                vk::PipelineStageFlags::TRANSFER,
+                                vk::DependencyFlags::empty(),
+                                &[] as &[vk::MemoryBarrier],
+                                &[] as &[vk::BufferMemoryBarrier],
+                                &[final_barrier],
+                            );
+                        }
+
+                        log::debug!("Blit to offscreen image complete");
+                    }
+                }
+            }
+        }
+
+        // In windowed mode, blit the final render target to the actual swapchain image
+        if !self.headless && !compiled.execution_order.is_empty() {
+            if let Some(swapchain_res) = graph.find_resource_by_name("swapchain_image") {
+                if let Some(texture) = self.resource_textures.get(&swapchain_res) {
+                    if let Some(vk_texture) =
+                        texture.as_any().downcast_ref::<resources::VulkanTexture>()
+                    {
+                        log::debug!("Blitting render result to swapchain image for presentation");
+
+                        let swapchain_image = self.swapchain_images[self.image_index as usize];
+
+                        // Transition render target to TRANSFER_SRC
+                        let src_barrier = vk::ImageMemoryBarrier::builder()
+                            .old_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+                            .new_layout(vk::ImageLayout::TRANSFER_SRC_OPTIMAL)
+                            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .image(vk_texture.image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: vk::ImageAspectFlags::COLOR,
+                                base_mip_level: 0,
+                                level_count: 1,
+                                base_array_layer: 0,
+                                layer_count: 1,
+                            })
+                            .src_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
+                            .dst_access_mask(vk::AccessFlags::TRANSFER_READ)
+                            .build();
+
+                        // Transition swapchain image to TRANSFER_DST
+                        let dst_barrier = vk::ImageMemoryBarrier::builder()
+                            .old_layout(vk::ImageLayout::UNDEFINED)
+                            .new_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                            .image(swapchain_image)
+                            .subresource_range(vk::ImageSubresourceRange {
+                                aspect_mask: vk::ImageAspectFlags::COLOR,
+                                base_mip_level: 0,
+                                level_count: 1,
+                                base_array_layer: 0,
+                                layer_count: 1,
+                            })
+                            .src_access_mask(vk::AccessFlags::empty())
+                            .dst_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                            .build();
+
+                        unsafe {
+                            device.cmd_pipeline_barrier(
+                                command_buffer,
+                                vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+                                vk::PipelineStageFlags::TRANSFER,
+                                vk::DependencyFlags::empty(),
+                                &[] as &[vk::MemoryBarrier],
+                                &[] as &[vk::BufferMemoryBarrier],
+                                &[src_barrier, dst_barrier],
+                            );
+
+                            // Blit the image
+                            let blit_region = vk::ImageBlit::builder()
+                                .src_subresource(vk::ImageSubresourceLayers {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    mip_level: 0,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .src_offsets([
+                                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                                    vk::Offset3D {
+                                        x: self.swapchain_extent.width as i32,
+                                        y: self.swapchain_extent.height as i32,
+                                        z: 1,
+                                    },
+                                ])
+                                .dst_subresource(vk::ImageSubresourceLayers {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    mip_level: 0,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .dst_offsets([
+                                    vk::Offset3D { x: 0, y: 0, z: 0 },
+                                    vk::Offset3D {
+                                        x: self.swapchain_extent.width as i32,
+                                        y: self.swapchain_extent.height as i32,
+                                        z: 1,
+                                    },
+                                ])
+                                .build();
+
+                            device.cmd_blit_image(
+                                command_buffer,
+                                vk_texture.image,
+                                vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+                                swapchain_image,
+                                vk::ImageLayout::TRANSFER_DST_OPTIMAL,
+                                &[blit_region],
+                                vk::Filter::NEAREST,
+                            );
+
+                            // Transition swapchain image to PRESENT_SRC for presentation
+                            let final_barrier = vk::ImageMemoryBarrier::builder()
+                                .old_layout(vk::ImageLayout::TRANSFER_DST_OPTIMAL)
+                                .new_layout(vk::ImageLayout::PRESENT_SRC_KHR)
+                                .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                                .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+                                .image(swapchain_image)
+                                .subresource_range(vk::ImageSubresourceRange {
+                                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                                    base_mip_level: 0,
+                                    level_count: 1,
+                                    base_array_layer: 0,
+                                    layer_count: 1,
+                                })
+                                .src_access_mask(vk::AccessFlags::TRANSFER_WRITE)
+                                .dst_access_mask(vk::AccessFlags::empty())
+                                .build();
+
+                            device.cmd_pipeline_barrier(
+                                command_buffer,
+                                vk::PipelineStageFlags::TRANSFER,
+                                vk::PipelineStageFlags::BOTTOM_OF_PIPE,
+                                vk::DependencyFlags::empty(),
+                                &[] as &[vk::MemoryBarrier],
+                                &[] as &[vk::BufferMemoryBarrier],
+                                &[final_barrier],
+                            );
+                        }
+
+                        log::debug!("Blit to swapchain image complete");
+                    }
+                }
+            }
         }
 
         // End command buffer
