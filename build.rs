@@ -157,12 +157,14 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
     println!("cargo:warning=Compiling {} to DXIL with DXC", name);
 
     // Compile vertex shader to DXIL
-    // Use SM 5.1 for better vkd3d-proton compatibility
+    // Use SM 6.0 for maximum compatibility with vkd3d-proton and WARP
+    // Enable validator to ensure proper DXIL signing
     let vert_result = Command::new("dxc")
         .arg("-T")
-        .arg("vs_5_1")
+        .arg("vs_6_0")
         .arg("-E")
         .arg(vs_entry)
+        .arg("-Qstrip_reflect") // Strip reflection data for smaller size
         .arg("-Fo")
         .arg(&vs_out)
         .arg(hlsl_src)
@@ -185,12 +187,14 @@ fn compile_hlsl_to_dxil(hlsl_src: &str, name: &str, vs_entry: &str, ps_entry: &s
     }
 
     // Compile fragment shader to DXIL
-    // Use SM 5.1 for better vkd3d-proton compatibility
+    // Use SM 6.0 for maximum compatibility with vkd3d-proton and WARP
+    // Enable validator to ensure proper DXIL signing
     let frag_result = Command::new("dxc")
         .arg("-T")
-        .arg("ps_5_1")
+        .arg("ps_6_0")
         .arg("-E")
         .arg(ps_entry)
+        .arg("-Qstrip_reflect") // Strip reflection data for smaller size
         .arg("-Fo")
         .arg(&ps_out)
         .arg(hlsl_src)

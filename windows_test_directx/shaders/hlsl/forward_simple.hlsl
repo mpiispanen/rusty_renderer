@@ -46,18 +46,19 @@ cbuffer PushConstants : register(b2) {
 };
 #endif
 
-// Base color texture (t0) and sampler (s1) - optional material texture
+// Base color texture (t0) and sampler (s0) - optional material texture
 #ifdef VULKAN
 [[vk::binding(2, 0)]]
 Texture2D baseColorTexture : register(t0);
 [[vk::binding(2, 0)]]
-SamplerState baseColorSampler : register(s1);
+SamplerState baseColorSampler : register(s0);
 #else
 Texture2D baseColorTexture : register(t0);
-SamplerState baseColorSampler : register(s1);
+SamplerState baseColorSampler : register(s0);
 #endif
 
-// Shadow map texture (t1) - combined with sampler in Vulkan at binding 4
+// Shadow map texture (t1) - only if ENABLE_SHADOWS is defined
+#if defined(ENABLE_SHADOWS)
 #ifdef VULKAN
 [[vk::binding(4, 0)]]
 Texture2D shadowMap : register(t1);
@@ -66,6 +67,7 @@ SamplerComparisonState shadowSampler : register(s2);
 #else
 Texture2D shadowMap : register(t1);
 SamplerComparisonState shadowSampler : register(s2);
+#endif
 #endif
 
 // Vertex input
@@ -111,6 +113,7 @@ PSInput VSMain(VSInput input) {
 }
 
 // Pixel Shader with simple lighting and shadow calculation
+#if defined(ENABLE_SHADOWS)
 float CalculateShadow(float4 lightSpacePos, float3 normal, float3 lightDir) {
     // Perspective divide
     float3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
@@ -146,6 +149,7 @@ float CalculateShadow(float4 lightSpacePos, float3 normal, float3 lightDir) {
     
     return shadow;
 }
+#endif
 
 float4 PSMain(PSInput input) : SV_TARGET {
     // Normalize interpolated normal
@@ -186,9 +190,11 @@ float4 PSMain(PSInput input) : SV_TARGET {
         
         // Apply shadow for directional lights
         float shadow = 1.0;
+#if defined(ENABLE_SHADOWS)
         if (light.lightType == LIGHT_DIRECTIONAL && shadowParams.x > 0.5) {
             shadow = CalculateShadow(input.lightSpacePos, normal, lightDir);
         }
+#endif
         
         finalColor += diffuse * surfaceColor * attenuation * shadow;
     }

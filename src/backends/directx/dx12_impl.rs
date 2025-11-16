@@ -869,18 +869,11 @@ impl DirectXBackendImpl {
 
     fn compile_shader(&self, entry_point: &str, target: &str) -> Result<ID3DBlob> {
         unsafe {
-            // Try to load pre-compiled shader first
-            if let Some(bytecode) = self.load_precompiled_shader(entry_point, target) {
-                use windows::Win32::Graphics::Direct3D::Fxc::D3DCreateBlob;
-                let blob = D3DCreateBlob(bytecode.len())?;
-                let dest = std::slice::from_raw_parts_mut(
-                    blob.GetBufferPointer() as *mut u8,
-                    blob.GetBufferSize(),
-                );
-                dest.copy_from_slice(&bytecode);
-                log::info!("Using pre-compiled shader for {} ({})", entry_point, target);
-                return Ok(blob);
-            }
+            // WORKAROUND: Skip pre-compiled DXIL for now due to vkd3d-proton compatibility issues
+            // vkd3d-proton's DXIL->SPIR-V converter fails with our DXIL bytecode (vkd3d result -3)
+            // TODO: Investigate proper DXIL format or use alternative shader compilation path
+            // For native Windows, we could re-enable DXIL loading here
+            log::warn!("Skipping pre-compiled DXIL due to vkd3d-proton compatibility issues");
 
             // Fall back to runtime compilation
             log::info!(
@@ -1648,6 +1641,7 @@ impl DirectXBackendImpl {
                 // - s2: shadowSampler (static comparison sampler)
 
                 // Descriptor ranges for textures
+                // Note: Only t0 for now since ENABLE_SHADOWS is not defined in shaders
                 let texture_descriptor_ranges = vec![
                     // t0: baseColorTexture
                     D3D12_DESCRIPTOR_RANGE {
@@ -1657,14 +1651,7 @@ impl DirectXBackendImpl {
                         RegisterSpace: 0,
                         OffsetInDescriptorsFromTableStart: 0,
                     },
-                    // t1: shadowMap
-                    D3D12_DESCRIPTOR_RANGE {
-                        RangeType: D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-                        NumDescriptors: 1,
-                        BaseShaderRegister: 1, // t1
-                        RegisterSpace: 0,
-                        OffsetInDescriptorsFromTableStart: 1,
-                    },
+                    // TODO: Add t1 (shadowMap) when ENABLE_SHADOWS is defined
                 ];
 
                 let root_parameters = [
@@ -1716,8 +1703,9 @@ impl DirectXBackendImpl {
                 ];
 
                 // Static samplers
+                // Note: Only s0 for now since ENABLE_SHADOWS is not defined in shaders
                 let static_samplers = [
-                    // s1: baseColorSampler (regular sampler)
+                    // s0: baseColorSampler (regular sampler)
                     D3D12_STATIC_SAMPLER_DESC {
                         Filter: D3D12_FILTER_MIN_MAG_MIP_LINEAR,
                         AddressU: D3D12_TEXTURE_ADDRESS_MODE_WRAP,
@@ -1729,26 +1717,11 @@ impl DirectXBackendImpl {
                         BorderColor: D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK,
                         MinLOD: 0.0,
                         MaxLOD: f32::MAX,
-                        ShaderRegister: 1, // s1
+                        ShaderRegister: 0, // s0
                         RegisterSpace: 0,
                         ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
                     },
-                    // s2: shadowSampler (comparison sampler)
-                    D3D12_STATIC_SAMPLER_DESC {
-                        Filter: D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,
-                        AddressU: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-                        AddressV: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-                        AddressW: D3D12_TEXTURE_ADDRESS_MODE_BORDER,
-                        MipLODBias: 0.0,
-                        MaxAnisotropy: 0,
-                        ComparisonFunc: D3D12_COMPARISON_FUNC_LESS_EQUAL,
-                        BorderColor: D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE,
-                        MinLOD: 0.0,
-                        MaxLOD: f32::MAX,
-                        ShaderRegister: 2, // s2
-                        RegisterSpace: 0,
-                        ShaderVisibility: D3D12_SHADER_VISIBILITY_PIXEL,
-                    },
+                    // TODO: Add s1 (shadowSampler) when ENABLE_SHADOWS is defined
                 ];
 
                 let root_sig_desc = D3D12_ROOT_SIGNATURE_DESC {
