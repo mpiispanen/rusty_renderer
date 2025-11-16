@@ -198,8 +198,8 @@ impl DirectXBackendImpl {
         self.create_command_objects()?;
         // Create fence
         self.create_fence()?;
-        // Create pipeline with shaders
-        self.create_pipeline()?;
+        // Note: Pipeline creation now happens via render graph compilation
+        // The old create_pipeline() is no longer needed
 
         log::info!("DirectX 12 backend initialized successfully");
         Ok(())
@@ -400,8 +400,8 @@ impl DirectXBackendImpl {
                 Type: D3D12_HEAP_TYPE_DEFAULT,
                 CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
                 MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
-                CreationNodeMask: 0,
-                VisibleNodeMask: 0,
+                CreationNodeMask: 1,
+                VisibleNodeMask: 1,
             };
 
             let mut depth_stencil: Option<ID3D12Resource> = None;
@@ -1089,8 +1089,8 @@ impl DirectXBackendImpl {
             // Create fence
             self.create_fence()?;
 
-            // Create pipeline
-            self.create_pipeline()?;
+            // Note: Pipeline creation now happens via render graph compilation
+            // The old create_pipeline() is no longer needed
 
             log::info!("DirectX 12 backend initialized successfully in headless mode");
             Ok(())
@@ -1126,8 +1126,8 @@ impl DirectXBackendImpl {
                     Type: D3D12_HEAP_TYPE_READBACK,
                     CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
                     MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
-                    CreationNodeMask: 0,
-                    VisibleNodeMask: 0,
+                    CreationNodeMask: 1,
+                    VisibleNodeMask: 1,
                 };
 
                 let desc = D3D12_RESOURCE_DESC {
@@ -2581,8 +2581,8 @@ impl DirectXBackendImpl {
                 Type: D3D12_HEAP_TYPE_DEFAULT,
                 CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
                 MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
-                CreationNodeMask: 0,
-                VisibleNodeMask: 0,
+                CreationNodeMask: 1,
+                VisibleNodeMask: 1,
             };
 
             // Create resource
@@ -2747,8 +2747,8 @@ impl DirectXBackendImpl {
                 Type: D3D12_HEAP_TYPE_UPLOAD,
                 CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
                 MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
-                CreationNodeMask: 0,
-                VisibleNodeMask: 0,
+                CreationNodeMask: 1,
+                VisibleNodeMask: 1,
             };
 
             let buffer_desc = D3D12_RESOURCE_DESC {
@@ -3324,8 +3324,8 @@ impl DirectXBackendImpl {
                 Type: D3D12_HEAP_TYPE_DEFAULT,
                 CPUPageProperty: D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
                 MemoryPoolPreference: D3D12_MEMORY_POOL_UNKNOWN,
-                CreationNodeMask: 0,
-                VisibleNodeMask: 0,
+                CreationNodeMask: 1,
+                VisibleNodeMask: 1,
             };
 
             let desc = D3D12_RESOURCE_DESC {

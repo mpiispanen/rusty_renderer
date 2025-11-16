@@ -13,7 +13,7 @@
 #   ./run_with_proton.sh --scene scenes/gltf_textured_cube.toml
 #   ./run_with_proton.sh --width 1920 --height 1080
 #   ./run_with_proton.sh --vkd3d-debug debug
-#   ./run_with_proton.sh --headless --screenshot output.png
+#   ./run_with_proton.sh --headless --max-frames 1 --screenshot output.png
 
 # Configuration
 PROTON_DIR="$HOME/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)"

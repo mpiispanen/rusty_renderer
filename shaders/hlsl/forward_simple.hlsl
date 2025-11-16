@@ -50,7 +50,7 @@ cbuffer PushConstants : register(b2) {
 #ifdef VULKAN
 [[vk::binding(2, 0)]]
 Texture2D baseColorTexture : register(t0);
-[[vk::binding(2, 0)]]
+[[vk::binding(3, 0)]]
 SamplerState baseColorSampler : register(s0);
 #else
 Texture2D baseColorTexture : register(t0);
@@ -62,7 +62,7 @@ SamplerState baseColorSampler : register(s0);
 #ifdef VULKAN
 [[vk::binding(4, 0)]]
 Texture2D shadowMap : register(t1);
-[[vk::binding(4, 0)]]
+[[vk::binding(5, 0)]]
 SamplerComparisonState shadowSampler : register(s2);
 #else
 Texture2D shadowMap : register(t1);
