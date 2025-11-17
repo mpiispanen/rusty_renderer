@@ -119,10 +119,12 @@ impl DeclarativePass for ForwardDeclarativePass {
 
     fn declare_dependencies(&self, builder: &mut PassBuilder) {
         // Declare color output attachment
-        builder.write(
-            self.color_output,
-            PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
-        );
+        builder
+            .write(
+                self.color_output,
+                PipelineStage::new(PipelineStage::COLOR_ATTACHMENT_OUTPUT),
+            )
+            .clear_color([0.1, 0.1, 0.2, 1.0]); // Dark blue background
 
         // Note: In the future, vertex/uniform buffers would be declared here
         // as resources managed by the graph. For now, they're passed directly

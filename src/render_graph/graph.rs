@@ -139,12 +139,13 @@ impl RenderGraph {
         // Build dependencies using the builder
         let mut builder = PassBuilder::new(id);
         pass.declare_dependencies(&mut builder);
-        let (inputs, outputs) = builder.build();
+        let (inputs, outputs, clear_color) = builder.build();
 
         // Create the RenderPass with the adapter
         let mut render_pass = RenderPass::new(id, pass.name(), pass.kind());
         render_pass.inputs = inputs;
         render_pass.outputs = outputs;
+        render_pass.clear_color = clear_color;
         render_pass.callback = Some(Box::new(DeclarativePassAdapter::new(pass)));
 
         self.add_pass(render_pass)

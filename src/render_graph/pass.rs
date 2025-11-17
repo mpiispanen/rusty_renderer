@@ -544,6 +544,8 @@ pub struct RenderPass {
     pub outputs: Vec<ResourceAccess>,
     /// Execution callback
     pub callback: Option<Box<dyn PassCallback>>,
+    /// Clear color for color attachments (RGBA)
+    pub clear_color: Option<[f32; 4]>,
 }
 
 /// Builder for declaratively configuring pass dependencies
@@ -565,6 +567,7 @@ pub struct PassBuilder {
     pass_id: PassId,
     inputs: Vec<ResourceAccess>,
     outputs: Vec<ResourceAccess>,
+    clear_color: Option<[f32; 4]>,
 }
 
 impl PassBuilder {
@@ -574,6 +577,7 @@ impl PassBuilder {
             pass_id,
             inputs: Vec::new(),
             outputs: Vec::new(),
+            clear_color: None,
         }
     }
 
@@ -619,9 +623,18 @@ impl PassBuilder {
         self
     }
 
-    /// Take ownership of inputs and outputs (internal use)
-    pub(crate) fn build(self) -> (Vec<ResourceAccess>, Vec<ResourceAccess>) {
-        (self.inputs, self.outputs)
+    /// Set the clear color for color attachments
+    ///
+    /// # Arguments
+    /// * `color` - Clear color (RGBA, 0.0-1.0)
+    pub fn clear_color(&mut self, color: [f32; 4]) -> &mut Self {
+        self.clear_color = Some(color);
+        self
+    }
+
+    /// Take ownership of inputs, outputs, and clear color (internal use)
+    pub(crate) fn build(self) -> (Vec<ResourceAccess>, Vec<ResourceAccess>, Option<[f32; 4]>) {
+        (self.inputs, self.outputs, self.clear_color)
     }
 }
 
@@ -635,6 +648,7 @@ impl RenderPass {
             inputs: Vec::new(),
             outputs: Vec::new(),
             callback: None,
+            clear_color: None,
         }
     }
 

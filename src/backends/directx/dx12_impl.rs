@@ -2129,7 +2129,8 @@ impl DirectXBackendImpl {
 
                 // Clear and set render targets for this pass
                 if let Some(rtv) = rtv_handle {
-                    let clear_color = [0.1f32, 0.1f32, 0.2f32, 1.0f32]; // Dark blue background (matches Vulkan)
+                    let pass = graph.get_pass(*pass_id).context("Pass not found")?;
+                    let clear_color = pass.clear_color.unwrap_or([0.0f32, 0.0f32, 0.0f32, 1.0f32]);
                     log::debug!("Clearing RTV at ptr: 0x{:x} with color [{}, {}, {}, {}]", 
                         rtv.ptr, clear_color[0], clear_color[1], clear_color[2], clear_color[3]);
                     command_list.ClearRenderTargetView(rtv, &clear_color, None);

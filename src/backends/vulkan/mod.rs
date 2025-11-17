@@ -3257,11 +3257,13 @@ impl GraphicsBackend for VulkanBackend {
             let framebuffer = self.get_or_create_pass_framebuffer(graph, *pass_id, render_pass)?;
             log::debug!("Got framebuffer for pass {:?}", pass_id);
 
-            // Prepare clear values
+            // Prepare clear values from pass definition
+            let pass = graph.get_pass(*pass_id).context("Pass not found")?;
+            let clear_color = pass.clear_color.unwrap_or([0.0f32, 0.0f32, 0.0f32, 1.0f32]);
             let clear_values = [
                 vk::ClearValue {
                     color: vk::ClearColorValue {
-                        float32: [0.2, 0.3, 0.5, 1.0], // Blue background
+                        float32: clear_color,
                     },
                 },
                 vk::ClearValue {
