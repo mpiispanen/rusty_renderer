@@ -3,6 +3,7 @@
 //! Shaders are now loaded dynamically through the render graph system.
 
 /// Convert byte slice to u32 slice for Vulkan SPIR-V shaders
+#[allow(dead_code)]
 pub fn bytes_to_u32_vec(bytes: &[u8]) -> Vec<u32> {
     assert_eq!(
         bytes.len() % 4,
