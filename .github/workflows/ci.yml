@@ -351,33 +351,32 @@ jobs:
           # Create Proton prefix directory
           mkdir -p "$STEAM_COMPAT_DATA_PATH"
           
-          export WINEDEBUG="-all"
-          export RUST_LOG=warn
-          
-          # Run via Proton with headless mode
-          cp target/x86_64-pc-windows-gnu/release/rusty_renderer.exe ./rusty_renderer.exe
-          BINARY_PATH="$(pwd)/rusty_renderer.exe"
-          SCENE_PATH="$(pwd)/scenes/damaged_helmet.toml"
-          PROTON_PATH="${{ steps.proton_check.outputs.proton_path }}"
-          PROTON_CMD="$PROTON_PATH/proton"
-          
-          # Debug info
-          ls -l "$BINARY_PATH"
-          ls -l "$SCENE_PATH"
-          
-          # Set up environment variables for Proton/VKD3D
-          export WINEDLLPATH="$PROTON_PATH/files/lib64/wine:$PROTON_PATH/files/lib64/vkd3d:$PROTON_PATH/files/lib/wine:$PROTON_PATH/files/lib/vkd3d"
-          export VKD3D_DEBUG=warn
-          
-          "$PROTON_CMD" run "$BINARY_PATH" \
-            --scene "$SCENE_PATH" \
-            --backend directx \
+          # Run via Proton using the helper script
+          chmod +x run_with_proton.sh
+          ./run_with_proton.sh \
+            --scene scenes/damaged_helmet.toml \
             --headless \
             --max-frames 1 \
             --screenshot screenshots/directx-proton/damaged_helmet.png
           
           # Verify screenshot was created
-          test -f screenshots/directx-proton/damaged_helmet.png
+          # Note: run_with_proton.sh runs in windows_test_directx, so screenshot path is relative to that
+          # But we passed a relative path "screenshots/directx-proton/..."
+          # The app resolves it relative to CWD (windows_test_directx).
+          # So the file should be at windows_test_directx/screenshots/directx-proton/damaged_helmet.png
+          
+          # Check where it actually ended up
+          if [ -f "windows_test_directx/screenshots/directx-proton/damaged_helmet.png" ]; then
+            echo "Found screenshot in windows_test_directx/"
+            mv "windows_test_directx/screenshots/directx-proton/damaged_helmet.png" "screenshots/directx-proton/damaged_helmet.png"
+          elif [ -f "screenshots/directx-proton/damaged_helmet.png" ]; then
+             echo "Found screenshot in root screenshots/"
+          else
+             echo "❌ Screenshot not found in expected locations"
+             find . -name "damaged_helmet.png"
+             exit 1
+          fi
+          
           test -s screenshots/directx-proton/damaged_helmet.png
           echo "✅ DirectX/Proton screenshot created successfully"
       
