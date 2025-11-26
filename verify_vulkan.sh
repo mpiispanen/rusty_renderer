@@ -23,7 +23,6 @@ for scene in "${SCENES[@]}"; do
     
     if cargo run --release -- \
         --backend vulkan \
-        --pipeline forward \
         --scene "$scene" \
         --headless \
         --screenshot "vk_${name}.png" \

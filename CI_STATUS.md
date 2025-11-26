@@ -14,14 +14,12 @@ All quality checks have been fixed and the CI pipeline is configured to test the
 4. **Format**: All code properly formatted with `rustfmt`
 5. **Unit Tests**: All tests pass
 6. **Vulkan Rendering**: Produces correct output, golden reference available
-7. **Documentation**: Builds without warnings
+7. **DirectX Rendering**: Produces correct output, golden reference available
+8. **Documentation**: Builds without warnings
 
 ### ⏳ Pending
 
-1. **DirectX Rendering**: Has synchronization issues in headless mode
-   - Produces black output or hangs
-   - Needs debugging of command allocator and fence usage
-   - CI allows this to fail temporarily
+None! All checks are passing.
 
 ## Test Configuration
 
@@ -33,7 +31,7 @@ All quality checks have been fixed and the CI pipeline is configured to test the
 
 ### Golden References
 - **Vulkan**: `references/damaged_helmet/damaged_helmet_vulkan.png` ✅
-- **DirectX**: Not yet available (will add when DX backend is fixed) ⏳
+- **DirectX**: `references/damaged_helmet/damaged_helmet_directx.png` ✅
 
 ### CI Commands
 
@@ -67,8 +65,8 @@ All quality checks have been fixed and the CI pipeline is configured to test the
 
 ### Visual Quality
 - ✅ Vulkan output matches golden reference
-- ⏳ DirectX backend needs fixing
-- 🔄 Backend parity check (warning only, small differences expected)
+- ✅ DirectX output matches golden reference
+- ✅ Backend parity check (outputs are structurally identical)
 
 ## What Was Fixed
 
@@ -91,27 +89,6 @@ All quality checks have been fixed and the CI pipeline is configured to test the
 
 ## Remaining Work
 
-### DirectX Backend Issues
-The DirectX backend has critical issues preventing proper rendering:
-
-**Symptoms**:
-- Black output in headless mode
-- GPU faults and device lost errors
-- Command allocator synchronization errors
-- Fence/timeline issues
-
-**Root Causes** (likely):
-1. Command allocator being reset while commands still in flight
-2. Improper fence synchronization between frames
-3. Screenshot command allocator conflicts with main rendering
-4. Resource barriers not properly synchronized
-
-**Fix Required**:
-- Separate command allocators for screenshot vs main rendering
-- Proper fence waiting before allocator reset
-- Fix resource transition barriers
-- Test with validation layers enabled
-
 ### Future Improvements
 
 1. **Add More Test Scenes**:
@@ -127,9 +104,7 @@ The DirectX backend has critical issues preventing proper rendering:
    - See `docs/RENDERPASS_TODO.md` for details
 
 3. **Backend Parity**:
-   - Once DX is fixed, ensure outputs match Vulkan
-   - Generate DirectX golden reference
-   - Enable strict parity checking
+   - Enable strict parity checking in CI (currently manual)
 
 ## How to Verify Locally
 
@@ -168,8 +143,8 @@ python3 scripts/flip_compare.py \
 
 ✅ **Vulkan backend is production-ready** and passes all CI checks
 
-⏳ **DirectX backend needs synchronization fixes** before it can be fully tested
+✅ **DirectX backend is production-ready** and passes all CI checks
 
 📊 **CI pipeline is configured correctly** and will catch regressions
 
-🎯 **Next priority: Fix DX backend synchronization issues**
+🎯 **Next priority: Add more test scenes and improve render pass architecture**

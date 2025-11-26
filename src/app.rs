@@ -346,6 +346,7 @@ impl App {
             .vertex_count(vertex_count)
             .index_count(index_count)
             .albedo_texture(albedo_texture) // Always provide a texture (default if none from scene)
+            .clear_color([0.1, 0.1, 0.2, 1.0]) // Dark blue background
             .with_name("forward_simple");
 
         // Add shadow resources if available
@@ -468,7 +469,6 @@ impl App {
 
             // Flip vertically for Vulkan only
             // Vulkan and DirectX have different framebuffer readback conventions
-            // Vulkan reads bottom-to-top, DirectX reads top-to-bottom
             if backend.backend_type() == crate::backends::BackendType::Vulkan {
                 img = imageops::flip_vertical(&img);
             }
@@ -509,7 +509,6 @@ impl App {
                 .context("Failed to create image from captured pixels")?;
 
             // Flip vertically for Vulkan only
-            // Vulkan and DirectX have different framebuffer readback conventions
             if backend.backend_type() == crate::backends::BackendType::Vulkan {
                 img = imageops::flip_vertical(&img);
             }

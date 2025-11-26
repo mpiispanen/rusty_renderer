@@ -87,51 +87,56 @@ The goal is to create an **interactive rendering laboratory** where developers c
 
 ---
 
-### Phase 3: Resource Management Overhaul (Nov 2025)
+### Phase 3: Render Graph Architecture Fix (Nov 2025)
 **Duration:** 1-2 weeks  
-**Priority:** High
+**Priority:** Critical (Blocking Experimentation)
 
-#### Goals: Stop All Hardcoding
+#### Goals: True Modularity & Data-Driven Rendering
 
 **Current Issues:**
-- Shaders are hardcoded in backends
-- Resources created manually
-- No dynamic shader loading
-- Pipeline state scattered
+- Vulkan backend uses single render pass for entire frame
+- Passes share render targets incorrectly (read/write hazards)
+- Hardcoded clear values and pipeline state
+- Cannot easily toggle or reorder passes
 
 **New Architecture:**
-```rust
-// Passes define their requirements
-impl RenderPass {
-    fn shaders(&self) -> Vec<ShaderRequirement> {
-        vec![
-            ShaderRequirement::Vertex("forward.vert"),
-            ShaderRequirement::Fragment("forward.frag"),
-        ]
-    }
-    
-    fn resources(&self) -> Vec<ResourceRequirement> {
-        vec![
-            ResourceRequirement::Uniform("camera", size_of::<CameraUniforms>()),
-            ResourceRequirement::Uniform("lighting", size_of::<LightingUniforms>()),
-        ]
-    }
-}
-```
-
-**Render Graph Responsibilities:**
-- Load and compile shaders on demand
-- Create pipelines for passes
-- Allocate resources based on requirements
-- Cache compiled shaders
-- Hot-reload when shaders change
+1. **Per-Pass Framebuffers**: Backend dynamically creates framebuffers based on pass outputs
+2. **Per-Pass Render Passes**: Each graph node gets its own Vulkan/DX12 render pass
+3. **Data-Driven State**: Pass definitions specify:
+   - Clear colors/depth
+   - Load/Store operations
+   - Pipeline state (blend, depth test, cull mode)
+4. **Proper Barriers**: Graph inserts barriers between passes based on resource usage
 
 #### Deliverables
-1. Pass definition system (JSON/TOML)
-2. Automatic shader loading/compilation
-3. Resource requirement specification
-4. Pipeline cache system
-5. Hot-reload infrastructure
+1. `RenderPass` struct updates (clear values, load/store ops)
+2. Backend `execute_graph` refactor for per-pass execution
+3. Dynamic framebuffer/render pass cache in backends
+4. Removal of hardcoded state from `app.rs` and backends
+
+---
+
+### Phase 3.5: Experimentation Foundation (Nov-Dec 2025)
+**Duration:** 1 week
+**Priority:** High
+
+#### Goals: Enable "What-If" Testing
+
+1. **Optional Shadow Pass**
+   - Fix shadow pass integration (separate depth buffer)
+   - Make it toggleable via config/UI
+   - Verify no artifacts when enabled/disabled
+
+2. **Basic Tone Mapping Pass**
+   - Simple post-processing pass
+   - Render to offscreen color buffer -> Tone Map -> Swapchain
+   - ACES or Reinhard operator
+   - Toggleable to compare with raw output
+
+3. **Comparison Workflow**
+   - Key bindings to toggle passes
+   - Visual validation of different configurations
+
 
 ---
 
@@ -355,19 +360,17 @@ Users can:
 - [ ] Set up shader conversion pipeline
 - [ ] Cross-platform testing
 
-### Week 2: Resource Management Refactor
-- [ ] Design pass requirement system
-- [ ] Implement shader loader/compiler
-- [ ] Add pipeline cache
-- [ ] Resource auto-allocation
-- [ ] Hot-reload infrastructure
+### Week 2: Render Graph Architecture
+- [ ] Add clear values and load/store ops to `RenderPass`
+- [ ] Implement per-pass framebuffer creation in Vulkan
+- [ ] Fix barrier insertion for multi-pass rendering
+- [ ] Verify independent render targets for Shadow + Forward passes
 
-### Week 3: Shadow Maps (Basic + PCF)
-- [ ] Depth-only render pass
-- [ ] Shadow map atlas
-- [ ] PCF filtering
-- [ ] Directional light shadows
-- [ ] Point light shadows (cubemap)
+### Week 3: Experimentation & Tone Mapping
+- [ ] Implement basic Tone Mapping pass
+- [ ] Make Shadow Pass optional/toggleable
+- [ ] Add key bindings to toggle passes
+- [ ] Create "Experimentation" scene configuration
 
 ### Week 4: Shadow Maps (Advanced)
 - [ ] Cascaded shadow maps

@@ -20,8 +20,9 @@ echo ""
 echo "Testing Vulkan backend..."
 BACKEND=vulkan cargo run --release -- \
     --scene "$SCENE" \
-    --pipeline "$PIPELINE" \
     --max-frames "$MAX_FRAMES" \
+    --headless \
+    --screenshot test.png \
     2>&1 | grep -E "INFO|ERROR|WARN" | tail -20
 
 if [ -f test.png ]; then
@@ -37,8 +38,9 @@ echo ""
 echo "Testing DirectX backend (via Proton)..."
 ./run_with_proton.sh \
     --scene "$SCENE" \
-    --pipeline "$PIPELINE" \
     --max-frames "$MAX_FRAMES" \
+    --headless \
+    --screenshot test.png \
     2>&1 | grep -E "INFO|ERROR|WARN" | grep -v "vkd3d-proton" | tail -20
 
 if [ -f windows_test_directx/test.png ]; then

@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REF_DIR="$REPO_ROOT/references/gltf_textured"
+REF_DIR="$REPO_ROOT/references/damaged_helmet"
 
 # Parse arguments
 UPDATE_MODE="${1:---all}"
@@ -24,24 +24,60 @@ update_vulkan() {
     # Render with Vulkan
     mkdir -p "$REPO_ROOT/screenshots/temp"
     cargo run --release -- \
-        --scene scenes/gltf_textured.toml \
+        --scene scenes/damaged_helmet.toml \
         --backend vulkan \
-        --pipeline forward \
         --headless \
+        --max-frames 1 \
         --screenshot "$REPO_ROOT/screenshots/temp/vulkan_temp.png"
     
     # Copy to golden reference
-    cp "$REPO_ROOT/screenshots/temp/vulkan_temp.png" "$REF_DIR/gltf_textured_vulkan.png"
-    echo "✅ Vulkan golden reference updated: $REF_DIR/gltf_textured_vulkan.png"
+    cp "$REPO_ROOT/screenshots/temp/vulkan_temp.png" "$REF_DIR/damaged_helmet_vulkan.png"
+    echo "✅ Vulkan golden reference updated: $REF_DIR/damaged_helmet_vulkan.png"
     
     # Show file info
-    ls -lh "$REF_DIR/gltf_textured_vulkan.png"
+    ls -lh "$REF_DIR/damaged_helmet_vulkan.png"
 }
 
 update_directx() {
     echo "📸 Updating DirectX golden reference..."
-    echo "⚠️  DirectX requires Windows - skipping on Linux"
-    echo "   Run this on Windows machine or let Windows CI create it"
+    
+    if [ -f "$REPO_ROOT/run_with_proton.sh" ]; then
+        # Use Proton script
+        mkdir -p "$REPO_ROOT/screenshots/temp"
+        "$REPO_ROOT/run_with_proton.sh" \
+            --scene scenes/damaged_helmet.toml \
+            --headless \
+            --max-frames 1 \
+            --screenshot "$REPO_ROOT/screenshots/temp/directx_temp.png"
+        
+        # The screenshot might be in windows_test_directx/screenshots/temp/directx_temp.png depending on how run_with_proton works
+        # run_with_proton.sh runs from windows_test_directx, so relative paths are relative to that.
+        # But wait, run_with_proton.sh takes arguments and passes them to the app.
+        # The app resolves paths relative to CWD.
+        # run_with_proton.sh changes directory to windows_test_directx.
+        
+        # Let's check where the file ends up.
+        # If we pass absolute path to screenshot, it might work if mapped correctly, but safer to use relative and find it.
+        
+        # Actually, let's just use a simple filename and find it.
+        "$REPO_ROOT/run_with_proton.sh" \
+            --scene scenes/damaged_helmet.toml \
+            --headless \
+            --max-frames 1 \
+            --screenshot "directx_ref.png"
+            
+        SRC_FILE="$REPO_ROOT/windows_test_directx/directx_ref.png"
+        
+        if [ -f "$SRC_FILE" ]; then
+            cp "$SRC_FILE" "$REF_DIR/damaged_helmet_directx.png"
+            echo "✅ DirectX golden reference updated: $REF_DIR/damaged_helmet_directx.png"
+            ls -lh "$REF_DIR/damaged_helmet_directx.png"
+        else
+            echo "❌ Failed to generate DirectX screenshot"
+        fi
+    else
+        echo "⚠️  DirectX update skipped (run_with_proton.sh not found)"
+    fi
 }
 
 case "$UPDATE_MODE" in

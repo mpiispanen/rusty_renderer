@@ -52,16 +52,29 @@ See [GITHUB_SETUP.md](GITHUB_SETUP.md) for detailed instructions on creating the
 
 ---
 
-## Milestone 5: Render Graph Foundation (7-10 days)
-**Goal:** Implement core render graph system
+## Milestone 5: Render Graph Architecture Fix (7-10 days)
+**Goal:** Fix architectural flaws to enable true multi-pass rendering without hardcoding
+**Priority:** Critical
 
 **Issues:**
-1. Design render graph data structures
-2. Implement dependency resolution
-3. Implement automatic barrier insertion
-4. Implement resource lifetime tracking
-5. Refactor triangle demo to use render graph
-6. Add render graph unit tests
+1. Update `RenderPass` with Clear/Load/Store state
+2. Implement per-pass framebuffer creation (Vulkan)
+3. Implement per-pass render pass creation (Vulkan)
+4. Fix barrier insertion logic
+5. Remove hardcoded clear values from backends
+
+---
+
+## Milestone 6: Experimentation Foundation (5-7 days)
+**Goal:** Enable optional passes and basic post-processing
+**Priority:** High
+
+**Issues:**
+1. Implement basic Tone Mapping pass
+2. Make Shadow Pass optional/toggleable
+3. Add input handling for toggling passes
+4. Verify Shadow + Tone Mapping combination
+5. Add CI test for multi-pass configuration
 
 ---
 

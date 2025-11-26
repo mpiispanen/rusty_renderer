@@ -864,8 +864,10 @@ impl VulkanBackend {
         };
 
         let front_face = match rast_state.front_face {
-            FrontFace::Clockwise => vk::FrontFace::CLOCKWISE,
-            FrontFace::CounterClockwise => vk::FrontFace::COUNTER_CLOCKWISE,
+            // Flip front face winding because we flip the Y-axis in projection matrix
+            // This is necessary because flipping Y changes the winding order of triangles
+            FrontFace::Clockwise => vk::FrontFace::COUNTER_CLOCKWISE,
+            FrontFace::CounterClockwise => vk::FrontFace::CLOCKWISE,
         };
 
         let rasterization_info = vk::PipelineRasterizationStateCreateInfo::builder()
@@ -3260,6 +3262,7 @@ impl GraphicsBackend for VulkanBackend {
             // Prepare clear values from pass definition
             let pass = graph.get_pass(*pass_id).context("Pass not found")?;
             let clear_color = pass.clear_color.unwrap_or([0.0f32, 0.0f32, 0.0f32, 1.0f32]);
+            log::debug!("Vulkan: Using clear color: {:?}", clear_color);
             let clear_values = [
                 vk::ClearValue {
                     color: vk::ClearColorValue {

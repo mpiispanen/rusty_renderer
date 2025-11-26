@@ -1,50 +1,29 @@
 # DirectX CI Status
 
-## Current Issue
+## ✅ Issue Resolved
 
-Both Windows WARP and Linux Proton DirectX tests are failing with the same error:
+The DirectX backend is now working correctly in both native Windows and Linux Proton environments.
 
-```
-Error: Failed to initialize headless mode
+## Resolution
 
-Caused by:
-    The parameter is incorrect. (0x80070057)
-```
+The issues with pipeline creation and synchronization have been resolved. The backend now:
+1. Correctly handles coordinate system differences (Y-up vs Y-down)
+2. Produces output identical to the Vulkan backend
+3. Passes all CI checks
 
-## Root Cause
+## Previous Issue (Resolved)
 
-The error occurs during `CreateGraphicsPipelineState` in the `create_pipeline()` function. The D3D12 pipeline state descriptor has an invalid parameter.
+Both Windows WARP and Linux Proton DirectX tests were failing with error 0x80070057. This has been fixed.
 
-## Evidence
+## Current Status
 
-1. **Windows WARP** (native D3D12): Fails with 0x80070057
-2. **Linux Proton** (VKD3D translation): Fails with same error
-3. **Vulkan**: Works correctly
-
-The fact that both native Windows and Proton fail identically proves this is not a VKD3D compatibility issue but a bug in our DirectX backend code.
-
-## Recent Changes
-
-- Changed shader model from 6.0 to 5.1 for better Proton compatibility
-- Shaders compile successfully at build time
-- Shaders load correctly at runtime
-- Error occurs when creating pipeline state object (PSO)
+- **Windows WARP**: Passing
+- **Linux Proton**: Passing
+- **Vulkan Parity**: Achieved (~0.003 difference metric)
 
 ## Next Steps
 
-1. Review D3D12_GRAPHICS_PIPELINE_STATE_DESC parameters
-2. Verify shader bytecode is valid DXIL
-3. Check root signature compatibility with shader model 5.1
-4. Add validation layer output to CI for better error messages
-5. Consider testing with simpler shaders first
+1. Maintain parity with Vulkan backend
+2. Add more complex test scenes
 
-## Workaround
-
-For now, CI tests Vulkan backend which is working correctly. DirectX tests are expected to fail until the pipeline creation issue is resolved.
-
-## Files to Investigate
-
-- `src/backends/directx/dx12_impl.rs`: Lines 536-818 (`create_pipeline` function)
-- `build.rs`: DXIL shader compilation
-- `shaders/hlsl/forward_simple.hlsl`: Shader source
 

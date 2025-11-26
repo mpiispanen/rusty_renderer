@@ -261,6 +261,7 @@ pub struct ForwardSimplePassBuilder {
     albedo_texture: Option<ResourceId>,
     shadow_map: Option<ResourceId>,
     shadow_uniforms: Option<ResourceId>,
+    clear_color: Option<[f32; 4]>,
     transform: Transform,
     vertex_count: u32,
     index_count: u32,
@@ -281,6 +282,7 @@ impl ForwardSimplePassBuilder {
             albedo_texture: None,
             shadow_map: None,
             shadow_uniforms: None,
+            clear_color: None,
             transform: Transform::default(),
             vertex_count: 0,
             index_count: 0,
@@ -348,6 +350,12 @@ impl ForwardSimplePassBuilder {
         self
     }
 
+    /// Set clear color (RGBA)
+    pub fn clear_color(mut self, color: [f32; 4]) -> Self {
+        self.clear_color = Some(color);
+        self
+    }
+
     /// Set object transform
     pub fn transform(mut self, transform: Transform) -> Self {
         self.transform = transform;
@@ -408,6 +416,12 @@ impl ForwardSimplePassBuilder {
 
         let pass_id = graph.next_pass_id();
         let mut pass = RenderPass::new(pass_id, &self.name, PassKind::Graphics);
+        pass.clear_color = self.clear_color;
+        if let Some(c) = self.clear_color {
+            log::debug!("ForwardSimplePassBuilder: Setting clear color to {:?}", c);
+        } else {
+            log::debug!("ForwardSimplePassBuilder: No clear color set!");
+        }
 
         // Declare dependencies
         // Output: Color attachment
@@ -591,7 +605,7 @@ impl PassCallback for ForwardSimplePassCallback {
             .vertex_layout(vertex_layout)
             .depth_test(true)
             .depth_write(true)
-            .cull_mode(CullMode::None); // Disable culling for debugging
+            .cull_mode(CullMode::Back); // Enable back-face culling
     }
 
     fn prepare(&self, context: &mut dyn PassPreparationContext) {

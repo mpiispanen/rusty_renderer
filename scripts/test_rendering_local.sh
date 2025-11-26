@@ -17,14 +17,14 @@ mkdir -p screenshots/local/{vulkan,directx}
 echo ""
 echo "🎨 Testing Vulkan rendering..."
 RUST_LOG=warn ./target/release/rusty_renderer \
-  --scene scenes/gltf_textured.toml \
+  --scene scenes/damaged_helmet.toml \
   --backend vulkan \
-  --pipeline forward \
   --headless \
-  --screenshot screenshots/local/vulkan/gltf_textured.png
+  --max-frames 1 \
+  --screenshot screenshots/local/vulkan/damaged_helmet.png
 
-if [ -f "screenshots/local/vulkan/gltf_textured.png" ]; then
-  size=$(stat -f%z "screenshots/local/vulkan/gltf_textured.png" 2>/dev/null || stat -c%s "screenshots/local/vulkan/gltf_textured.png")
+if [ -f "screenshots/local/vulkan/damaged_helmet.png" ]; then
+  size=$(stat -f%z "screenshots/local/vulkan/damaged_helmet.png" 2>/dev/null || stat -c%s "screenshots/local/vulkan/damaged_helmet.png")
   echo "✅ Vulkan screenshot created ($size bytes)"
 else
   echo "❌ Vulkan screenshot failed"
@@ -38,27 +38,27 @@ if command -v wine64 &> /dev/null || [ -f "run_with_proton.sh" ]; then
   
   if [ -f "run_with_proton.sh" ]; then
     # Use Proton script - note that it runs from windows_test_directx directory
-    ./run_with_proton.sh --scene scenes/gltf_textured.toml --headless --screenshot screenshots/local/directx/gltf_textured.png
+    ./run_with_proton.sh --scene scenes/damaged_helmet.toml --headless --max-frames 1 --screenshot screenshots/local/directx/damaged_helmet.png
     
     # Copy screenshot from windows_test_directx to main screenshots directory
-    if [ -f "windows_test_directx/screenshots/local/directx/gltf_textured.png" ]; then
+    if [ -f "windows_test_directx/screenshots/local/directx/damaged_helmet.png" ]; then
       mkdir -p screenshots/local/directx
-      cp windows_test_directx/screenshots/local/directx/gltf_textured.png screenshots/local/directx/
+      cp windows_test_directx/screenshots/local/directx/damaged_helmet.png screenshots/local/directx/
     fi
   else
     # Try Wine
     wine64 ./target/x86_64-pc-windows-gnu/release/rusty_renderer.exe \
-      --scene scenes/gltf_textured.toml \
+      --scene scenes/damaged_helmet.toml \
       --backend directx \
-      --pipeline forward \
       --headless \
-      --screenshot screenshots/local/directx/gltf_textured.png 2>/dev/null || {
+      --max-frames 1 \
+      --screenshot screenshots/local/directx/damaged_helmet.png 2>/dev/null || {
         echo "⚠️  DirectX test skipped (Wine/Proton not available)"
       }
   fi
   
-  if [ -f "screenshots/local/directx/gltf_textured.png" ]; then
-    size=$(stat -f%z "screenshots/local/directx/gltf_textured.png" 2>/dev/null || stat -c%s "screenshots/local/directx/gltf_textured.png")
+  if [ -f "screenshots/local/directx/damaged_helmet.png" ]; then
+    size=$(stat -f%z "screenshots/local/directx/damaged_helmet.png" 2>/dev/null || stat -c%s "screenshots/local/directx/damaged_helmet.png")
     echo "✅ DirectX screenshot created ($size bytes)"
   fi
 else
@@ -68,15 +68,15 @@ fi
 
 # Compare backends if both exist
 echo ""
-if [ -f "screenshots/local/vulkan/gltf_textured.png" ] && [ -f "screenshots/local/directx/gltf_textured.png" ]; then
+if [ -f "screenshots/local/vulkan/damaged_helmet.png" ] && [ -f "screenshots/local/directx/damaged_helmet.png" ]; then
   echo "🔍 Comparing backend outputs..."
   
   if command -v python3 &> /dev/null && python3 -c "import flip_evaluator" 2>/dev/null; then
     mkdir -p screenshots/local/comparisons
     
     python3 scripts/flip_compare.py \
-      screenshots/local/vulkan/gltf_textured.png \
-      screenshots/local/directx/gltf_textured.png \
+      screenshots/local/vulkan/damaged_helmet.png \
+      screenshots/local/directx/damaged_helmet.png \
       screenshots/local/comparisons/vulkan_vs_directx.png \
       --threshold 0.05 && {
         echo "✅ Backend parity check PASSED"

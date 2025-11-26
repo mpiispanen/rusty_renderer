@@ -15,11 +15,24 @@
 #   ./run_with_proton.sh --vkd3d-debug debug
 #   ./run_with_proton.sh --headless --max-frames 1 --screenshot output.png
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 # Configuration
 PROTON_DIR="$HOME/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)"
 COMPAT_DATA="$HOME/.proton_rusty_renderer"
-TEST_DIR="windows_test_directx"
+TEST_DIR="$SCRIPT_DIR/windows_test_directx"
 BUILD_TARGETS=("x86_64-pc-windows-gnu" "x86_64-pc-windows-msvc")
+if [[ -n "${CARGO_TARGET_DIR:-}" ]]; then
+    if [[ "$CARGO_TARGET_DIR" = /* ]]; then
+        TARGET_DIR="$CARGO_TARGET_DIR"
+    else
+        TARGET_DIR="$SCRIPT_DIR/$CARGO_TARGET_DIR"
+    fi
+else
+    TARGET_DIR="$SCRIPT_DIR/target"
+fi
+BINARY_NAME="rusty_renderer.exe"
 
 # Default settings
 VKD3D_DEBUG_LEVEL="warn"
@@ -62,6 +75,11 @@ build_windows_binary() {
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
+    if [[ "$1" == *.exe ]]; then
+        BINARY_NAME="$1"
+        shift
+        continue
+    fi
     case $1 in
         --vkd3d-debug)
             VKD3D_DEBUG_LEVEL="$2"
@@ -120,8 +138,9 @@ echo "Syncing binary and assets..."
 
 BINARY_COPIED=false
 for TARGET in "${BUILD_TARGETS[@]}"; do
-    if [ -f "target/$TARGET/release/rusty_renderer.exe" ]; then
-        cp "target/$TARGET/release/rusty_renderer.exe" "$TEST_DIR/"
+    BINARY_PATH="$TARGET_DIR/$TARGET/release/rusty_renderer.exe"
+    if [ -f "$BINARY_PATH" ]; then
+        cp "$BINARY_PATH" "$TEST_DIR/"
         echo "  ✓ Binary copied (from $TARGET)"
         BINARY_COPIED=true
         break
@@ -137,8 +156,9 @@ fi
 if [ "$BINARY_COPIED" = false ]; then
     if build_windows_binary; then
         for TARGET in "${BUILD_TARGETS[@]}"; do
-            if [ -f "target/$TARGET/release/rusty_renderer.exe" ]; then
-                cp "target/$TARGET/release/rusty_renderer.exe" "$TEST_DIR/"
+            BINARY_PATH="$TARGET_DIR/$TARGET/release/rusty_renderer.exe"
+            if [ -f "$BINARY_PATH" ]; then
+                cp "$BINARY_PATH" "$TEST_DIR/"
                 echo "  ✓ Binary copied (from $TARGET)"
                 BINARY_COPIED=true
                 break
@@ -194,7 +214,7 @@ RUST_LOG="${RUST_LOG:-debug}" \
 RUST_BACKTRACE="${RUST_BACKTRACE:-1}" \
 WINEDEBUG=-all \
 WINEDLLPATH="$PROTON_DIR/files/lib64/wine:$PROTON_DIR/files/lib64/vkd3d:$PROTON_DIR/files/lib/wine:$PROTON_DIR/files/lib/vkd3d" \
-"$PROTON_DIR/proton" run rusty_renderer.exe --backend directx "${APP_ARGS[@]}"
+"$PROTON_DIR/proton" run "$BINARY_NAME" --backend directx "${APP_ARGS[@]}"
 
 EXIT_CODE=$?
 
