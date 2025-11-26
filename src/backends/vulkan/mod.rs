@@ -703,8 +703,6 @@ impl VulkanBackend {
         Ok(())
     }
 
-
-
     /// Create shader module from SPIR-V
     fn create_shader_module(&self, code: &[u32]) -> Result<vk::ShaderModule> {
         let device = self.device.as_ref().context("Device not initialized")?;
