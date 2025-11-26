@@ -354,11 +354,25 @@ jobs:
           # Run via Proton using the helper script
           chmod +x run_with_proton.sh
           export PROTON_DIR="${{ steps.proton_check.outputs.proton_path }}"
-          ./run_with_proton.sh \
-            --scene scenes/damaged_helmet.toml \
-            --headless \
-            --max-frames 1 \
-            --screenshot screenshots/directx-proton/damaged_helmet.png
+          
+          echo "DISPLAY=$DISPLAY"
+          
+          # Use xvfb-run if available to ensure a display is present for Wine
+          if command -v xvfb-run >/dev/null 2>&1; then
+            echo "Using xvfb-run"
+            xvfb-run -a ./run_with_proton.sh \
+              --scene scenes/damaged_helmet.toml \
+              --headless \
+              --max-frames 1 \
+              --screenshot screenshots/directx-proton/damaged_helmet.png
+          else
+            echo "xvfb-run not found, running directly"
+            ./run_with_proton.sh \
+              --scene scenes/damaged_helmet.toml \
+              --headless \
+              --max-frames 1 \
+              --screenshot screenshots/directx-proton/damaged_helmet.png
+          fi
           
           # Verify screenshot was created
           # Note: run_with_proton.sh runs in windows_test_directx, so screenshot path is relative to that
