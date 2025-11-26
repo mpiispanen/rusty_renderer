@@ -355,11 +355,12 @@ jobs:
           export RUST_LOG=warn
           
           # Run via Proton with headless mode
-          BINARY_PATH="target/x86_64-pc-windows-gnu/release/rusty_renderer.exe"
+          cp target/x86_64-pc-windows-gnu/release/rusty_renderer.exe ./rusty_renderer.exe
+          BINARY_PATH="./rusty_renderer.exe"
           PROTON_CMD="${{ steps.proton_check.outputs.proton_path }}/proton"
           
           "$PROTON_CMD" run "$BINARY_PATH" \
-            --scene damaged_helmet \
+            --scene scenes/damaged_helmet.toml \
             --backend directx \
             --headless \
             --max-frames 1 \
