@@ -353,6 +353,7 @@ jobs:
           
           # Run via Proton using the helper script
           chmod +x run_with_proton.sh
+          export PROTON_DIR="${{ steps.proton_check.outputs.proton_path }}"
           ./run_with_proton.sh \
             --scene scenes/damaged_helmet.toml \
             --headless \

@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Configuration
-PROTON_DIR="$HOME/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)"
+PROTON_DIR="${PROTON_DIR:-$HOME/.local/share/Steam/steamapps/common/Proton 9.0 (Beta)}"
 COMPAT_DATA="${STEAM_COMPAT_DATA_PATH:-$HOME/.proton_rusty_renderer}"
 TEST_DIR="$SCRIPT_DIR/windows_test_directx"
 BUILD_TARGETS=("x86_64-pc-windows-gnu" "x86_64-pc-windows-msvc")
