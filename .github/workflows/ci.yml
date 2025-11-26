@@ -356,16 +356,21 @@ jobs:
           
           # Run via Proton with headless mode
           cp target/x86_64-pc-windows-gnu/release/rusty_renderer.exe ./rusty_renderer.exe
-          BINARY_PATH="./rusty_renderer.exe"
+          BINARY_PATH="$(pwd)/rusty_renderer.exe"
+          SCENE_PATH="$(pwd)/scenes/damaged_helmet.toml"
           PROTON_PATH="${{ steps.proton_check.outputs.proton_path }}"
           PROTON_CMD="$PROTON_PATH/proton"
+          
+          # Debug info
+          ls -l "$BINARY_PATH"
+          ls -l "$SCENE_PATH"
           
           # Set up environment variables for Proton/VKD3D
           export WINEDLLPATH="$PROTON_PATH/files/lib64/wine:$PROTON_PATH/files/lib64/vkd3d:$PROTON_PATH/files/lib/wine:$PROTON_PATH/files/lib/vkd3d"
           export VKD3D_DEBUG=warn
           
           "$PROTON_CMD" run "$BINARY_PATH" \
-            --scene scenes/damaged_helmet.toml \
+            --scene "$SCENE_PATH" \
             --backend directx \
             --headless \
             --max-frames 1 \
