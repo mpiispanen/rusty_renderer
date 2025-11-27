@@ -39,8 +39,8 @@ def compare_images(reference_path, test_path, ppd=None, output_map=None, verbosi
         Dictionary containing FLIP metrics and metadata
     """
     # Validate inputs
-    reference_path = Path(reference_path)
-    test_path = Path(test_path)
+    reference_path = Path(reference_path).resolve()
+    test_path = Path(test_path).resolve()
     
     if not reference_path.exists():
         raise FileNotFoundError(f"Reference image not found: {reference_path}")

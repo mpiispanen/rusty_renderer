@@ -86,6 +86,8 @@ None! All checks are passing.
 3. Added `--max-frames 1` for deterministic output
 4. Changed log level to `warn` for cleaner output
 5. Golden reference comparison now fails CI (not just warns)
+6. Fixed FLIP comparison script to handle relative paths correctly
+7. Removed obsolete wgpu backend tests from visual regression suite
 
 ## Remaining Work
 
